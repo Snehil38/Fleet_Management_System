@@ -33,7 +33,7 @@ class SupabaseDataController {
         Task {
             do {
                 let session = try await supabase.auth.signIn(email: email, password: password)
-                await fetchUserRoles(userID: session.user.id)
+                await fetchUserRole(userID: session.user.id)
                 completion(.success(()))
             } catch {
                 completion(.failure(error))
@@ -54,19 +54,53 @@ class SupabaseDataController {
     }
     
     // MARK: - Fetch User Role
-    private func fetchUserRoles(userID: UUID) async {
+    private func fetchUserRole(userID: UUID) async {
         do {
-            let result = try await supabase
+            // Step 1: Get role_id from user_roles
+            let userRolesResult = try await supabase
                 .from("user_roles")
-                .select("roles(role_name)")
+                .select("role_id")
                 .eq("user_id", value: userID)
                 .execute()
             
-            let userRoles = try JSONDecoder().decode([UserRole].self, from: result.data)
-            let roles = userRoles.map { $0.roles.role_name }
-            print("User roles: \(roles)")
+            // Decode role_id
+            struct UserRoleID: Codable {
+                let role_id: Int
+            }
+            
+            let userRoles = try JSONDecoder().decode([UserRoleID].self, from: userRolesResult.data)
+            
+            guard let roleID = userRoles.first?.role_id else {
+                print("⚠️ No role assigned to this user.")
+                return
+            }
+            
+            print("🔍 Retrieved role_id: \(roleID)")
+            
+            // Step 2: Get role_name from roles using role_id
+            let roleResult = try await supabase
+                .from("roles")
+                .select("role_name")
+                .eq("id", value: roleID)
+                .execute()
+            
+            // Decode role_name
+            struct Role: Codable {
+                let role_name: String
+            }
+            
+            let roles = try JSONDecoder().decode([Role].self, from: roleResult.data)
+            
+            guard let roleName = roles.first?.role_name else {
+                print("⚠️ Role ID \(roleID) not found in roles table.")
+                return
+            }
+            
+            print("✅ User role: \(roleName)")
+            
         } catch {
-            print("Error fetching user roles: \(error.localizedDescription)")
+            print("❌ Error fetching user role: \(error.localizedDescription)")
         }
     }
+
 }
