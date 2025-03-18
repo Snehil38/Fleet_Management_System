@@ -6,6 +6,7 @@ struct LoginView: View {
     @StateObject private var dataController = SupabaseDataController.shared
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
+    @State private var showAlert: Bool = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -65,6 +66,14 @@ struct LoginView: View {
             .disabled(isLoading || email.isEmpty || password.isEmpty)
         }
         .padding()
+        .alert(isPresented: Binding<Bool>(
+                    get: { dataController.authError != nil },  // Show alert when error exists
+                    set: { _ in dataController.authError = nil }  // Reset error on dismiss
+        )) {
+            Alert(title: Text("Login Failed"),
+                  message: Text(dataController.authError ?? "Unknown error."),
+                  dismissButton: .default(Text("OK")))
+        }
     }
 }
 
