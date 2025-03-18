@@ -17,6 +17,42 @@ class SupabaseDataController: ObservableObject {
     private init() {}
     
     // MARK: - Authentication
+    func signUp(name: String, email: String, role: String) async {
+        struct UserRole: Codable {
+            let user_id: UUID
+            let role_id: Int
+        }
+        
+        let roleMapping: [String: Int] = [
+            "fleet_manager": 1,
+            "driver": 2,
+            "maintenance_personnel": 3
+        ]
+        
+        guard let roleID = roleMapping[role] else {
+            print("Invalid role: \(role)")
+            return
+        }
+        
+        do {
+            let password = AppDataController.shared.randomPasswordGenerator(length: 6)
+            print(password)
+            let signUpResponse = try await supabase.auth.signUp(email: email, password: password)
+            
+            let userID = signUpResponse.user.id
+            
+            let userRole = UserRole(user_id: userID, role_id: roleID)
+            try await supabase
+                .from("user_roles")
+                .insert(userRole)
+                .execute()
+            
+            print("User signed up successfully with role: \(role)")
+        } catch {
+            print("Error during sign-up: \(error.localizedDescription)")
+        }
+    }
+
     func signIn(email: String, password: String) {
         Task {
             do {
@@ -34,7 +70,7 @@ class SupabaseDataController: ObservableObject {
                     self.authError = "Login failed: \(error.localizedDescription)"
                     self.isAuthenticated = false
                 }
-                print("❌ Login error: \(error.localizedDescription)")
+                print("Login error: \(error.localizedDescription)")
             }
         }
     }
@@ -85,7 +121,7 @@ class SupabaseDataController: ObservableObject {
             print(roleName)
             
         } catch {
-            print("❌ Error fetching user role: \(error.localizedDescription)")
+            print("Error fetching user role: \(error.localizedDescription)")
         }
     }
 }
