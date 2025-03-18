@@ -39,15 +39,15 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    func signOut(completion: @escaping (Result<Void, Error>) -> Void) {
+    func signOut() {
         Task {
             do {
                 try await supabase.auth.signOut()
-                self.userRole = nil
-                completion(.success(()))
-                self.isAuthenticated = false
+                await MainActor.run {
+                    self.userRole = nil
+                    self.isAuthenticated = false
+                }
             } catch {
-                completion(.failure(error))
             }
         }
     }
