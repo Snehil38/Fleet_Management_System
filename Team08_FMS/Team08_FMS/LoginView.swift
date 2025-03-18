@@ -19,7 +19,7 @@ struct LoginView: View {
                 .frame(height: 250)
                 .padding(.bottom, 20)
             
-            Text("Welcome Back!")
+            Text("Login!")
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .padding(.bottom, 20)
