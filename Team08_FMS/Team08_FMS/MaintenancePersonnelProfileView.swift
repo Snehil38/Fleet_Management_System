@@ -14,7 +14,6 @@ struct MaintenancePersonnelProfileView: View {
     @State private var lastStatusChangeDate: Date = Date()
     @State private var pendingStatusChange: Bool = false
     
-    // Sample user data - In a real app, this would come from a user service
     let user = MaintenancePersonnel(
         name: "John Doe",
         email: "john.doe@fleetmanagement.com",
@@ -27,7 +26,6 @@ struct MaintenancePersonnelProfileView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Profile Image
                     Image(systemName: user.profileImage)
                         .resizable()
                         .scaledToFit()
@@ -35,7 +33,6 @@ struct MaintenancePersonnelProfileView: View {
                         .foregroundColor(.blue)
                         .padding()
                     
-                    // User Details
                     VStack(spacing: 15) {
                         Text(user.name)
                             .font(.title2)
@@ -55,7 +52,6 @@ struct MaintenancePersonnelProfileView: View {
                     }
                     .padding()
                     
-                    // Availability Status
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Availability Status")
                             .font(.headline)
@@ -72,7 +68,6 @@ struct MaintenancePersonnelProfileView: View {
                                         showingStatusAlert = true
                                         pendingStatusChange = true
                                     } else {
-                                        // Check if 24 hours have passed since last status change
                                         let calendar = Calendar.current
                                         let now = Date()
                                         if let nextDay = calendar.date(byAdding: .day, value: 1, to: lastStatusChangeDate),
@@ -95,7 +90,6 @@ struct MaintenancePersonnelProfileView: View {
                     }
                     .padding(.vertical)
                     
-                    // Password Reset Button
                     Button(action: {
                         showingPasswordReset = true
                     }) {
@@ -111,7 +105,6 @@ struct MaintenancePersonnelProfileView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Logout Button
                     Button(action: {
                         showingLogoutAlert = true
                     }) {
@@ -132,6 +125,18 @@ struct MaintenancePersonnelProfileView: View {
             }
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
+                    }
+                }
+            }
             .alert("Status Change", isPresented: $showingStatusAlert) {
                 if pendingStatusChange {
                     Button("Continue", role: .none) {
@@ -177,6 +182,7 @@ struct MaintenancePersonnelProfileView: View {
         }
     }
 }
+
 
 struct PasswordResetView: View {
     @Binding var isPresented: Bool
