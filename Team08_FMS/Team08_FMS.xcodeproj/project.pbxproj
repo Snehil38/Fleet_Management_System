@@ -16,7 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		EFB4A69C2D884F810027A015 /* Team08_FMS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Team08_FMS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EFB4A69C2D884F810027A015 /* Team08_FMS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = Team08_FMS.app; path = "/Users/ravitiwari/Desktop/FMS_Team08/Team08_FMS/build/Debug-iphoneos/Team08_FMS.app"; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -48,16 +48,7 @@
 			isa = PBXGroup;
 			children = (
 				EFB4A69E2D884F810027A015 /* Team08_FMS */,
-				EFB4A69D2D884F810027A015 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		EFB4A69D2D884F810027A015 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				EFB4A69C2D884F810027A015 /* Team08_FMS.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -119,7 +110,7 @@
 				EFAA8FB62D8873E700B04EA0 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
-			productRefGroup = EFB4A69D2D884F810027A015 /* Products */;
+			productRefGroup = EFB4A6932D884F810027A015;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
