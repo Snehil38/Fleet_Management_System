@@ -7,12 +7,12 @@
 
 import SwiftUI
 
-struct MaintenancePersonnelHomeScreen: View {
+struct MaintenancePersonnelDashboardView: View {
     var body: some View {
         Text("Maintenance Personnel")
     }
 }
 
 #Preview {
-    MaintenancePersonnelHomeScreen()
+    MaintenancePersonnelDashboardView()
 }

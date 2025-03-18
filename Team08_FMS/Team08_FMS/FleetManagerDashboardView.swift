@@ -7,12 +7,12 @@
 
 import SwiftUI
 
-struct FleetManagerHomeScreen: View {
+struct FleetManagerDashboardView: View {
     var body: some View {
         Text("Fleet Manager")
     }
 }
 
 #Preview {
-    FleetManagerHomeScreen()
+    FleetManagerDashboardView()
 }

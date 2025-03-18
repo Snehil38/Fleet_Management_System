@@ -7,12 +7,12 @@
 
 import SwiftUI
 
-struct DriverHomeScreen: View {
+struct DriverDashboardView: View {
     var body: some View {
         Text("Driver")
     }
 }
 
 #Preview {
-    DriverHomeScreen()
+    DriverDashboardView()
 }
