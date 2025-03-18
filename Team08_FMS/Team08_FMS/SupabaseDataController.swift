@@ -5,7 +5,9 @@ import Combine
 class SupabaseDataController: ObservableObject {
     static let shared = SupabaseDataController()
     
-    @Published var userRole: String? // Observable role property
+    @Published var userRole: String?
+    @Published var isAuthenticated: Bool = false
+    @Published var authError: String?
     
     private let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
@@ -15,14 +17,24 @@ class SupabaseDataController: ObservableObject {
     private init() {}
     
     // MARK: - Authentication
-    func signIn(email: String, password: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    func signIn(email: String, password: String) {
         Task {
             do {
                 let session = try await supabase.auth.signIn(email: email, password: password)
+                
+                // Fetch role after login
                 await fetchUserRole(userID: session.user.id)
-                completion(.success(()))
+                
+                await MainActor.run {
+                    self.isAuthenticated = true
+                    self.authError = nil  // Clear previous errors
+                }
             } catch {
-                completion(.failure(error))
+                await MainActor.run {
+                    self.authError = "Login failed: \(error.localizedDescription)"
+                    self.isAuthenticated = false
+                }
+                print("❌ Login error: \(error.localizedDescription)")
             }
         }
     }
@@ -33,6 +45,7 @@ class SupabaseDataController: ObservableObject {
                 try await supabase.auth.signOut()
                 self.userRole = nil
                 completion(.success(()))
+                self.isAuthenticated = false
             } catch {
                 completion(.failure(error))
             }
