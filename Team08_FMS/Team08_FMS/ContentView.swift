@@ -15,15 +15,19 @@ struct ContentView: View {
             if !auth.isAuthenticated {
                 LoginView()
             } else {
-                switch auth.userRole {
-                case "fleet_manager":
-                    FleetManagerDashboardView()
-                case "driver":
-                    DriverDashboardView()
-                case "maintenance_personnel":
-                    MaintenancePersonnelDashboardView()
-                default:
-                    LoginView() // Handles unknown role case
+                if let userID = auth.userID, auth.isGenPass {
+                    ResetGeneratedPasswordView(userID: userID)
+                } else {
+                    switch auth.userRole {
+                    case "fleet_manager":
+                        FleetManagerDashboardView()
+                    case "driver":
+                        DriverDashboardView()
+                    case "maintenance_personnel":
+                        MaintenancePersonnelDashboardView()
+                    default:
+                        LoginView() // Handles unknown role case
+                    }
                 }
             }
         }

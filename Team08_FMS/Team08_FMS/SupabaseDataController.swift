@@ -8,6 +8,8 @@ class SupabaseDataController: ObservableObject {
     @Published var userRole: String?
     @Published var isAuthenticated: Bool = false
     @Published var authError: String?
+    @Published var userID: UUID?
+    @Published var isGenPass: Bool = false
     
     private let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
@@ -17,10 +19,14 @@ class SupabaseDataController: ObservableObject {
     private init() {}
     
     // MARK: - Authentication
-    func signUp(name: String, email: String, role: String) async {
+    func signUp(name: String, email: String, phoneNo: Int, role: String) async {
         struct UserRole: Codable {
             let user_id: UUID
             let role_id: Int
+        }
+        
+        struct GenPass: Codable {
+            let user_id: UUID
         }
         
         let roleMapping: [String: Int] = [
@@ -47,6 +53,12 @@ class SupabaseDataController: ObservableObject {
                 .insert(userRole)
                 .execute()
             
+            let genPass = GenPass(user_id: userID)
+            try await supabase
+                .from("gen_pass")
+                .insert(genPass)
+                .execute()
+            
             print("User signed up successfully with role: \(role)")
         } catch {
             print("Error during sign-up: \(error.localizedDescription)")
@@ -59,8 +71,11 @@ class SupabaseDataController: ObservableObject {
                 let session = try await supabase.auth.signIn(email: email, password: password)
                 
                 // Fetch role after login
-                await fetchUserRole(userID: session.user.id)
-                
+                await MainActor.run {
+                    userID = session.user.id
+                }
+                await fetchUserRole(userID: userID!)
+                await CheckGenPass(userID: userID!)
                 await MainActor.run {
                     self.isAuthenticated = true
                     self.authError = nil  // Clear previous errors
@@ -82,9 +97,64 @@ class SupabaseDataController: ObservableObject {
                 await MainActor.run {
                     self.userRole = nil
                     self.isAuthenticated = false
+                    self.userID = nil
+                    self.isGenPass = false
                 }
             } catch {
             }
+        }
+    }
+    
+    func CheckGenPass(userID: UUID) async {
+        struct GenPassRow: Codable {
+            let is_gen: Bool
+        }
+
+        do {
+            let response = try await supabase
+                .from("gen_pass")
+                .select("is_gen")
+                .eq("user_id", value: userID)
+                .execute()
+            
+            // Ensure response.data is not nil
+            let responseData = response.data
+            // Debugging: Print raw JSON response
+            if let jsonString = String(data: responseData, encoding: .utf8) {
+                print("Raw JSON: \(jsonString)")
+            }
+
+            // Decode JSON
+            let decodedRows = try JSONDecoder().decode([GenPassRow].self, from: responseData)
+
+            // Extract first row
+            if let firstRow = decodedRows.first {
+                await MainActor.run {
+                    self.isGenPass = firstRow.is_gen
+                }
+            } else {
+                print("No matching row found for userID: \(userID)")
+            }
+        } catch {
+            print("Error checking generated password : \(error.localizedDescription)")
+        }
+    }
+    
+    func updatePassword(newPassword: String) async -> Bool {
+        do {
+            try await supabase.auth.update(user: UserAttributes(password: newPassword))
+            try await supabase
+                .from("gen_pass")
+                .update(["is_gen": false])
+                .eq("user_id", value: supabase.auth.user().id)
+                .execute()
+            await MainActor.run {
+                self.isGenPass = false  // This will trigger the UI update
+            }
+            return true  // Successfully updated
+        } catch {
+            print("Error updating password: \(error.localizedDescription)")
+            return false
         }
     }
     
