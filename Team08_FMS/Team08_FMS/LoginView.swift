@@ -4,6 +4,8 @@ struct LoginView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @StateObject private var dataController = SupabaseDataController.shared
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String?
     
     var body: some View {
         VStack(spacing: 20) {
@@ -26,6 +28,7 @@ struct LoginView: View {
             
             TextField("Email", text: $email)
                 .autocapitalization(.none)
+                .keyboardType(.emailAddress)
                 .padding(10)
                 .background(Color.white)
                 .cornerRadius(25)
@@ -38,6 +41,13 @@ struct LoginView: View {
                 .cornerRadius(25)
                 .shadow(radius: 1)
                 .padding(.horizontal, 20)
+            
+            if let error = errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+                    .padding()
+            }
             
             Button(action: {
                 SupabaseDataController.shared.signIn(email: email, password: password)
@@ -52,6 +62,7 @@ struct LoginView: View {
                     .padding(.horizontal, 20)
             }
             .buttonStyle(PlainButtonStyle())
+            .disabled(isLoading || email.isEmpty || password.isEmpty)
         }
         .padding()
     }
