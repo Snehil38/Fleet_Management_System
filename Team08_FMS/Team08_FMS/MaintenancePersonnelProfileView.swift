@@ -154,19 +154,7 @@ struct MaintenancePersonnelProfileView: View {
             .alert("Logout", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Logout", role: .destructive) {
-                    SupabaseDataController.shared.signOut { result in
-                        switch result {
-                        case .success:
-                            // Navigate to LoginView
-                            DispatchQueue.main.async {
-                                if let window = UIApplication.shared.windows.first {
-                                    window.rootViewController = UIHostingController(rootView: LoginView())
-                                }
-                            }
-                        case .failure(let error):
-                            print("Logout failed: \(error.localizedDescription)")
-                        }
-                    }
+                    SupabaseDataController.shared.signOut()
                 }
             } message: {
                 Text("Are you sure you want to logout?")
