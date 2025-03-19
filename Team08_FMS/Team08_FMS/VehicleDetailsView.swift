@@ -249,7 +249,7 @@ struct VehicleDetailView: View {
     var body: some View {
         NavigationView {
             Form {
-                if isEditing {
+                if vehicle == nil || isEditing {
                     BasicInformationSection(
                         name: $name,
                         year: $year,
@@ -303,13 +303,13 @@ struct VehicleDetailView: View {
                         LabeledContent("Pollution Expiry", value: pollutionExpiry.formatted(date: .long, time: .omitted))
                         LabeledContent("Insurance Expiry", value: insuranceExpiry.formatted(date: .long, time: .omitted))
                     }
-                }
 
-                if let vehicle = vehicle {
-                    StatusSection(
-                        status: vehicle.status,
-                        driverName: nil // TODO: Get driver name from driver ID
-                    )
+                    if let vehicle = vehicle {
+                        StatusSection(
+                            status: vehicle.status,
+                            driverName: nil // TODO: Get driver name from driver ID
+                        )
+                    }
                 }
             }
             .navigationTitle(vehicle == nil ? "Add Vehicle" : "Vehicle Details")
