@@ -36,15 +36,22 @@ struct AddMaintenancePersonnelView: View {
             Form {
                 // Basic Information
                 Section("Basic Information") {
-                    TextField("Personnel ID (optional)", text: $personnelID)
+                    TextField("Personnel ID", text: $personnelID)
+                        .textInputAutocapitalization(.never)
+                        .onChange(of: personnelID) { oldValue, newValue in
+                            if !newValue.isEmpty {
+                                personnelID = newValue.uppercased()
+                            }
+                        }
                     TextField("Full Name", text: $name)
                     TextField("Avatar Initials", text: $avatar)
-                        .onChange(of: name) { newValue in
+                        .onChange(of: name) {
                             if avatar.isEmpty {
-                                let words = newValue.components(separatedBy: " ")
+                                let words = name.components(separatedBy: " ")
                                 avatar = words.compactMap { $0.first }.map(String.init).joined()
                             }
                         }
+
                 }
                 
                 // Contact Information

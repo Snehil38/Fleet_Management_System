@@ -7,32 +7,70 @@
 
 import SwiftUI
 
+struct DetailItem: Identifiable {
+    let id = UUID()
+    let label: String
+    var value: String
+}
+
 struct CrewProfileView: View {
     let crewMember: CrewMember
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var dataManager: CrewDataManager
     @State private var showingDeleteAlert = false
     @State private var showingMessageSheet = false
+    @State private var isEditing = false
+    @State private var editedName: String = ""
+    @State private var editedDetails: [DetailItem] = []
+
+    init(crewMember: CrewMember) {
+        self.crewMember = crewMember
+        _editedName = State(initialValue: crewMember.name)
+        _editedDetails = State(initialValue: crewMember.details)
+    }
 
     var body: some View {
         Form {
             // Basic Information Section
             Section("Basic Information") {
-                LabeledContent("ID", value: crewMember.id)
-                LabeledContent("Name", value: crewMember.name)
-                LabeledContent("Role", value: crewMember.role)
-                HStack {
-                    Text("Status")
-                    Spacer()
-                    Text(crewMember.status.rawValue)
-                        .foregroundColor(crewMember.status.color)
+                if isEditing {
+                    TextField("Name", text: $editedName)
+                    LabeledContent("ID", value: crewMember.id)
+                    LabeledContent("Role", value: crewMember.role)
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        Text(crewMember.status.rawValue)
+                            .foregroundColor(crewMember.status.color)
+                    }
+                } else {
+                    LabeledContent("ID", value: crewMember.id)
+                    LabeledContent("Name", value: crewMember.name)
+                    LabeledContent("Role", value: crewMember.role)
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        Text(crewMember.status.rawValue)
+                            .foregroundColor(crewMember.status.color)
+                    }
                 }
             }
 
             // Details Section
             Section("Details") {
-                ForEach(crewMember.details) { detail in
-                    LabeledContent(detail.label, value: detail.value)
+                if isEditing {
+                    ForEach($editedDetails) { $detail in
+                        HStack {
+                            Text(detail.label)
+                            Spacer()
+                            TextField("Value", text: $detail.value)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                } else {
+                    ForEach(crewMember.details) { detail in
+                        LabeledContent(detail.label, value: detail.value)
+                    }
                 }
             }
 
@@ -67,6 +105,19 @@ struct CrewProfileView: View {
         }
         .navigationTitle(crewMember.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if isEditing {
+                    Button("Save") {
+                        saveChanges()
+                    }
+                } else {
+                    Button("Edit") {
+                        isEditing = true
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showingMessageSheet) {
             NavigationView {
                 ContactView()
@@ -80,6 +131,16 @@ struct CrewProfileView: View {
         } message: {
             Text("Are you sure you want to delete this crew member? This action cannot be undone.")
         }
+    }
+    
+    private func saveChanges() {
+        // Update the crew member with edited details
+        if crewMember.role == "Driver" {
+            dataManager.updateDriver(crewMember.id, name: editedName, details: editedDetails)
+        } else {
+            dataManager.updateMaintenancePersonnel(crewMember.id, name: editedName, details: editedDetails)
+        }
+        isEditing = false
     }
     
     private func deleteCrew() {
@@ -134,7 +195,7 @@ struct AssignTaskView: View {
             name: "John Doe",
             avatar: "JD",
             role: "Driver",
-            status: .available,
+            status: CrewMember.Status.available,
             details: [
                 DetailItem(label: "Experience", value: "5 years"),
                 DetailItem(label: "License", value: "Class A CDL"),

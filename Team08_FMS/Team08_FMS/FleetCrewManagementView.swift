@@ -38,12 +38,6 @@ struct CrewMember: Identifiable {
     }
 }
 
-struct DetailItem: Identifiable {
-    let id = UUID()
-    let label: String
-    let value: String
-}
-
 enum CrewType {
     case drivers
     case maintenance
