@@ -150,8 +150,8 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                         self.route = primaryRoute
                         
                         // Set default values for current step
-                        if let steps = primaryRoute.steps as? [MKRoute.Step], !steps.isEmpty {
-                            self.currentStep = steps[0]
+                        if !primaryRoute.steps.isEmpty {
+                            self.currentStep = primaryRoute.steps[0]
                             self.nextStepDistance = 0
                             
                             // Calculate estimated time and distance
@@ -282,7 +282,8 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             remainingTime = remainingDistance / (averageSpeed * 1000 / 3600)
             
             // Find the current step
-            if let steps = route.steps as? [MKRoute.Step], steps.count > 0 {
+            if !route.steps.isEmpty {
+                let steps = route.steps
                 // Find the closest step based on user location
                 for (index, step) in steps.enumerated() {
                     if index < steps.count - 1 {

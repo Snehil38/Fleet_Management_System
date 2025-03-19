@@ -463,7 +463,7 @@ struct HomeView: View {
                 // Show regular action buttons in a more compact layout
                 HStack(spacing: 10) {
                     ActionButton(
-                        title: "Start Navigation",
+                        title: "Start\nNavigation",
                         icon: "location.fill",
                         color: currentTrip.hasCompletedPreTrip ? .blue : .gray
                     ) {
