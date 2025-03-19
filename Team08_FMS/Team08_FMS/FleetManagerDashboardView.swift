@@ -8,8 +8,16 @@
 import SwiftUI
 
 struct FleetManagerDashboardView: View {
+    @StateObject private var vehicleManager = VehicleManager()
+
     var body: some View {
-        Text("Fleet Manager")
+        TabView {
+            VehiclesView(vehicleManager: vehicleManager)
+                .tabItem {
+                    Label("Vehicles", systemImage: "car.fill")
+                }
+
+        }
     }
 }
 
