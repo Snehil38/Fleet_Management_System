@@ -222,7 +222,7 @@ struct HomeView: View {
                     VStack(alignment: .leading) {
                         Text("Vehicle Details")
                             .font(.headline)
-                        Text(currentTrip.vehicleDetails.number)
+                        Text(currentTrip.vehicleDetails.licensePlate)
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
@@ -821,14 +821,13 @@ struct VehicleDetailItem: View {
 
 struct VehicleDetailsView: View {
     @Environment(\.presentationMode) var presentationMode
-    let vehicleDetails: VehicleDetails
+    let vehicleDetails: Vehicle
     
     var body: some View {
         NavigationView {
             List {
                 Section(header: Text("Basic Information")) {
-                    DetailRow(icon: "truck.box.fill", title: "Vehicle Number", value: vehicleDetails.number)
-                    DetailRow(icon: "car.fill", title: "Vehicle Type", value: vehicleDetails.type)
+                    DetailRow(icon: "car.fill", title: "Vehicle Type", value: vehicleDetails.vehicleType.rawValue)
                     DetailRow(icon: "number", title: "License Plate", value: vehicleDetails.licensePlate)
                 }
                 

@@ -6,15 +6,6 @@ enum TripStatus {
     case upcoming, current, delivered
 }
 
-// Vehicle Details Model
-struct VehicleDetails: Identifiable {
-    let id = UUID()
-    let number: String
-    let type: String
-    let licensePlate: String
-    let capacity: String
-}
-
 // Trip Model
 struct Trip: Identifiable {
     let id = UUID()
@@ -26,7 +17,7 @@ struct Trip: Identifiable {
     var status: TripStatus
     var hasCompletedPreTrip: Bool = false
     var hasCompletedPostTrip: Bool = false
-    let vehicleDetails: VehicleDetails
+    let vehicleDetails: Vehicle
     let sourceCoordinate: CLLocationCoordinate2D
     let destinationCoordinate: CLLocationCoordinate2D
     let startingPoint: String
@@ -39,12 +30,13 @@ struct Trip: Identifiable {
             eta: "25 mins",
             distance: "8.5 km",
             status: .current,
-            vehicleDetails: VehicleDetails(
-                number: "TRK-001",
-                type: "Heavy Truck",
-                licensePlate: "MH-01-AB-1234",
-                capacity: "40 tons"
-            ),
+            vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
+//                VehicleDetails(
+//                number: "TRK-001",
+//                type: "Heavy Truck",
+//                licensePlate: "MH-01-AB-1234",
+//                capacity: "40 tons"
+//            ),
             sourceCoordinate: CLLocationCoordinate2D(
                 latitude: 19.0178,  // Mumbai region
                 longitude: 72.8478
@@ -66,12 +58,7 @@ struct Trip: Identifiable {
                 eta: "1.5 hours",
                 distance: "22 km",
                 status: .upcoming,
-                vehicleDetails: VehicleDetails(
-                    number: "TRK-002",
-                    type: "Container Truck",
-                    licensePlate: "DL-01-CD-5678",
-                    capacity: "20 tons"
-                ),
+                vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 28.5244,  // Delhi coordinates
                     longitude: 77.2877

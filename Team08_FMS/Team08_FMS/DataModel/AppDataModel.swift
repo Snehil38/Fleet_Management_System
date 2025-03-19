@@ -10,7 +10,7 @@ import Foundation
 
 // MARK: - App Data Model
 struct Vehicle: Identifiable, Codable {
-    var id: UUID
+    var id: UUID = UUID()
     var name: String
     var year: Int
     var make: String
@@ -121,11 +121,14 @@ struct ServiceRequest: Identifiable {
 enum VehicleType: String, Codable, CaseIterable {
     case truck = "Truck"
     case van = "Van"
+    case car = "Car"
 }
 
 enum BodyType: String, Codable, CaseIterable {
     case pickup = "Pickup"
     case cargo = "Cargo"
+    case sedan = "Sedan"
+    case suv = "SUV"
 }
 
 struct VehicleDocuments: Codable {

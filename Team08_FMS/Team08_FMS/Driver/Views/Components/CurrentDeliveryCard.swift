@@ -11,7 +11,7 @@ struct CurrentDeliveryCard: View {
             
             HStack {
                 Image(systemName: "truck")
-                Text("Vehicle Details: \(tripController.currentTrip.vehicleDetails.number)")
+                Text("Vehicle Details: \(tripController.currentTrip.vehicleDetails.licensePlate)")
                     .font(.subheadline)
             }
             .padding()

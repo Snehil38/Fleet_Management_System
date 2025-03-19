@@ -18,24 +18,25 @@ class TripDataController: ObservableObject {
     
     private static func getInitialTrips() -> (current: Trip, upcoming: [Trip], recent: [DeliveryDetails]) {
         let currentTrip = Trip(
-            name: "MUM-001",
+            name: "TRP-001",
             destination: "Nhava Sheva Port Terminal",
             address: "JNPT Port Road, Navi Mumbai, Maharashtra 400707",
             eta: "25 mins",
             distance: "8.5 km",
             status: .current,
-            vehicleDetails: VehicleDetails(
-                number: "TRK-001",
-                type: "Container Truck",
-                licensePlate: "MH-43-AB-1234",
-                capacity: "40 tons"
-            ),
+            vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
+//                VehicleDetails(
+//                number: "TRK-001",
+//                type: "Heavy Truck",
+//                licensePlate: "MH-01-AB-1234",
+//                capacity: "40 tons"
+//            ),
             sourceCoordinate: CLLocationCoordinate2D(
-                latitude: 19.0178,
+                latitude: 19.0178,  // Mumbai region
                 longitude: 72.8478
             ),
             destinationCoordinate: CLLocationCoordinate2D(
-                latitude: 18.9490,
+                latitude: 18.9490,  // JNPT coordinates
                 longitude: 72.9492
             ),
             startingPoint: "Mumbai"
@@ -49,11 +50,22 @@ class TripDataController: ObservableObject {
                 eta: "1.5 hours", 
                 distance: "22 km",
                 status: .upcoming,
-                vehicleDetails: VehicleDetails(
-                    number: "TRK-002",
-                    type: "Multi-axle Truck",
-                    licensePlate: "DL-01-CD-5678",
-                    capacity: "35 tons"
+                vehicleDetails: Vehicle(
+                    name: "Ford",
+                    year: 2018,
+                    make: "Ford",
+                    model: "F-150",
+                    vin: "1FTFW1E5XJFC12345",
+                    licensePlate: "ABC123",
+                    vehicleType: .truck,
+                    color: "Red",
+                    bodyType: .pickup,
+                    bodySubtype: "SuperCrew",
+                    msrp: 45000.0,
+                    pollutionExpiry: Date(),
+                    insuranceExpiry: Date(),
+                    status: .inService,
+                    documents: VehicleDocuments()
                 ),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 28.5244,
@@ -72,11 +84,22 @@ class TripDataController: ObservableObject {
                 eta: "45 mins", 
                 distance: "15 km",
                 status: .upcoming,
-                vehicleDetails: VehicleDetails(
-                    number: "TRK-003",
-                    type: "Container Truck",
-                    licensePlate: "KA-03-EF-9012",
-                    capacity: "30 tons"
+                vehicleDetails: Vehicle(
+                    name: "Toyota",
+                    year: 2022,
+                    make: "Toyota",
+                    model: "Camry",
+                    vin: "4T1BF1FK6JU123456",
+                    licensePlate: "XYZ789",
+                    vehicleType: .car,
+                    color: "Blue",
+                    bodyType: .sedan,
+                    bodySubtype: "Hybrid",
+                    msrp: 28000.0,
+                    pollutionExpiry: Date(),
+                    insuranceExpiry: Date(),
+                    status: .available,
+                    documents: VehicleDocuments()
                 ),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 12.9716,
@@ -95,11 +118,22 @@ class TripDataController: ObservableObject {
                 eta: "55 mins", 
                 distance: "18 km",
                 status: .upcoming,
-                vehicleDetails: VehicleDetails(
-                    number: "TRK-004",
-                    type: "Box Truck",
-                    licensePlate: "TS-07-GH-3456",
-                    capacity: "25 tons"
+                vehicleDetails: Vehicle(
+                    name: "Tesla",
+                    year: 2023,
+                    make: "Tesla",
+                    model: "Model Y",
+                    vin: "5YJYGDEE3MF123456",
+                    licensePlate: "TESLA88",
+                    vehicleType: .car,
+                    color: "White",
+                    bodyType: .suv,
+                    bodySubtype: "Electric",
+                    msrp: 55000.0,
+                    pollutionExpiry: Date(),
+                    insuranceExpiry: Date(),
+                    status: .available,
+                    documents: VehicleDocuments()
                 ),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 17.3850,
@@ -166,8 +200,8 @@ class TripDataController: ObservableObject {
             date: Date().formatted(date: .numeric, time: .shortened),
             status: "Delivered",
             driver: "Current Driver",
-            vehicle: trip.vehicleDetails.number,
-            notes: "Trip \(trip.name) completed successfully. Vehicle: \(trip.vehicleDetails.type) (\(trip.vehicleDetails.licensePlate))"
+            vehicle: trip.vehicleDetails.licensePlate,
+            notes: "Trip \(trip.name) completed successfully. Vehicle: \(trip.vehicleDetails.bodyType) (\(trip.vehicleDetails.licensePlate))"
         )
         
         // Add to recent deliveries

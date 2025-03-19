@@ -57,11 +57,22 @@ struct TripsView: View {
                     eta: "",
                     distance: "",
                     status: .delivered,
-                    vehicleDetails: VehicleDetails(
-                        number: delivery.vehicle,
-                        type: "Vehicle",
-                        licensePlate: "",
-                        capacity: ""
+                    vehicleDetails: Vehicle(
+                        name: "Tesla",
+                        year: 2023,
+                        make: "Tesla",
+                        model: "Model Y",
+                        vin: "5YJYGDEE3MF123456",
+                        licensePlate: "TESLA88",
+                        vehicleType: .car,
+                        color: "White",
+                        bodyType: .suv,
+                        bodySubtype: "Electric",
+                        msrp: 55000.0,
+                        pollutionExpiry: Date(),
+                        insuranceExpiry: Date(),
+                        status: .available,
+                        documents: VehicleDocuments()
                     ),
                     sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
                     destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
@@ -167,8 +178,7 @@ struct TripDetailsView: View {
                 }
                 
                 Section(header: Text("Vehicle Information")) {
-                    TripDetailRow(icon: "truck.box.fill", title: "Vehicle Number", value: trip.vehicleDetails.number)
-                    TripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.type)
+                    TripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.bodyType.rawValue)
                     if !trip.vehicleDetails.licensePlate.isEmpty {
                         TripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
                     }
