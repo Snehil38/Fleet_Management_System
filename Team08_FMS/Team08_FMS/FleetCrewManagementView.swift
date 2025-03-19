@@ -54,309 +54,91 @@ struct FleetCrewManagementView: View {
     @State private var crewType: CrewType = .drivers
     @State private var showingAddDriverSheet = false
     @State private var showingAddMaintenanceSheet = false
-    @State private var currentPage = 1
-    @State private var itemsPerPage = 6
     @State private var searchText = ""
-    @State private var showingFilterSheet = false
-    @State private var selectedStatusFilter: CrewMember.Status? = nil
+    @State private var selectedStatus: CrewMember.Status?
 
     var filteredCrew: [CrewMember] {
         let crewList = crewType == .drivers ? dataManager.drivers : dataManager.maintenancePersonnel
-
         return crewList.filter { crewMember in
-            // Filter by search text
             let matchesSearch = searchText.isEmpty ||
                 crewMember.name.lowercased().contains(searchText.lowercased())
-
-            // Filter by status
-            let matchesStatus = selectedStatusFilter == nil || crewMember.status == selectedStatusFilter
-
+            let matchesStatus = selectedStatus == nil || crewMember.status == selectedStatus
             return matchesSearch && matchesStatus
         }
     }
 
-    var pagedCrew: [CrewMember] {
-        let startIndex = (currentPage - 1) * itemsPerPage
-        let endIndex = min(startIndex + itemsPerPage, filteredCrew.count)
-
-        if startIndex >= filteredCrew.count {
-            return []
-        }
-
-        return Array(filteredCrew[startIndex..<endIndex])
-    }
-
-    var totalPages: Int {
-        return max(1, Int(ceil(Double(filteredCrew.count) / Double(itemsPerPage))))
-    }
-
-    var statusCounts: (available: Int, busy: Int, offline: Int) {
-        let crewList = crewType == .drivers ? dataManager.drivers : dataManager.maintenancePersonnel
-        let available = crewList.filter { $0.status == .available }.count
-        let busy = crewList.filter { $0.status == .busy }.count
-        let offline = crewList.filter { $0.status == .offline }.count
-        return (available, busy, offline)
-    }
-
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Status Summary Cards
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        StatusCard(
-                            title: "Available",
-                            count: statusCounts.available,
-                            color: .green,
-                            icon: "checkmark.circle.fill",
-                            isSelected: selectedStatusFilter == .available
-                        )
-                        .onTapGesture {
-                            if selectedStatusFilter == .available {
-                                selectedStatusFilter = nil
-                            } else {
-                                selectedStatusFilter = .available
-                            }
-                            currentPage = 1
-                        }
-
-                        StatusCard(
-                            title: "Busy",
-                            count: statusCounts.busy,
-                            color: .yellow,
-                            icon: "clock.fill",
-                            isSelected: selectedStatusFilter == .busy
-                        )
-                        .onTapGesture {
-                            if selectedStatusFilter == .busy {
-                                selectedStatusFilter = nil
-                            } else {
-                                selectedStatusFilter = .busy
-                            }
-                            currentPage = 1
-                        }
-
-                        StatusCard(
-                            title: "Offline",
-                            count: statusCounts.offline,
-                            color: .red,
-                            icon: "xmark.circle.fill",
-                            isSelected: selectedStatusFilter == .offline
-                        )
-                        .onTapGesture {
-                            if selectedStatusFilter == .offline {
-                                selectedStatusFilter = nil
-                            } else {
-                                selectedStatusFilter = .offline
-                            }
-                            currentPage = 1
-                        }
-
-                        StatusCard(
-                            title: "Total",
-                            count: statusCounts.available + statusCounts.busy + statusCounts.offline,
-                            color: .blue,
-                            icon: "person.3.fill",
-                            isSelected: selectedStatusFilter == nil
-                        )
-                        .onTapGesture {
-                            selectedStatusFilter = nil
-                            currentPage = 1
-                        }
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Search Bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                        TextField("Search crew members...", text: $searchText)
                     }
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
                     .padding(.horizontal)
-                }
-                .padding(.vertical, 8)
 
-                // Segmented Control
-                Picker("Crew Type", selection: $crewType) {
-                    Text("Drivers").tag(CrewType.drivers)
-                    Text("Maintenance Personnel").tag(CrewType.maintenance)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .onChange(of: crewType) { _ in
-                    // Reset to page 1 when switching crew types
-                    currentPage = 1
-                    selectedStatusFilter = nil
-                }
-
-                // Search Bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-
-                    TextField("Search by name", text: $searchText)
-                        .onChange(of: searchText) { _ in
-                            // Reset to page 1 when search text changes
-                            currentPage = 1
-                        }
-
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            searchText = ""
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
-                        }
+                    // Crew Type Selector
+                    Picker("Crew Type", selection: $crewType) {
+                        Text("Drivers").tag(CrewType.drivers)
+                        Text("Maintenance Personnel").tag(CrewType.maintenance)
                     }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
 
-                    Divider()
-                        .frame(height: 20)
+                    // Status Filter
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            FilterChip(
+                                title: "All",
+                                isSelected: selectedStatus == nil,
+                                action: { selectedStatus = nil }
+                            )
 
-                    Button(action: {
-                        showingFilterSheet = true
-                    }) {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .foregroundColor(.blue)
-                    }
-                }
-                .padding(8)
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(10)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-
-                // Results count
-                HStack {
-                    Text("\(filteredCrew.count) \(crewType == .drivers ? "Drivers" : "Maintenance Personnel")")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    if selectedStatusFilter != nil {
-                        Button(action: {
-                            selectedStatusFilter = nil
-                        }) {
-                            HStack {
-                                Text("Clear Filter")
-                                    .font(.subheadline)
-                                Image(systemName: "xmark")
+                            ForEach([CrewMember.Status.available, .busy, .offline], id: \.self) { status in
+                                FilterChip(
+                                    title: status.rawValue,
+                                    isSelected: selectedStatus == status,
+                                    action: { selectedStatus = status }
+                                )
                             }
-                            .foregroundColor(.blue)
                         }
+                        .padding(.horizontal)
                     }
-                }
-                .padding(.horizontal)
+                    .padding(.vertical, 8)
 
-                ScrollView {
-                    // Crew Grid
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 280))], spacing: 16) {
-                        if pagedCrew.isEmpty {
-                            VStack(spacing: 16) {
-                                Image(systemName: "person.slash")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.gray)
-
-                                Text("No \(crewType == .drivers ? "drivers" : "maintenance personnel") found")
-                                    .foregroundColor(.secondary)
-
-                                if !searchText.isEmpty || selectedStatusFilter != nil {
-                                    Button(action: {
-                                        searchText = ""
-                                        selectedStatusFilter = nil
-                                    }) {
-                                        Text("Clear all filters")
-                                            .foregroundColor(.blue)
-                                    }
-                                }
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity)
+                    // Crew List
+                    LazyVStack(spacing: 16) {
+                        if filteredCrew.isEmpty {
+                            EmptyStateView(type: crewType)
                         } else {
-                            ForEach(pagedCrew) { crewMember in
+                            ForEach(filteredCrew) { crewMember in
                                 CrewCardView(crewMember: crewMember)
+                                    .padding(.horizontal)
                             }
                         }
                     }
-                    .padding()
-
-                    // Pagination UI
-                    if totalPages > 1 {
-                        HStack(spacing: 16) {
-                            Button(action: {
-                                if currentPage > 1 {
-                                    currentPage -= 1
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: "chevron.left")
-                                    Text("Previous")
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(currentPage > 1 ? Color.blue : Color.gray.opacity(0.3))
-                                .foregroundColor(currentPage > 1 ? .white : .gray)
-                                .cornerRadius(8)
-                            }
-                            .disabled(currentPage <= 1)
-
-                            // Page indicator
-                            VStack(spacing: 4) {
-                                Text("Page \(currentPage) of \(totalPages)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-
-                                // Page dots
-                                HStack(spacing: 8) {
-                                    ForEach(1...min(totalPages, 5), id: \.self) { page in
-                                        Circle()
-                                            .fill(page == currentPage ? Color.blue : Color.gray.opacity(0.3))
-                                            .frame(width: 8, height: 8)
-                                    }
-
-                                    if totalPages > 5 {
-                                        Text("...")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
-
-                            Button(action: {
-                                if currentPage < totalPages {
-                                    currentPage += 1
-                                }
-                            }) {
-                                HStack {
-                                    Text("Next")
-                                    Image(systemName: "chevron.right")
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(currentPage < totalPages ? Color.blue : Color.gray.opacity(0.3))
-                                .foregroundColor(currentPage < totalPages ? .white : .gray)
-                                .cornerRadius(8)
-                            }
-                            .disabled(currentPage >= totalPages)
-                        }
-                        .padding()
-                    }
+                    .padding(.vertical)
                 }
-                .background(Color(UIColor.systemGroupedBackground))
             }
             .navigationTitle("Crew Management")
-            .navigationBarTitleDisplayMode(.large)
-            .navigationBarItems(
-                leading: Button(action: {
-                    // Export or generate report action
-                    // This would typically generate a PDF or CSV of the crew data
-                }) {
-                    Image(systemName: "square.and.arrow.up")
-                },
-                trailing: Button(action: {
-                    if crewType == .drivers {
-                        showingAddDriverSheet = true
-                    } else {
-                        showingAddMaintenanceSheet = true
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        if crewType == .drivers {
+                            showingAddDriverSheet = true
+                        } else {
+                            showingAddMaintenanceSheet = true
+                        }
+                    }) {
+                        Image(systemName: "plus")
                     }
-                }) {
-                    Image(systemName: "plus")
-                        .font(.title2)
                 }
-            )
+            }
             .sheet(isPresented: $showingAddDriverSheet) {
                 AddDriverView()
                     .environmentObject(dataManager)
@@ -365,20 +147,45 @@ struct FleetCrewManagementView: View {
                 AddMaintenancePersonnelView()
                     .environmentObject(dataManager)
             }
-            .actionSheet(isPresented: $showingFilterSheet) {
-                ActionSheet(
-                    title: Text("Filter Crew"),
-                    message: Text("Select status to filter by"),
-                    buttons: [
-                        .default(Text("All")) { selectedStatusFilter = nil },
-                        .default(Text("Available")) { selectedStatusFilter = .available },
-                        .default(Text("Busy")) { selectedStatusFilter = .busy },
-                        .default(Text("Offline")) { selectedStatusFilter = .offline },
-                        .cancel()
-                    ]
-                )
-            }
         }
+    }
+}
+
+private struct FilterChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(isSelected ? Color.accentColor : Color(.systemGray6))
+                .foregroundColor(isSelected ? .white : .primary)
+                .clipShape(Capsule())
+        }
+    }
+}
+
+private struct EmptyStateView: View {
+    let type: CrewType
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+            Text("No \(type == .drivers ? "drivers" : "maintenance personnel") found")
+                .font(.headline)
+            Text("Add new crew members or try different filters")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -428,111 +235,117 @@ struct CrewCardView: View {
     @State private var showingProfile = false
     @State private var showingActionSheet = false
 
+    private var statusColor: Color {
+        switch crewMember.status {
+        case .available: return .green
+        case .busy: return .yellow
+        case .offline: return .red
+        }
+    }
+
     var body: some View {
-        Button(action: {
-            showingProfile = true
-        }) {
-            VStack(spacing: 0) {
-                // Card Header
-                HStack {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.2))
-                            .frame(width: 48, height: 48)
-
-                        Text(crewMember.avatar)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(.blue)
-                    }
-
+        VStack(spacing: 0) {
+            // Header with name and status
+            HStack {
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Text(crewMember.avatar)
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                        )
+                    
                     VStack(alignment: .leading) {
                         Text(crewMember.name)
                             .font(.headline)
-                        Text("\(crewMember.role) • ID: \(crewMember.id)")
+                        Text(crewMember.role)
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
-
-                    Spacer()
-
-                    Menu {
-                        Button(action: {
-                            showingProfile = true
-                        }) {
-                            Label("View Profile", systemImage: "person.crop.circle")
-                        }
-
-                        Button(action: {
-                            // Assign task action
-                        }) {
-                            Label("Assign Task", systemImage: "checkmark.circle")
-                        }
-
-                        Button(action: {
-                            // Message action
-                        }) {
-                            Label("Send Message", systemImage: "message")
-                        }
-
-                        Divider()
-
-                        Button(role: .destructive, action: {
-                            showingActionSheet = true
-                        }) {
-                            Label("Remove", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                            .foregroundColor(.gray)
-                    }
-
-                    Text(crewMember.status.rawValue)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(crewMember.status.backgroundColor)
-                        .foregroundColor(crewMember.status.color)
-                        .cornerRadius(4)
                 }
-                .padding()
-
-                Divider()
-
-                // Card Details
-                VStack(spacing: 8) {
-                    ForEach(crewMember.details) { detail in
-                        HStack {
-                            Text(detail.label + ":")
-                                .foregroundColor(.gray)
-                            Spacer()
-                            Text(detail.value)
-                        }
-                        .font(.subheadline)
-                    }
-                }
-                .padding()
-
-                // View indicator at bottom
-                HStack {
-                    Spacer()
-                    Text("Tap to view profile")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 12)
+                
+                Spacer()
+                
+                Text(crewMember.status.rawValue)
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(statusColor)
+                    .clipShape(Capsule())
             }
-            .background(Color(UIColor.systemBackground))
-            .cornerRadius(8)
-            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+            .padding()
+            
+            Divider()
+            
+            // Details section
+            VStack(spacing: 12) {
+                ForEach(crewMember.details) { detail in
+                    HStack(spacing: 16) {
+                        Label {
+                            Text(detail.label)
+                                .foregroundColor(.secondary)
+                        } icon: {
+                            Image(systemName: iconForDetail(detail.label))
+                                .foregroundColor(.blue)
+                        }
+                        
+                        Spacer()
+                        
+                        Text(detail.value)
+                            .foregroundColor(.primary)
+                    }
+                    .font(.subheadline)
+                }
+            }
+            .padding()
+            
+            Divider()
+            
+            // Footer with actions
+            HStack {
+                Button(action: {
+                    showingProfile = true
+                }) {
+                    Label("View Profile", systemImage: "person.circle")
+                        .font(.subheadline)
+                }
+                
+                Spacer()
+                
+                Menu {
+                    Button(action: {
+                        // Assign task action
+                    }) {
+                        Label("Assign Task", systemImage: "checkmark.circle")
+                    }
+                    
+                    Button(action: {
+                        // Message action
+                    }) {
+                        Label("Send Message", systemImage: "message")
+                    }
+                    
+                    Divider()
+                    
+                    Button(role: .destructive, action: {
+                        showingActionSheet = true
+                    }) {
+                        Label("Remove", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                }
+            }
+            .padding()
         }
-        .buttonStyle(PlainButtonStyle())
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .sheet(isPresented: $showingProfile) {
             NavigationView {
                 CrewProfileView(crewMember: crewMember)
@@ -549,6 +362,39 @@ struct CrewCardView: View {
                     .cancel()
                 ]
             )
+        }
+    }
+    
+    private func iconForDetail(_ label: String) -> String {
+        switch label {
+        case "Experience":
+            return "clock.fill"
+        case "License":
+            return "car.fill"
+        case "Phone":
+            return "phone.fill"
+        case "Email":
+            return "envelope.fill"
+        case "Specialty":
+            return "wrench.fill"
+        case "Certification":
+            return "checkmark.seal.fill"
+        case "Last Active":
+            return "calendar"
+        case "Vehicle":
+            return "car.fill"
+        case "ETA":
+            return "timer"
+        case "Next Shift":
+            return "clock.fill"
+        case "Hours This Week":
+            return "hourglass"
+        case "Location":
+            return "location.fill"
+        case "Last Job":
+            return "briefcase.fill"
+        default:
+            return "info.circle.fill"
         }
     }
 }
