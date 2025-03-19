@@ -13,7 +13,7 @@ struct ContentView: View {
     var body: some View {
         VStack {
             if !auth.isAuthenticated {
-                LoginView()
+                RoleSelectionView()
             } else {
                 if let userID = auth.userID, auth.isGenPass {
                     ResetGeneratedPasswordView(userID: userID)
@@ -26,7 +26,7 @@ struct ContentView: View {
                     case "maintenance_personnel":
                         MaintenancePersonnelDashboardView()
                     default:
-                        LoginView() // Handles unknown role case
+                        RoleSelectionView() // Handles unknown role case
                     }
                 }
             }

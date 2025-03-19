@@ -10,6 +10,8 @@ class SupabaseDataController: ObservableObject {
     @Published var authError: String?
     @Published var userID: UUID?
     @Published var isGenPass: Bool = false
+    @Published var showAlert = false
+    @Published var alertMessage = ""
     
     private let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
@@ -65,25 +67,49 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
-    func signIn(email: String, password: String) {
+    func signIn(email: String, password: String, roleName: String) {
         Task {
             do {
                 let session = try await supabase.auth.signIn(email: email, password: password)
+                await fetchUserRole(userID: session.user.id)
+                var role = ""
                 
-                // Fetch role after login
-                await MainActor.run {
-                    userID = session.user.id
+                if roleName == "Fleet Manager" {
+                    role = "fleet_manager"
+                } else if roleName == "Driver" {
+                    role = "driver"
+                } else if roleName == "Maintenance Personnel" {
+                    role = "maintenance_personnel"
+                } else {
+                    await MainActor.run {
+                        alertMessage = "No account found for \(email) as a \(roleName). Please check your credentials or select the correct role."
+                    }
+                    signOut()
+                    return
                 }
-                await fetchUserRole(userID: userID!)
-                await CheckGenPass(userID: userID!)
-                await MainActor.run {
-                    self.isAuthenticated = true
-                    self.authError = nil  // Clear previous errors
+                
+                if role == userRole {
+                    await MainActor.run {
+                        userID = session.user.id
+                    }
+                    await CheckGenPass(userID: userID!)
+                    await MainActor.run {
+                        self.isAuthenticated = true
+                        self.authError = nil  // Clear previous errors
+                    }
+                } else {
+                    await MainActor.run {
+                        alertMessage = "No account found for \(email) as a \(roleName). Please check your credentials or select the correct role."
+                        showAlert = true
+                    }
+                    signOut()
                 }
             } catch {
                 await MainActor.run {
-                    self.authError = "Login failed: \(error.localizedDescription)"
-                    self.isAuthenticated = false
+                    authError = "Login failed: \(error.localizedDescription)"
+                    alertMessage = authError!
+                    showAlert = true
+                    isAuthenticated = false
                 }
                 print("Login error: \(error.localizedDescription)")
             }
