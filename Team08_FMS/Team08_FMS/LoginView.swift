@@ -45,7 +45,9 @@ struct RoleSelectionView: View {
             }
             .padding()
             .navigationDestination(isPresented: $navigateToLogin) {
-                LoginView(selectedRole: selectedRole ?? "")
+                NavigationStack {
+                    LoginView(selectedRole: selectedRole ?? "")
+                }
             }
         }
     }

@@ -7,26 +7,33 @@
 
 import SwiftUI
 
-struct FleetManagerDashboardView: View {
+struct FleetManagerTabView: View {
     @StateObject private var vehicleManager = VehicleManager()
     @StateObject private var dataManager = CrewDataManager()
 
     var body: some View {
         TabView {
+            FleetManagerDashboardTabView()
+                .environmentObject(dataManager)
+                .environmentObject(vehicleManager)
+                .tabItem {
+                    Label("Dashboard", systemImage: "car.fill")
+                }
             VehiclesView(vehicleManager: vehicleManager)
                 .tabItem {
                     Label("Vehicles", systemImage: "car.fill")
                 }
             // Crew Tab (only tab)
             FleetCrewManagementView()
-            .environmentObject(dataManager)
-            .tabItem {
-                Label("Crew", systemImage: "person.3")
-            }
+                .environmentObject(dataManager)
+                .environmentObject(vehicleManager)
+                .tabItem {
+                    Label("Crew", systemImage: "person.3")
+                }
         }
     }
 }
 
 #Preview {
-    FleetManagerDashboardView()
+    FleetManagerTabView()
 }

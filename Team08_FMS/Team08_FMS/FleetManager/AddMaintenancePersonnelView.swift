@@ -102,12 +102,14 @@ struct AddMaintenancePersonnelView: View {
             avatar: avatar.isEmpty ? String(name.prefix(2).uppercased()) : avatar,
             role: "Maintenance",
             status: .available,
+            salary: 5000.0,
             details: [
                 DetailItem(label: "Specialty", value: specialty),
                 DetailItem(label: "Experience", value: "\(experience) years"),
                 DetailItem(label: "Certification", value: certification),
                 DetailItem(label: "Phone", value: phoneNumber),
-                DetailItem(label: "Email", value: email)
+                DetailItem(label: "Email", value: email),
+                DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
             ]
         )
         dataManager.addMaintenancePersonnel(newPersonnel)

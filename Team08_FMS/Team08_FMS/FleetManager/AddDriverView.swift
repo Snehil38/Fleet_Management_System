@@ -23,6 +23,7 @@ struct AddDriverView: View {
     @State private var address = ""
     @State private var dateOfBirth = Date()
     @State private var licenseExpiration = Date()
+    @State private var salary: String = ""
     
     let licenseTypes = ["Class A CDL", "Class B CDL", "Class C CDL", "Non-CDL"]
     
@@ -30,7 +31,9 @@ struct AddDriverView: View {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !experience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !salary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        Double(salary) ?? 0 > 0
     }
     
     var body: some View {
@@ -82,6 +85,18 @@ struct AddDriverView: View {
                 Section("Personal Information") {
                     DatePicker("Date of Birth", selection: $dateOfBirth, displayedComponents: .date)
                 }
+                
+                // Add Salary Section
+                Section("Compensation") {
+                    TextField("Monthly Salary", text: $salary)
+                        .keyboardType(.decimalPad)
+                        .onChange(of: salary) { oldValue, newValue in
+                            let filtered = newValue.filter { "0123456789.".contains($0) }
+                            if filtered != newValue {
+                                salary = filtered
+                            }
+                        }
+                }
             }
             .navigationTitle("Add Driver")
             .navigationBarTitleDisplayMode(.inline)
@@ -109,6 +124,7 @@ struct AddDriverView: View {
             avatar: avatar.isEmpty ? String(name.prefix(2).uppercased()) : avatar,
             role: "Driver",
             status: .available,
+            salary: 5000.0,
             details: [
                 DetailItem(label: "Experience", value: "\(experience) years"),
                 DetailItem(label: "License", value: licenseType),

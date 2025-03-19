@@ -20,11 +20,11 @@ struct ContentView: View {
                 } else {
                     switch auth.userRole {
                     case "fleet_manager":
-                        FleetManagerDashboardView()
+                        FleetManagerTabView()
                     case "driver":
-                        HomeView()
+                        DriverTabView()
                     case "maintenance_personnel":
-                        MaintenancePersonnelDashboardView()
+                        MaintenancePersonnelTabView()
                     default:
                         RoleSelectionView() // Handles unknown role case
                     }

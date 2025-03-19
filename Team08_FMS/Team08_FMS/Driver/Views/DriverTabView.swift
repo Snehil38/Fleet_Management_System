@@ -6,7 +6,7 @@ import CoreLocation
 // Import custom components
 import SwiftUI
 
-struct HomeView: View {
+struct DriverTabView: View {
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
     @State private var showingChatBot = false
@@ -1081,6 +1081,6 @@ struct MapPolyline: View {
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        HomeView()
+        DriverTabView()
     }
 } 

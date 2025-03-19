@@ -7,36 +7,37 @@
 
 import SwiftUI
 
-struct CrewMember: Identifiable {
-    let id: String
-    let name: String
-    let avatar: String
-    let role: String
-    let status: Status
-    let details: [DetailItem]
-
-    enum Status: String {
-        case available = "Available"
-        case busy = "Busy"
-        case offline = "Offline"
-
-        var color: Color {
-            switch self {
-            case .available: return Color.green
-            case .busy: return Color.yellow
-            case .offline: return Color.red
-            }
-        }
-
-        var backgroundColor: Color {
-            switch self {
-            case .available: return Color.green.opacity(0.2)
-            case .busy: return Color.yellow.opacity(0.2)
-            case .offline: return Color.red.opacity(0.2)
-            }
-        }
-    }
-}
+//struct CrewMember: Identifiable {
+//    let id: String
+//    let name: String
+//    let avatar: String
+//    let role: String
+//    let status: Status
+//    let salary: Double
+//    let details: [DetailItem]
+//
+//    enum Status: String {
+//        case available = "Available"
+//        case busy = "Busy"
+//        case offline = "Offline"
+//
+//        var color: Color {
+//            switch self {
+//            case .available: return Color.green
+//            case .busy: return Color.yellow
+//            case .offline: return Color.red
+//            }
+//        }
+//
+//        var backgroundColor: Color {
+//            switch self {
+//            case .available: return Color.green.opacity(0.2)
+//            case .busy: return Color.yellow.opacity(0.2)
+//            case .offline: return Color.red.opacity(0.2)
+//            }
+//        }
+//    }
+//}
 
 enum CrewType {
     case drivers

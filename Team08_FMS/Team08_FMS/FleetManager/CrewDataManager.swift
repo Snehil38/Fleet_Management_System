@@ -18,11 +18,13 @@ class CrewDataManager: ObservableObject {
                 avatar: "JD",
                 role: "Driver",
                 status: .available,
+                salary: 5000.0,
                 details: [
                     DetailItem(label: "Experience", value: "5 years"),
                     DetailItem(label: "License", value: "Class A CDL"),
                     DetailItem(label: "Last Active", value: "Today, 10:45 AM"),
-                    DetailItem(label: "Vehicle", value: "None assigned")
+                    DetailItem(label: "Vehicle", value: "None assigned"),
+                    DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
                 ]
             ),
             CrewMember(
@@ -31,11 +33,13 @@ class CrewDataManager: ObservableObject {
                 avatar: "MS",
                 role: "Driver",
                 status: .busy,
+                salary: 5000.0,
                 details: [
                     DetailItem(label: "Experience", value: "3 years"),
                     DetailItem(label: "License", value: "Class B CDL"),
                     DetailItem(label: "Vehicle", value: "Truck #103"),
-                    DetailItem(label: "ETA", value: "2:30 PM Today")
+                    DetailItem(label: "ETA", value: "2:30 PM Today"),
+                    DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
                 ]
             ),
             CrewMember(
@@ -44,11 +48,13 @@ class CrewDataManager: ObservableObject {
                 avatar: "AW",
                 role: "Driver",
                 status: .offline,
+                salary: 5000.0,
                 details: [
                     DetailItem(label: "Experience", value: "2 years"),
                     DetailItem(label: "License", value: "Class A CDL"),
                     DetailItem(label: "Next Shift", value: "Tomorrow, 8:00 AM"),
-                    DetailItem(label: "Hours This Week", value: "32 / 40")
+                    DetailItem(label: "Hours This Week", value: "32 / 40"),
+                    DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
                 ]
             )
         ]
@@ -60,11 +66,13 @@ class CrewDataManager: ObservableObject {
                 avatar: "SJ",
                 role: "Maintenance",
                 status: .available,
+                salary: 5000.0,
                 details: [
                     DetailItem(label: "Specialty", value: "Engine Repair"),
                     DetailItem(label: "Experience", value: "7 years"),
                     DetailItem(label: "Certification", value: "ASE Master Tech"),
-                    DetailItem(label: "Last Job", value: "Yesterday")
+                    DetailItem(label: "Last Job", value: "Yesterday"),
+                    DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
                 ]
             ),
             CrewMember(
@@ -73,11 +81,13 @@ class CrewDataManager: ObservableObject {
                 avatar: "RT",
                 role: "Maintenance",
                 status: .busy,
+                salary: 5000.0,
                 details: [
                     DetailItem(label: "Specialty", value: "Electrical Systems"),
                     DetailItem(label: "Current Task", value: "Truck #108 Repair"),
                     DetailItem(label: "Location", value: "Main Garage"),
-                    DetailItem(label: "ETA Completion", value: "1:15 PM Today")
+                    DetailItem(label: "ETA Completion", value: "1:15 PM Today"),
+                    DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
                 ]
             ),
             CrewMember(
@@ -86,11 +96,13 @@ class CrewDataManager: ObservableObject {
                 avatar: "EH",
                 role: "Maintenance",
                 status: .offline,
+                salary: 5000.0,
                 details: [
                     DetailItem(label: "Specialty", value: "Brake Systems"),
                     DetailItem(label: "Experience", value: "4 years"),
                     DetailItem(label: "Next Shift", value: "Tomorrow, 9:00 AM"),
-                    DetailItem(label: "Last Job", value: "Yesterday, Bus #24")
+                    DetailItem(label: "Last Job", value: "Yesterday, Bus #24"),
+                    DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
                 ]
             )
         ]
@@ -130,6 +142,7 @@ class CrewDataManager: ObservableObject {
                 avatar: drivers[index].avatar,
                 role: drivers[index].role,
                 status: status,
+                salary: 5000.0,
                 details: drivers[index].details
             )
         }
@@ -142,7 +155,8 @@ class CrewDataManager: ObservableObject {
                 name: maintenancePersonnel[index].name,
                 avatar: maintenancePersonnel[index].avatar,
                 role: maintenancePersonnel[index].role,
-                status: status,
+                status: maintenancePersonnel[index].status,
+                salary: maintenancePersonnel[index].salary,
                 details: maintenancePersonnel[index].details
             )
         }
@@ -164,6 +178,7 @@ class CrewDataManager: ObservableObject {
                 avatar: String(name.prefix(2).uppercased()),
                 role: drivers[index].role,
                 status: drivers[index].status,
+                salary: drivers[index].salary,
                 details: details
             )
             drivers[index] = updatedDriver
@@ -178,9 +193,16 @@ class CrewDataManager: ObservableObject {
                 avatar: String(name.prefix(2).uppercased()),
                 role: maintenancePersonnel[index].role,
                 status: maintenancePersonnel[index].status,
+                salary: maintenancePersonnel[index].salary,
                 details: details
             )
             maintenancePersonnel[index] = updatedPersonnel
         }
+    }
+    
+    var totalSalaryExpenses: Double {
+        let driversSalaries = drivers.reduce(0) { $0 + $1.salary }
+        let maintenanceSalaries = maintenancePersonnel.reduce(0) { $0 + $1.salary }
+        return driversSalaries + maintenanceSalaries
     }
 }

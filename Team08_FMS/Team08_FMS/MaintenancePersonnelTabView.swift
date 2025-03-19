@@ -7,9 +7,7 @@
 
 import SwiftUI
 
-
-
-struct MaintenancePersonnelDashboardView: View {
+struct MaintenancePersonnelTabView: View {
     @State private var selectedTab = 0
     @State private var showingProfile = false
     @State private var showingContact = false
@@ -264,5 +262,5 @@ struct ContactRow: View {
 }
 
 #Preview {
-    MaintenancePersonnelDashboardView()
+    MaintenancePersonnelTabView()
 }
