@@ -121,4 +121,66 @@ class CrewDataManager: ObservableObject {
 
         return Array(allCrew[startIndex..<endIndex])
     }
+
+    func updateDriverStatus(_ id: String, status: CrewMember.Status) {
+        if let index = drivers.firstIndex(where: { $0.id == id }) {
+            drivers[index] = CrewMember(
+                id: drivers[index].id,
+                name: drivers[index].name,
+                avatar: drivers[index].avatar,
+                role: drivers[index].role,
+                status: status,
+                details: drivers[index].details
+            )
+        }
+    }
+    
+    func updateMaintenancePersonnelStatus(_ id: String, status: CrewMember.Status) {
+        if let index = maintenancePersonnel.firstIndex(where: { $0.id == id }) {
+            maintenancePersonnel[index] = CrewMember(
+                id: maintenancePersonnel[index].id,
+                name: maintenancePersonnel[index].name,
+                avatar: maintenancePersonnel[index].avatar,
+                role: maintenancePersonnel[index].role,
+                status: status,
+                details: maintenancePersonnel[index].details
+            )
+        }
+    }
+    
+    func deleteDriver(_ id: String) {
+        drivers.removeAll { $0.id == id }
+    }
+    
+    func deleteMaintenancePersonnel(_ id: String) {
+        maintenancePersonnel.removeAll { $0.id == id }
+    }
+
+    func updateDriver(_ id: String, name: String, details: [DetailItem]) {
+        if let index = drivers.firstIndex(where: { $0.id == id }) {
+            let updatedDriver = CrewMember(
+                id: drivers[index].id,
+                name: name,
+                avatar: String(name.prefix(2).uppercased()),
+                role: drivers[index].role,
+                status: drivers[index].status,
+                details: details
+            )
+            drivers[index] = updatedDriver
+        }
+    }
+    
+    func updateMaintenancePersonnel(_ id: String, name: String, details: [DetailItem]) {
+        if let index = maintenancePersonnel.firstIndex(where: { $0.id == id }) {
+            let updatedPersonnel = CrewMember(
+                id: maintenancePersonnel[index].id,
+                name: name,
+                avatar: String(name.prefix(2).uppercased()),
+                role: maintenancePersonnel[index].role,
+                status: maintenancePersonnel[index].status,
+                details: details
+            )
+            maintenancePersonnel[index] = updatedPersonnel
+        }
+    }
 }
