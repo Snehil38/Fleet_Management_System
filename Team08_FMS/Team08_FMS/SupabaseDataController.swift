@@ -9,6 +9,11 @@ class SupabaseDataController: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var authError: String?
     @Published var userID: UUID?
+    @Published var otpVerified: Bool = false
+    
+    @Published var is2faEnabled: Bool = false
+    
+    @Published var roleMatched: Bool = false
     @Published var isGenPass: Bool = false
     @Published var showAlert = false
     @Published var alertMessage = ""
@@ -67,7 +72,7 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
-    func signIn(email: String, password: String, roleName: String) {
+    func signInWithPassword(email: String, password: String, roleName: String, completion: @escaping (Bool, String?) -> Void) {
         Task {
             do {
                 let session = try await supabase.auth.signIn(email: email, password: password)
@@ -91,11 +96,16 @@ class SupabaseDataController: ObservableObject {
                 if role == userRole {
                     await MainActor.run {
                         userID = session.user.id
+                        self.roleMatched = true
                     }
                     await CheckGenPass(userID: userID!)
+                    if isGenPass {
+                        await MainActor.run {
+                            self.isAuthenticated = true
+                        }
+                    }
                     await MainActor.run {
-                        self.isAuthenticated = true
-                        self.authError = nil  // Clear previous errors
+                        self.authError = nil
                     }
                 } else {
                     await MainActor.run {
@@ -104,7 +114,14 @@ class SupabaseDataController: ObservableObject {
                     }
                     signOut()
                 }
+                if !is2faEnabled {
+                    await MainActor.run {
+                        isAuthenticated = true
+                    }
+                }
+                completion(true, nil)
             } catch {
+                completion(false, error.localizedDescription)
                 await MainActor.run {
                     authError = "Login failed: \(error.localizedDescription)"
                     alertMessage = authError!
@@ -112,6 +129,41 @@ class SupabaseDataController: ObservableObject {
                     isAuthenticated = false
                 }
                 print("Login error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func sendOTP(email: String, completion: @escaping (Bool, String?) -> Void) {
+        Task {
+            if !isGenPass {
+                do {
+                    try await supabase.auth.signInWithOTP(email: email)
+                    completion(true, nil)
+                } catch {
+                    signOut()
+                    completion(false, error.localizedDescription)
+                }
+            }
+            else {
+                await MainActor.run {
+                    self.isAuthenticated = true
+                }
+            }
+        }
+    }
+    
+    func verifyOTP(email: String, token: String, completion: @escaping (Bool, String?) -> Void) {
+        Task {
+            do {
+                try await supabase.auth.verifyOTP(email: email, token: token, type: .magiclink)
+                await MainActor.run {
+                    self.isAuthenticated = true
+                    self.otpVerified = true
+                }
+                completion(true, nil)
+            } catch {
+                signOut()
+                completion(false, error.localizedDescription)
             }
         }
     }
@@ -125,6 +177,8 @@ class SupabaseDataController: ObservableObject {
                     self.isAuthenticated = false
                     self.userID = nil
                     self.isGenPass = false
+                    self.otpVerified = false
+                    self.roleMatched = false
                 }
             } catch {
             }

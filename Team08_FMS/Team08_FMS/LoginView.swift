@@ -57,6 +57,7 @@ struct LoginView: View {
     @State private var password: String = ""
     @StateObject private var dataController = SupabaseDataController.shared
     @State private var isLoading: Bool = false
+    @State private var navigateToVerify = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -84,7 +85,27 @@ struct LoginView: View {
                 .padding(.horizontal, 20)
             
             Button(action: {
-                dataController.signIn(email: email, password: password, roleName: selectedRole)
+                dataController.signInWithPassword(email: email, password: password, roleName: selectedRole) { success, error in
+                    if success {
+                        print("success")
+                        if !dataController.isGenPass, dataController.is2faEnabled {
+                            email = email
+                            UserDefaults.standard.set(email, forKey: "email")
+                            if dataController.roleMatched {
+                                dataController.sendOTP(email: email) { success, error in
+                                    if success {
+                                        print("OTP sent")
+                                    } else {
+                                        print("Failed to send OTP: \(error ?? "Unknown error")")
+                                    }
+                                }
+                            }
+                            navigateToVerify = dataController.roleMatched
+                        }
+                    } else {
+                        print("Cannot sign in")
+                    }
+                }
             }) {
                 Text("Login")
                     .font(.headline)
@@ -102,9 +123,74 @@ struct LoginView: View {
         .alert(isPresented: $dataController.showAlert) {  // 🔹 Uses showAlert state from controller
             Alert(title: Text("Alert"), message: Text(dataController.alertMessage), dismissButton: .default(Text("OK")))
         }
+        .navigationDestination(isPresented: $navigateToVerify) {
+            VerifyOTPView(email: email)
+        }
     }
 }
 
+struct VerifyOTPView: View {
+    var email: String
+    @State private var otpCode: String = ""
+    @State private var isLoading = false
+    @StateObject private var dataController = SupabaseDataController.shared
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Enter OTP Sent to \(email)")
+                .multilineTextAlignment(.center)
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(Color.pink.opacity(0.5))
+                .padding(.top, 20)
+            
+            TextField("Enter OTP", text: $otpCode)
+                .keyboardType(.numberPad)
+                .padding(10)
+                .background(Color.white)
+                .cornerRadius(25)
+                .shadow(radius: 1)
+                .padding(.horizontal, 20)
+
+            Button(action: {
+                isLoading = true
+                dataController.verifyOTP(email: email, token: otpCode) { success, error in
+                    isLoading = false
+                    if success {
+                        print("OTP verified")
+                    } else {
+                        print("OTP verification failed: \(error ?? "Unknown error")")
+                    }
+                }
+            }) {
+                Text("Verify OTP")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue)
+                    .cornerRadius(25)
+                    .padding(.horizontal, 20)
+            }
+            .disabled(isLoading || otpCode.isEmpty)
+            
+            Button(action: {
+                dataController.sendOTP(email: email) { success, error in
+                    if success {
+                        print("OTP sent again")
+                    } else {
+                        print("Failed to send OTP: \(error ?? "Unknown error")")
+                    }
+                }
+            }) {
+                Text("Resend OTP")
+                    .foregroundColor(.blue)
+                    .underline()
+            }
+        }
+        .padding()
+    }
+}
 
 #Preview {
     RoleSelectionView()
