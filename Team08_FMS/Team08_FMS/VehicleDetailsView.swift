@@ -89,12 +89,14 @@ private struct StatusSection: View {
 
     private func statusColor(for status: VehicleStatus) -> Color {
         switch status {
-        case .idle:
+        case .available:
             return .green
-        case .allotted:
+        case .inService:
             return .blue
-        case .maintenance:
+        case .underMaintenance:
             return .orange
+        case .decommissioned:
+            return .red
         }
     }
 }

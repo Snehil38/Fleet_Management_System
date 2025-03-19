@@ -15,9 +15,10 @@ private struct VehicleCard: View {
 
     private var statusColor: Color {
         switch vehicle.status {
-        case .idle: return .green
-        case .allotted: return .blue
-        case .maintenance: return .orange
+        case .available: return .green
+        case .inService: return .blue
+        case .underMaintenance: return .orange
+        case .decommissioned: return .red
         }
     }
 
@@ -109,7 +110,7 @@ private struct VehicleCard: View {
                 Label("Delete Vehicle", systemImage: "trash")
             }
 
-            if vehicle.status != .maintenance {
+            if vehicle.status != .underMaintenance {
                 Button {
                     vehicleManager.markVehicleForMaintenance(vehicleId: vehicle.id)
                 } label: {
@@ -117,7 +118,7 @@ private struct VehicleCard: View {
                 }
             }
 
-            if vehicle.status != .idle {
+            if vehicle.status != .available {
                 Button {
                     vehicleManager.markVehicleAsIdle(vehicleId: vehicle.id)
                 } label: {
@@ -190,8 +191,8 @@ private struct StatusFilterView: View {
                     isSelected: selectedStatus == nil,
                     action: { selectedStatus = nil }
                 )
-
-                ForEach(VehicleStatus.allCases, id: \.self) { status in
+                
+                ForEach(VehicleStatus.allValues, id: \.self) { status in
                     FilterChip(
                         title: status.rawValue.capitalized,
                         isSelected: selectedStatus == status,

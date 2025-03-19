@@ -225,7 +225,6 @@ struct AddDriverView: View {
         .cornerRadius(12)
         .edgesIgnoringSafeArea(.bottom)
     }
-    
     func saveDriver() {
         // Create a new driver with the entered information
         let newDriver = CrewMember(
@@ -248,6 +247,8 @@ struct AddDriverView: View {
         // Dismiss the view
         presentationMode.wrappedValue.dismiss()
     }
+    
+  
 }
 
 #Preview {

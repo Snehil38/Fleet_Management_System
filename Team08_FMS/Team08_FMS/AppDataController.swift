@@ -10,7 +10,9 @@ import Foundation
 class AppDataController {
     static let shared = AppDataController()
     
-    private init() {}
+    private init() {
+        
+    }
     
     func randomPasswordGenerator(length: Int) -> String {
         let character = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

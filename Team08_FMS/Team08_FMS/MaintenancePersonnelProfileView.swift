@@ -1,125 +1,67 @@
 import SwiftUI
 
 struct MaintenancePersonnelProfileView: View {
-    @Environment(\.dismiss) private var dismiss
+    
+    @Environment(\.dismiss) var dismiss
     @State private var isAvailable: Bool = true
-    @State private var showingLogoutAlert = false
     @State private var showingPasswordReset = false
-    @State private var currentPassword = ""
-    @State private var newPassword = ""
-    @State private var confirmPassword = ""
+    @State private var currentPassword: String = ""
+    @State private var newPassword: String = ""
+    @State private var confirmPassword: String = ""
     @State private var showingPasswordAlert = false
-    @State private var passwordAlertMessage = ""
+    @State private var passwordAlertMessage: String = ""
+    @State private var showingLogoutAlert = false
     @State private var showingStatusAlert = false
     @State private var lastStatusChangeDate: Date = Date()
     @State private var pendingStatusChange: Bool = false
     
     let user = MaintenancePersonnel(
         name: "John Doe",
+        profileImage: "person.circle.fill",
         email: "john.doe@fleetmanagement.com",
-        phone: "+1 234 567 8900",
-        role: "Senior Maintenance Technician",
-        profileImage: "person.circle.fill"
+        phoneNumber: "+1 234 567 8900",
+        yearsOfExperience: 2,
+        specialty: "Truck Maintenance",
+        avatar: ""
     )
+    
+    // Computed binding for the availability toggle.
+    private var availabilityBinding: Binding<Bool> {
+        Binding<Bool>(
+            get: { isAvailable },
+            set: { newValue in
+                if newValue == false {
+                    showingStatusAlert = true
+                    pendingStatusChange = true
+                } else {
+                    let calendar = Calendar.current
+                    let now = Date()
+                    if let nextDay = calendar.date(byAdding: .day, value: 1, to: lastStatusChangeDate),
+                       now >= nextDay {
+                        isAvailable = newValue
+                        lastStatusChangeDate = now
+                    } else {
+                        showingStatusAlert = true
+                        pendingStatusChange = false
+                    }
+                }
+            }
+        )
+    }
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    Image(systemName: user.profileImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 120, height: 120)
-                        .foregroundColor(.blue)
-                        .padding()
                     
-                    VStack(spacing: 15) {
-                        Text(user.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Text(user.email)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        
-                        Text(user.phone)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        
-                        Text(user.role)
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                    }
-                    .padding()
+                    ProfileHeaderView(user: user)
                     
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Availability Status")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                        HStack {
-                            Text(isAvailable ? "Available" : "Unavailable")
-                                .foregroundColor(isAvailable ? .green : .red)
-                            Spacer()
-                            Toggle("", isOn: Binding(
-                                get: { isAvailable },
-                                set: { newValue in
-                                    if newValue == false {
-                                        showingStatusAlert = true
-                                        pendingStatusChange = true
-                                    } else {
-                                        let calendar = Calendar.current
-                                        let now = Date()
-                                        if let nextDay = calendar.date(byAdding: .day, value: 1, to: lastStatusChangeDate),
-                                           now >= nextDay {
-                                            isAvailable = newValue
-                                            lastStatusChangeDate = now
-                                        } else {
-                                            showingStatusAlert = true
-                                            pendingStatusChange = false
-                                        }
-                                    }
-                                }
-                            ))
-                            .tint(isAvailable ? .green : .red)
-                        }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
-                        .padding(.horizontal)
-                    }
-                    .padding(.vertical)
+                    AvailabilityView(isAvailable: isAvailable, binding: availabilityBinding)
                     
-                    Button(action: {
-                        showingPasswordReset = true
-                    }) {
-                        HStack {
-                            Image(systemName: "lock.rotation")
-                            Text("Reset Password")
-                        }
-                        .foregroundColor(.blue)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
-                    }
-                    .padding(.horizontal)
-                    
-                    Button(action: {
-                        showingLogoutAlert = true
-                    }) {
-                        HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                            Text("Logout")
-                        }
-                        .foregroundColor(.red)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 20)
+                    ActionButtonsView(
+                        onResetPassword: { showingPasswordReset = true },
+                        onLogout: { showingLogoutAlert = true }
+                    )
                 }
                 .padding(.vertical)
             }
@@ -137,6 +79,7 @@ struct MaintenancePersonnelProfileView: View {
                     }
                 }
             }
+            // Status Change Alert
             .alert("Status Change", isPresented: $showingStatusAlert) {
                 if pendingStatusChange {
                     Button("Continue", role: .none) {
@@ -156,6 +99,7 @@ struct MaintenancePersonnelProfileView: View {
                     Text("Your status will automatically change back to available tomorrow.")
                 }
             }
+            // Logout Alert
             .alert("Logout", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Logout", role: .destructive) {
@@ -164,6 +108,7 @@ struct MaintenancePersonnelProfileView: View {
             } message: {
                 Text("Are you sure you want to logout?")
             }
+            // Password Reset Sheet
             .sheet(isPresented: $showingPasswordReset) {
                 PasswordResetView(
                     isPresented: $showingPasswordReset,
@@ -174,6 +119,7 @@ struct MaintenancePersonnelProfileView: View {
                     alertMessage: $passwordAlertMessage
                 )
             }
+            // Password Reset Alert
             .alert("Password Reset", isPresented: $showingPasswordAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
@@ -183,6 +129,100 @@ struct MaintenancePersonnelProfileView: View {
     }
 }
 
+struct ProfileHeaderView: View {
+    let user: MaintenancePersonnel
+    
+    var body: some View {
+        VStack(spacing: 15) {
+            Image(systemName: user.profileImage)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 120, height: 120)
+                .foregroundColor(.blue)
+                .padding()
+            
+            Text(user.name)
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text(user.email)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            
+            Text(user.phoneNumber)  // Ensure this matches your model
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            
+            // Displaying specialty as the role; adjust as needed.
+            Text(user.specialty)
+                .font(.subheadline)
+                .foregroundColor(.blue)
+        }
+        .padding()
+    }
+}
+
+struct AvailabilityView: View {
+    let isAvailable: Bool
+    let binding: Binding<Bool>
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Availability Status")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            HStack {
+                Text(isAvailable ? "Available" : "Unavailable")
+                    .foregroundColor(isAvailable ? .green : .red)
+                Spacer()
+                Toggle("", isOn: binding)
+                    .tint(isAvailable ? .green : .red)
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
+            .padding(.horizontal)
+        }
+        .padding(.vertical)
+    }
+}
+
+struct ActionButtonsView: View {
+    var onResetPassword: () -> Void
+    var onLogout: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            Button(action: onResetPassword) {
+                HStack {
+                    Image(systemName: "lock.rotation")
+                    Text("Reset Password")
+                }
+                .foregroundColor(.blue)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
+            .padding(.horizontal)
+            
+            Button(action: onLogout) {
+                HStack {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                    Text("Logout")
+                }
+                .foregroundColor(.red)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
+            .padding(.horizontal)
+            .padding(.top, 20)
+        }
+    }
+}
 
 struct PasswordResetView: View {
     @Binding var isPresented: Bool
@@ -254,13 +294,13 @@ struct PasswordResetView: View {
     }
 }
 
-struct MaintenancePersonnel {
-    let name: String
-    let email: String
-    let phone: String
-    let role: String
-    let profileImage: String
-}
+//struct MaintenancePersonnel {
+//    let name: String
+//    let email: String
+//    let phone: String
+//    let role: String
+//    let profileImage: String
+//}
 
 #Preview {
     MaintenancePersonnelProfileView()

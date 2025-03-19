@@ -37,7 +37,7 @@ class VehicleManager: ObservableObject {
             msrp: msrp,
             pollutionExpiry: pollutionExpiry,
             insuranceExpiry: insuranceExpiry,
-            status: .idle,
+            status: .available,
             driverId: nil,
             documents: documents
         )
@@ -89,7 +89,7 @@ class VehicleManager: ObservableObject {
         if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
             var vehicle = vehicles[index]
             vehicle.driverId = driverId
-            vehicle.status = .allotted
+            vehicle.status = .inService
             vehicles[index] = vehicle
             saveVehicles()
         }
@@ -99,7 +99,7 @@ class VehicleManager: ObservableObject {
         if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
             var vehicle = vehicles[index]
             vehicle.driverId = nil
-            vehicle.status = .idle
+            vehicle.status = .available
             vehicles[index] = vehicle
             saveVehicles()
         }
@@ -108,7 +108,7 @@ class VehicleManager: ObservableObject {
     func markVehicleForMaintenance(vehicleId: UUID) {
         if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
             var vehicle = vehicles[index]
-            vehicle.status = .maintenance
+            vehicle.status = .underMaintenance
             vehicles[index] = vehicle
             saveVehicles()
         }
@@ -117,7 +117,7 @@ class VehicleManager: ObservableObject {
     func markVehicleAsIdle(vehicleId: UUID) {
         if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
             var vehicle = vehicles[index]
-            vehicle.status = .idle
+            vehicle.status = .available
             vehicles[index] = vehicle
             saveVehicles()
         }

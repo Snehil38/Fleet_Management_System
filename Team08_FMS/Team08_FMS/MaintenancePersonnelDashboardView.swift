@@ -7,16 +7,7 @@
 
 import SwiftUI
 
-struct ServiceRequest: Identifiable {
-    let id = UUID()
-    let vehicleId: String
-    let vehicleName: String
-    let issueType: String
-    let description: String
-    let priority: String
-    let date: Date
-    let status: String
-}
+
 
 struct MaintenancePersonnelDashboardView: View {
     @State private var selectedTab = 0
