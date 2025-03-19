@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var showingVehicleDetails = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var selectedTab = 0
     
     // State properties for trip data
     @State private var currentTrip: Trip
@@ -43,7 +44,29 @@ struct HomeView: View {
     }
     
     var body: some View {
-        mainContentView
+        TabView(selection: $selectedTab) {
+            mainContentView
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+                .tag(0)
+            
+            NavigationView {
+                TripsView()
+            }
+            .tabItem {
+                Label("Trips", systemImage: "car.fill")
+            }
+            .tag(1)
+            
+            NavigationView {
+                DriverProfileView()
+            }
+            .tabItem {
+                Label("Profile", systemImage: "person.fill")
+            }
+            .tag(2)
+        }
     }
     
     private var mainContentView: some View {

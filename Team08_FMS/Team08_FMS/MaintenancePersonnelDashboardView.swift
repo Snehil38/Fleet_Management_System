@@ -266,8 +266,6 @@ struct ContactRow: View {
     
     var body: some View {
         HStack {
-            Text(title)
-                .foregroundColor(.gray)
             Spacer()
             Text(value)
         }
