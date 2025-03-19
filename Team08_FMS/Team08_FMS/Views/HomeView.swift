@@ -3,10 +3,17 @@ import MapKit
 import AVFoundation
 import CoreLocation
 
-// Import custom components
-import SwiftUI
+// Add RouteOption struct at the top
+struct RouteOption: Identifiable {
+    let id: String
+    let name: String
+    let eta: String
+    let distance: String
+    let isRecommended: Bool
+}
 
 struct HomeView: View {
+    // MARK: - Properties
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
     @State private var showingChatBot = false
@@ -15,6 +22,7 @@ struct HomeView: View {
     @State private var showingVehicleDetails = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var showingProfile = false
     
     // State properties for trip data
     @State private var currentTrip: Trip
@@ -26,7 +34,7 @@ struct HomeView: View {
     @State private var selectedDelivery: DeliveryDetails?
     @State private var isCurrentTripDeclined = false
     @State private var tripQueue: [Trip] = []
-    
+
     // Route Information
     @State private var availableRoutes: [RouteOption] = [
         RouteOption(id: "1", name: "Route 1", eta: "25 mins", distance: "8.5 km", isRecommended: true),
@@ -42,10 +50,21 @@ struct HomeView: View {
         _recentDeliveries = State(initialValue: TripDataController.shared.recentDeliveries)
     }
     
+    // MARK: - Computed Properties
+    private var selectedRouteEta: String {
+        availableRoutes.first(where: { $0.id == selectedRouteId })?.eta ?? currentTrip.eta
+    }
+
+    private var selectedRouteDistance: String {
+        availableRoutes.first(where: { $0.id == selectedRouteId })?.distance ?? currentTrip.distance
+    }
+
+    // MARK: - View Body
     var body: some View {
         mainContentView
     }
     
+    // MARK: - View Components
     private var mainContentView: some View {
         ZStack {
             NavigationView {
@@ -80,11 +99,20 @@ struct HomeView: View {
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            showingChatBot = true
-                        }) {
-                            Label("SOS", systemImage: "exclamationmark.circle.fill")
-                                .foregroundColor(.red)
+                        HStack(spacing: 16) {
+                            Button {
+                                showingChatBot = true
+                            } label: {
+                                Image(systemName: "message.fill")
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Button {
+                                showingProfile = true
+                            } label: {
+                                Image(systemName: "person.circle")
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
                 }
@@ -99,6 +127,9 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.3), value: showingNavigation)
         .sheet(isPresented: $showingChatBot) {
             ChatBotView()
+        }
+        .sheet(isPresented: $showingProfile) {
+            ProfileView()
         }
         .sheet(isPresented: $showingPreTripInspection) {
             VehicleInspectionView(isPreTrip: true) { success in
@@ -145,10 +176,6 @@ struct HomeView: View {
             Text("You are currently unavailable for trips")
                 .foregroundColor(.gray)
             Spacer()
-            Button("Go Available") {
-                availabilityManager.isAvailable = true
-            }
-            .foregroundColor(.blue)
         }
         .padding()
         .background(Color(.systemBackground))
@@ -275,15 +302,6 @@ struct HomeView: View {
         }
     }
     
-    // Route Information
-    private var selectedRouteEta: String {
-        availableRoutes.first(where: { $0.id == selectedRouteId })?.eta ?? currentTrip.eta
-    }
-    
-    private var selectedRouteDistance: String {
-        availableRoutes.first(where: { $0.id == selectedRouteId })?.distance ?? currentTrip.distance
-    }
-    
     private var routeSelectionView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Available Routes")
@@ -336,15 +354,6 @@ struct HomeView: View {
             }
         }
         .padding(.vertical, 8)
-    }
-    
-    // Add RouteOption struct
-    struct RouteOption: Identifiable {
-        let id: String
-        let name: String
-        let eta: String
-        let distance: String
-        let isRecommended: Bool
     }
     
     private var tripLocationsView: some View {
@@ -643,6 +652,7 @@ struct HomeView: View {
         .padding(.horizontal)
     }
     
+    // MARK: - Helper Methods
     private func markCurrentTripDelivered() {
         if currentTrip.hasCompletedPostTrip {
             // Use the TripDataController to mark the trip as delivered

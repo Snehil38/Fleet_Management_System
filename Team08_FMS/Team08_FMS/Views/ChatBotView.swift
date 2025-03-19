@@ -22,136 +22,43 @@ struct QuickAction: Identifiable {
 
 struct ChatBotView: View {
     @Environment(\.presentationMode) var presentationMode
-    @State private var messages: [Message] = []
-    @State private var newMessage = ""
-    @State private var isTyping = false
-    @State private var selectedDepartment: Department = .fleet
+    @State private var selectedRole = CommunicationRole.fleetManager
+    @State private var message = ""
+    @FocusState private var isFocused: Bool
     
-    enum Department: String, CaseIterable {
-        case fleet = "Fleet Management"
+    enum CommunicationRole: String, CaseIterable {
+        case fleetManager = "Fleet Manager"
         case maintenance = "Maintenance"
     }
     
-    let quickActions = [
-        QuickAction(title: "Vehicle Breakdown", icon: "wrench.fill", color: .red),
-        QuickAction(title: "Medical Emergency", icon: "cross.fill", color: .red),
-        QuickAction(title: "Accident", icon: "exclamationmark.triangle.fill", color: .red),
-        QuickAction(title: "Weather Conditions", icon: "cloud.rain.fill", color: .orange),
-        QuickAction(title: "Route Assistance", icon: "map.fill", color: .blue)
-    ]
-    
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Chat Header
-                VStack(spacing: 12) {
-                    Text("Emergency Support")
-                        .font(.headline)
-                    Text("We're here to help 24/7")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                    
-                    Picker("Department", selection: $selectedDepartment) {
-                        ForEach(Department.allCases, id: \.self) { department in
-                            Text(department.rawValue).tag(department)
-                        }
+            VStack(spacing: 20) {
+                // Role Selector
+                Picker("Select Role", selection: $selectedRole) {
+                    ForEach(CommunicationRole.allCases, id: \.self) { role in
+                        Text(role.rawValue).tag(role)
                     }
-                    .pickerStyle(.segmented)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                
+                // Contact Card
+                ContactCard(role: selectedRole)
                     .padding(.horizontal)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color(.systemBackground))
-                .shadow(radius: 2)
                 
-                // Department Info
-                HStack(spacing: 12) {
-                    Image(systemName: selectedDepartment == .fleet ? "car.2.fill" : "wrench.and.screwdriver.fill")
-                        .foregroundColor(selectedDepartment == .fleet ? .blue : .orange)
-                    Text("Connected to \(selectedDepartment.rawValue)")
-                        .font(.subheadline)
-                    Spacer()
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                }
-                .padding()
-                .background(Color(.systemBackground))
-                
-                // Messages
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(messages) { message in
-                                MessageView(message: message) { action in
-                                    handleQuickAction(action)
-                                }
-                            }
-                        }
-                        .padding()
-                    }
-                    .onChange(of: messages.count) { oldCount, newCount in
-                        withAnimation {
-                            proxy.scrollTo(messages.last?.id, anchor: .bottom)
-                        }
-                    }
-                }
-                
-                // Quick Actions
-                if messages.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("How can we help?")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(quickActions) { action in
-                                    Button(action: { handleQuickAction(action) }) {
-                                        VStack(spacing: 8) {
-                                            Image(systemName: action.icon)
-                                                .font(.title2)
-                                            Text(action.title)
-                                                .font(.caption)
-                                                .multilineTextAlignment(.center)
-                                        }
-                                        .frame(width: 80)
-                                        .padding()
-                                        .background(action.color.opacity(0.1))
-                                        .foregroundColor(action.color)
-                                        .cornerRadius(12)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    .padding(.vertical)
-                }
+                Spacer()
                 
                 // Message Input
-                HStack(spacing: 12) {
-                    TextField("Type your message...", text: $newMessage)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                    
-                    Button(action: sendMessage) {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundColor(.white)
-                            .padding(10)
-                            .background(newMessage.isEmpty ? Color.gray : Color.blue)
-                            .clipShape(Circle())
-                    }
-                    .disabled(newMessage.isEmpty)
+                MessageInputField(message: $message, isFocused: _isFocused) {
+                    sendMessage()
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .shadow(radius: 2)
             }
+            .navigationTitle("Messages")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") {
+                    Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
@@ -160,121 +67,85 @@ struct ChatBotView: View {
     }
     
     private func sendMessage() {
-        guard !newMessage.isEmpty else { return }
-        
-        let userMessage = Message(content: newMessage, isUser: true, timestamp: Date())
-        messages.append(userMessage)
-        newMessage = ""
-        
-        // Simulate bot typing
-        isTyping = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isTyping = false
-            handleBotResponse(to: userMessage)
-        }
-    }
-    
-    private func handleQuickAction(_ action: QuickAction) {
-        let message = Message(content: action.title, isUser: true, timestamp: Date())
-        messages.append(message)
-        
-        // Simulate bot typing
-        isTyping = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isTyping = false
-            handleBotResponse(to: message)
-        }
-    }
-    
-    private func handleBotResponse(to message: Message) {
-        var response = ""
-        var type: MessageType = .text
-        let department = selectedDepartment.rawValue
-        
-        switch message.content {
-        case "Vehicle Breakdown":
-            response = "I understand you're experiencing a breakdown. I've notified our \(department.lowercased()) team and they're on their way. Your location has been shared with them. Would you like me to contact emergency roadside assistance as well?"
-            type = .action(actions: [
-                QuickAction(title: "Yes, Call Assistance", icon: "phone.fill", color: .green),
-                QuickAction(title: "No, Wait for Team", icon: "clock.fill", color: .orange)
-            ])
-        case "Medical Emergency":
-            response = "I'm contacting emergency services right away and notifying your fleet manager. Please stay calm and don't move if injured. Emergency services are being dispatched to your location."
-        case "Accident":
-            response = "I'm alerting emergency services and your fleet manager immediately. Please ensure you're in a safe location if possible. Do you need medical assistance?"
-            type = .action(actions: [
-                QuickAction(title: "Need Medical Help", icon: "cross.fill", color: .red),
-                QuickAction(title: "No Injuries", icon: "checkmark.circle.fill", color: .green)
-            ])
-        case "Weather Conditions":
-            response = "I'll help you assess the situation and provide guidance. What specific weather challenges are you facing?"
-            type = .action(actions: [
-                QuickAction(title: "Heavy Rain", icon: "cloud.rain.fill", color: .blue),
-                QuickAction(title: "Snow/Ice", icon: "snow", color: .blue),
-                QuickAction(title: "Strong Winds", icon: "wind", color: .orange)
-            ])
-        case "Route Assistance":
-            response = "I'll help you find the safest alternative route. Please confirm your current location and I'll provide updated navigation instructions."
-        default:
-            response = "I understand you need assistance. I'm connecting you with our \(department.lowercased()) team. What specific support do you need?"
-        }
-        
-        let botMessage = Message(content: response, isUser: false, timestamp: Date(), type: type)
-        messages.append(botMessage)
+        // Handle sending message
+        message = ""
+        isFocused = false
     }
 }
 
-struct MessageView: View {
-    let message: Message
-    let onActionSelected: (QuickAction) -> Void
+struct ContactCard: View {
+    let role: ChatBotView.CommunicationRole
     
     var body: some View {
-        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
-            // Message bubble
-            HStack {
-                if message.isUser { Spacer() }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: role == .fleetManager ? "person.2.fill" : "wrench.and.screwdriver.fill")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+                    .frame(width: 40, height: 40)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
                 
-                VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
-                    Text(message.content)
-                        .padding(12)
-                        .background(message.isUser ? Color.blue : Color.gray.opacity(0.2))
-                        .foregroundColor(message.isUser ? .white : .primary)
-                        .cornerRadius(20)
-                    
-                    Text(message.timestamp, style: .time)
-                        .font(.caption2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(role == .fleetManager ? "John Smith" : "Mike Johnson")
+                        .font(.headline)
+                    Text(role.rawValue)
+                        .font(.subheadline)
                         .foregroundColor(.gray)
                 }
                 
-                if !message.isUser { Spacer() }
+                Spacer()
+                
+                Image(systemName: "phone.fill")
+                    .foregroundColor(.blue)
+                    .padding(8)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
             }
             
-            // Quick actions if available
-            if case .action(let actions) = message.type {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(actions) { action in
-                            Button(action: { onActionSelected(action) }) {
-                                HStack {
-                                    Image(systemName: action.icon)
-                                    Text(action.title)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(action.color.opacity(0.1))
-                                .foregroundColor(action.color)
-                                .cornerRadius(16)
-                            }
-                        }
-                    }
-                }
-            }
+            Text(role == .fleetManager ? "Available: Mon-Fri, 9AM-5PM" : "Available: 24/7")
+                .font(.caption)
+                .foregroundColor(.gray)
         }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5)
     }
 }
 
-struct ChatBotView_Previews: PreviewProvider {
-    static var previews: some View {
-        ChatBotView()
+struct MessageInputField: View {
+    @Binding var message: String
+    @FocusState var isFocused: Bool
+    let onSend: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            TextField("Type your message...", text: $message)
+                .padding(12)
+                .background(Color(.systemGray6))
+                .cornerRadius(20)
+                .focused($isFocused)
+            
+            Button(action: onSend) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(message.isEmpty ? .gray : .blue)
+            }
+            .disabled(message.isEmpty)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(.systemBackground))
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(Color(.systemGray5)),
+            alignment: .top
+        )
     }
+}
+
+#Preview {
+    ChatBotView()
 } 
