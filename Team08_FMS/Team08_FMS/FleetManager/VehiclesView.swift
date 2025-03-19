@@ -279,9 +279,12 @@ private struct DeleteVehiclesView: View {
 }
 
 struct VehiclesView: View {
-    @ObservedObject var vehicleManager: VehicleManager
+    @EnvironmentObject private var dataManager: CrewDataManager
+    @EnvironmentObject private var vehicleManager: VehicleManager
     @State private var showingAddVehicle = false
     @State private var showingDeleteMode = false
+    @State private var showingProfile = false
+    @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: VehicleStatus?
 
@@ -313,16 +316,36 @@ struct VehiclesView: View {
             .navigationTitle("Vehicles")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-//                        Button(action: { showingDeleteMode = true }) {
-//                            Image(systemName: "trash")
-//                                .foregroundColor(.red)
-//                        }
-
+                    HStack(spacing: 16) {
                         Button(action: { showingAddVehicle = true }) {
                             Image(systemName: "plus")
                         }
+//                        Button {
+//                            showingMessages = true
+//                        } label: {
+//                            Image(systemName: "message.fill")
+//                                .foregroundColor(.blue)
+//                        }
+//
+//                        Button {
+//                            showingProfile = true
+//                        } label: {
+//                            Image(systemName: "person.circle.fill")
+//                                .foregroundColor(.blue)
+//                        }
                     }
+                }
+            }
+            .sheet(isPresented: $showingProfile) {
+                NavigationView {
+                    FleetManagerProfileView()
+                        .environmentObject(dataManager)
+                }
+            }
+            .sheet(isPresented: $showingMessages) {
+                NavigationView {
+                    ContactView()
+                        .environmentObject(dataManager)
                 }
             }
             .sheet(isPresented: $showingAddVehicle) {

@@ -49,6 +49,8 @@ struct FleetCrewManagementView: View {
     @State private var crewType: CrewType = .drivers
     @State private var showingAddDriverSheet = false
     @State private var showingAddMaintenanceSheet = false
+    @State private var showingProfile = false
+    @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: CrewMember.Status?
 
@@ -123,15 +125,42 @@ struct FleetCrewManagementView: View {
             .navigationTitle("Crew Management")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        if crewType == .drivers {
-                            showingAddDriverSheet = true
-                        } else {
-                            showingAddMaintenanceSheet = true
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            if crewType == .drivers {
+                                showingAddDriverSheet = true
+                            } else {
+                                showingAddMaintenanceSheet = true
+                            }
+                        }) {
+                            Image(systemName: "plus")
                         }
-                    }) {
-                        Image(systemName: "plus")
+//                        Button {
+//                            showingMessages = true
+//                        } label: {
+//                            Image(systemName: "message.fill")
+//                                .foregroundColor(.blue)
+//                        }
+//
+//                        Button {
+//                            showingProfile = true
+//                        } label: {
+//                            Image(systemName: "person.circle.fill")
+//                                .foregroundColor(.blue)
+//                        }
                     }
+                }
+            }
+            .sheet(isPresented: $showingProfile) {
+                NavigationView {
+                    FleetManagerProfileView()
+                        .environmentObject(dataManager)
+                }
+            }
+            .sheet(isPresented: $showingMessages) {
+                NavigationView {
+                    ContactView()
+                        .environmentObject(dataManager)
                 }
             }
             .sheet(isPresented: $showingAddDriverSheet) {
