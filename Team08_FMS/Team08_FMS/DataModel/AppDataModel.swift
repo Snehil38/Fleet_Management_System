@@ -66,27 +66,10 @@ enum VehicleStatus: String, Codable {
     ]
 }
 
-enum TripStatus: String, Codable {
-    case scheduled
-    case inProgress
-    case completed
-    case canceled
-}
-
 struct Route: Codable {
     var startLocation: String
     var endLocation: String
     var waypoints: [String]?
-}
-
-struct Trip: Identifiable, Codable {
-    var id: String
-    var vehicleID: String
-    var driverID: String
-    var route: Route
-    var startTime: Date
-    var endTime: Date?
-    var status: TripStatus
 }
 
 enum MaintenanceStatus: String, Codable {
