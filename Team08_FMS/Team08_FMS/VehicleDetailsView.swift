@@ -185,9 +185,9 @@ struct VehicleDetailView: View {
     @State private var model: String = ""
     @State private var vin: String = ""
     @State private var licensePlate: String = ""
-    @State private var vehicleType: VehicleType = .car
+    @State private var vehicleType: VehicleType = .truck
     @State private var color: String = ""
-    @State private var bodyType: BodyType = .sedan
+    @State private var bodyType: BodyType = .cargo
     @State private var bodySubtype: String = ""
     @State private var msrp: String = ""
     @State private var pollutionExpiry: Date = Date()
@@ -282,16 +282,45 @@ struct VehicleDetailView: View {
                 }
             }
             .navigationTitle(vehicle == nil ? "Add Vehicle" : "Edit Vehicle")
+//            .toolbar {
+//                ToolbarItem(placement: .navigationBarTrailing) {
+//                    Button("Save") {
+//                        saveVehicle()
+//                    }
+//                    .disabled(!isFormValid)
+//                }
+//                ToolbarItem(placement: .navigationBarLeading) {
+//                    Button("Cancel") {
+//                        dismiss()
+//                    }
+//                }
+//            }
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         saveVehicle()
                     }
                     .disabled(!isFormValid)
                 }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                
+                if vehicle != nil {
+                    ToolbarItem(placement: .bottomBar) {
+                        Button(role: .destructive) {
+                            deleteVehicle()
+                        } label: {
+                            HStack {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                                Text("Delete Vehicle")
+                                    .foregroundColor(.red)
+                            }
+                        }
                     }
                 }
             }
@@ -374,4 +403,9 @@ struct VehicleDetailView: View {
 
         dismiss()
     }
-} 
+    private func deleteVehicle() {
+        guard let vehicle = vehicle else { return }
+        vehicleManager.deleteVehicle(vehicle)
+        dismiss()
+    }
+}
