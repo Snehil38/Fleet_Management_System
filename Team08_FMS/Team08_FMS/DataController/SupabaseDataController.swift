@@ -137,7 +137,7 @@ class SupabaseDataController: ObservableObject {
         Task {
             if !isGenPass {
                 do {
-                    try await supabase.auth.signInWithOTP(email: email)
+                    try await supabase.auth.signInWithOTP(email: email, shouldCreateUser: false)
                     completion(true, nil)
                 } catch {
                     signOut()
