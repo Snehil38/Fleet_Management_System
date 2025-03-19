@@ -10,137 +10,120 @@ import SwiftUI
 struct CrewProfileView: View {
     let crewMember: CrewMember
     @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject var dataManager: CrewDataManager
+    @State private var showingDeleteAlert = false
+    @State private var showingMessageSheet = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Header with profile info
-                VStack(spacing: 16) {
-                    // Avatar
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.2))
-                            .frame(width: 100, height: 100)
-
-                        Text(crewMember.avatar)
-                            .font(.system(size: 40, weight: .bold))
-                            .foregroundColor(.blue)
-                    }
-
-                    // Name and role
-                    VStack(spacing: 4) {
-                        Text(crewMember.name)
-                            .font(.title)
-                            .fontWeight(.bold)
-
-                        Text("\(crewMember.role) • ID: \(crewMember.id)")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-
-                    // Status badge
+        Form {
+            // Basic Information Section
+            Section("Basic Information") {
+                LabeledContent("ID", value: crewMember.id)
+                LabeledContent("Name", value: crewMember.name)
+                LabeledContent("Role", value: crewMember.role)
+                HStack {
+                    Text("Status")
+                    Spacer()
                     Text(crewMember.status.rawValue)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(crewMember.status.backgroundColor)
                         .foregroundColor(crewMember.status.color)
-                        .cornerRadius(20)
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color(UIColor.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                .padding(.horizontal)
-
-                // Details section
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Details")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    ForEach(crewMember.details) { detail in
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(detail.label)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-
-                                Text(detail.value)
-                                    .font(.body)
-                            }
-
-                            Spacer()
-                        }
-                        .padding()
-                        .background(Color(UIColor.systemBackground))
-                        .cornerRadius(8)
-                    }
-                }
-                .padding(.horizontal)
-
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button(action: {
-                        // Action for assigning task
-                    }) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Assign Task")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
-
-                    Button(action: {
-                        // Action for sending message
-                    }) {
-                        HStack {
-                            Image(systemName: "message.fill")
-                            Text("Send Message")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
-
-                    Button(action: {
-                        presentationMode.wrappedValue.dismiss()
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.left")
-                            Text("Back to List")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.primary)
-                        .cornerRadius(10)
-                    }
-                }
-                .padding()
             }
-            .padding(.vertical)
+
+            // Details Section
+            Section("Details") {
+                ForEach(crewMember.details) { detail in
+                    LabeledContent(detail.label, value: detail.value)
+                }
+            }
+
+            // Message Button Section
+            Section {
+                Button {
+                    showingMessageSheet = true
+                } label: {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "message.fill")
+                        Text("Send Message")
+                        Spacer()
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+            
+            // Delete Section
+            Section {
+                Button(role: .destructive) {
+                    showingDeleteAlert = true
+                } label: {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "trash")
+                        Text("Delete \(crewMember.role)")
+                        Spacer()
+                    }
+                }
+            }
         }
-        .navigationBarTitle("", displayMode: .inline)
-        .navigationBarBackButtonHidden(true)
-        .navigationBarItems(leading: Button(action: {
-            presentationMode.wrappedValue.dismiss()
-        }) {
-            HStack {
-                Image(systemName: "chevron.left")
-                Text("Back")
+        .navigationTitle(crewMember.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingMessageSheet) {
+            NavigationView {
+                ContactView()
             }
-        })
-        .background(Color(UIColor.systemGroupedBackground))
-        .edgesIgnoringSafeArea(.bottom)
+        }
+        .alert("Delete \(crewMember.role)", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteCrew()
+            }
+        } message: {
+            Text("Are you sure you want to delete this crew member? This action cannot be undone.")
+        }
+    }
+    
+    private func deleteCrew() {
+        if crewMember.role == "Driver" {
+            dataManager.deleteDriver(crewMember.id)
+        } else {
+            dataManager.deleteMaintenancePersonnel(crewMember.id)
+        }
+        presentationMode.wrappedValue.dismiss()
+    }
+}
+
+// Add this view for task assignment
+struct AssignTaskView: View {
+    let crewMember: CrewMember
+    @Environment(\.presentationMode) var presentationMode
+    @State private var taskTitle = ""
+    @State private var taskDescription = ""
+    @State private var dueDate = Date()
+    
+    var body: some View {
+        Form {
+            Section(header: Text("Task Details")) {
+                TextField("Task Title", text: $taskTitle)
+                TextField("Description", text: $taskDescription)
+                DatePicker("Due Date", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
+            }
+        }
+        .navigationTitle("Assign Task")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    presentationMode.wrappedValue.dismiss()
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Assign") {
+                    // Handle task assignment here
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .disabled(taskTitle.isEmpty)
+            }
+        }
     }
 }
 

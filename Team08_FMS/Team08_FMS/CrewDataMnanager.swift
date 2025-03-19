@@ -121,4 +121,38 @@ class CrewDataManager: ObservableObject {
 
         return Array(allCrew[startIndex..<endIndex])
     }
+
+    func updateDriverStatus(_ id: String, status: CrewMember.Status) {
+        if let index = drivers.firstIndex(where: { $0.id == id }) {
+            drivers[index] = CrewMember(
+                id: drivers[index].id,
+                name: drivers[index].name,
+                avatar: drivers[index].avatar,
+                role: drivers[index].role,
+                status: status,
+                details: drivers[index].details
+            )
+        }
+    }
+    
+    func updateMaintenancePersonnelStatus(_ id: String, status: CrewMember.Status) {
+        if let index = maintenancePersonnel.firstIndex(where: { $0.id == id }) {
+            maintenancePersonnel[index] = CrewMember(
+                id: maintenancePersonnel[index].id,
+                name: maintenancePersonnel[index].name,
+                avatar: maintenancePersonnel[index].avatar,
+                role: maintenancePersonnel[index].role,
+                status: status,
+                details: maintenancePersonnel[index].details
+            )
+        }
+    }
+    
+    func deleteDriver(_ id: String) {
+        drivers.removeAll { $0.id == id }
+    }
+    
+    func deleteMaintenancePersonnel(_ id: String) {
+        maintenancePersonnel.removeAll { $0.id == id }
+    }
 }

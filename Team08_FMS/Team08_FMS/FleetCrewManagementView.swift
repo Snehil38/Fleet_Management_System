@@ -232,8 +232,9 @@ struct StatusCard: View {
 
 struct CrewCardView: View {
     let crewMember: CrewMember
-    @State private var showingProfile = false
-    @State private var showingActionSheet = false
+    @EnvironmentObject var dataManager: CrewDataManager
+    @State private var showingDeleteAlert = false
+    @State private var showingMessageSheet = false
 
     private var statusColor: Color {
         switch crewMember.status {
@@ -244,124 +245,127 @@ struct CrewCardView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header with name and status
-            HStack {
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(Color.blue.opacity(0.2))
-                        .frame(width: 40, height: 40)
-                        .overlay(
-                            Text(crewMember.avatar)
+        NavigationLink(destination: CrewProfileView(crewMember: crewMember)) {
+            VStack(spacing: 0) {
+                // Header with name and status
+                HStack {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color.blue.opacity(0.2))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Text(crewMember.avatar)
+                                    .font(.headline)
+                                    .foregroundColor(.blue)
+                            )
+                        
+                        VStack(alignment: .leading) {
+                            Text(crewMember.name)
                                 .font(.headline)
-                                .foregroundColor(.blue)
-                        )
-                    
-                    VStack(alignment: .leading) {
-                        Text(crewMember.name)
-                            .font(.headline)
-                        Text(crewMember.role)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                }
-                
-                Spacer()
-                
-                Text(crewMember.status.rawValue)
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(statusColor)
-                    .clipShape(Capsule())
-            }
-            .padding()
-            
-            Divider()
-            
-            // Details section
-            VStack(spacing: 12) {
-                ForEach(crewMember.details) { detail in
-                    HStack(spacing: 16) {
-                        Label {
-                            Text(detail.label)
-                                .foregroundColor(.secondary)
-                        } icon: {
-                            Image(systemName: iconForDetail(detail.label))
-                                .foregroundColor(.blue)
+                            Text(crewMember.role)
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
                         }
-                        
-                        Spacer()
-                        
-                        Text(detail.value)
-                            .foregroundColor(.primary)
                     }
-                    .font(.subheadline)
-                }
-            }
-            .padding()
-            
-            Divider()
-            
-            // Footer with actions
-            HStack {
-                Button(action: {
-                    showingProfile = true
-                }) {
-                    Label("View Profile", systemImage: "person.circle")
+                    
+                    Spacer()
+                    
+                    Text(crewMember.status.rawValue)
                         .font(.subheadline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(statusColor)
+                        .clipShape(Capsule())
                 }
+                .padding()
                 
-                Spacer()
+                Divider()
                 
-                Menu {
-                    Button(action: {
-                        // Assign task action
-                    }) {
-                        Label("Assign Task", systemImage: "checkmark.circle")
+                // Details section
+                VStack(spacing: 12) {
+                    ForEach(crewMember.details) { detail in
+                        HStack(spacing: 16) {
+                            Label {
+                                Text(detail.label)
+                                    .foregroundColor(.secondary)
+                            } icon: {
+                                Image(systemName: iconForDetail(detail.label))
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Spacer()
+                            
+                            Text(detail.value)
+                                .foregroundColor(.primary)
+                        }
+                        .font(.subheadline)
                     }
-                    
-                    Button(action: {
-                        // Message action
-                    }) {
-                        Label("Send Message", systemImage: "message")
-                    }
-                    
-                    Divider()
-                    
-                    Button(role: .destructive, action: {
-                        showingActionSheet = true
-                    }) {
-                        Label("Remove", systemImage: "trash")
-                    }
+                }
+                .padding()
+            }
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .contextMenu {
+            Button(role: .destructive) {
+                showingDeleteAlert = true
+            } label: {
+                Label("Delete Crew Member", systemImage: "trash")
+            }
+
+            if crewMember.status != .busy {
+                Button {
+                    updateCrewStatus(.busy)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundColor(.gray)
+                    Label("Mark as Busy", systemImage: "person.fill.checkmark")
                 }
             }
-            .padding()
-        }
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .sheet(isPresented: $showingProfile) {
-            NavigationView {
-                CrewProfileView(crewMember: crewMember)
+
+            if crewMember.status != .available {
+                Button {
+                    updateCrewStatus(.available)
+                } label: {
+                    Label("Mark as Available", systemImage: "checkmark.circle.fill")
+                }
+            }
+
+            Button {
+                showingMessageSheet = true
+            } label: {
+                Label("Send Message", systemImage: "message.fill")
             }
         }
-        .actionSheet(isPresented: $showingActionSheet) {
-            ActionSheet(
-                title: Text("Remove \(crewMember.name)"),
-                message: Text("Are you sure you want to remove this crew member? This action cannot be undone."),
-                buttons: [
-                    .destructive(Text("Remove")) {
-                        // Remove crew member action
-                    },
-                    .cancel()
-                ]
-            )
+        .alert("Delete Crew Member", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteCrew()
+            }
+        } message: {
+            Text("Are you sure you want to delete this crew member? This action cannot be undone.")
+        }
+        .sheet(isPresented: $showingMessageSheet) {
+            NavigationView {
+                ContactView()
+            }
+        }
+    }
+    
+    private func updateCrewStatus(_ newStatus: CrewMember.Status) {
+        if crewMember.role == "Driver" {
+            dataManager.updateDriverStatus(crewMember.id, status: newStatus)
+        } else {
+            dataManager.updateMaintenancePersonnelStatus(crewMember.id, status: newStatus)
+        }
+    }
+    
+    private func deleteCrew() {
+        if crewMember.role == "Driver" {
+            dataManager.deleteDriver(crewMember.id)
+        } else {
+            dataManager.deleteMaintenancePersonnel(crewMember.id)
         }
     }
     
