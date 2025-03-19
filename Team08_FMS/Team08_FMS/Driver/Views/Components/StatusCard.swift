@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct StatusCard: View {
+struct DriverStatusCard: View {
     let icon: String
     let title: String
     let value: String
@@ -32,14 +32,14 @@ struct StatusCard: View {
 
 #Preview {
     HStack(spacing: 12) {
-        StatusCard(
+        DriverStatusCard(
             icon: "clock.fill",
             title: "ETA",
             value: "25 mins",
             color: .blue
         )
         
-        StatusCard(
+        DriverStatusCard(
             icon: "arrow.left.and.right",
             title: "Distance",
             value: "8.5 km",
