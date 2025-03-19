@@ -1,32 +1,72 @@
 import SwiftUI
 
+struct RoleSelectionView: View {
+    @State private var selectedRole: String? = nil
+    @State private var navigateToLogin = false
+    let roles = ["Fleet Manager", "Driver", "Maintenance Personnel"]
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("TrackNGo")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.pink.opacity(0.5))
+                    .padding(.top, 20)
+                
+                Image("image")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 200)
+                    .padding(.bottom, 20)
+                
+                Text("Select Your Role")
+                    .font(.headline)
+                
+                VStack(spacing: 10) {
+                    ForEach(roles, id: \ .self) { role in
+                        Button(action: {
+                            selectedRole = role
+                            UserDefaults.standard.set(role, forKey: "selectedRole")
+                            navigateToLogin = true
+                        }) {
+                            Text(role)
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.blue)
+                                .cornerRadius(15)
+                                .shadow(radius: 5)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+            }
+            .padding()
+            .navigationDestination(isPresented: $navigateToLogin) {
+                LoginView(selectedRole: selectedRole ?? "")
+            }
+        }
+    }
+}
+
 struct LoginView: View {
+    var selectedRole: String
     @State private var email: String = ""
     @State private var password: String = ""
     @StateObject private var dataController = SupabaseDataController.shared
     @State private var isLoading: Bool = false
-    @State private var errorMessage: String?
-    @State private var showAlert: Bool = false
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("TrackNGo")
+            Text("Login as \(selectedRole)")
+                .multilineTextAlignment(.center)
                 .font(.title)
                 .fontWeight(.bold)
                 .foregroundColor(Color.pink.opacity(0.5))
                 .padding(.top, 20)
-            
-            Image("image")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 250)
-                .padding(.bottom, 20)
-            
-            Text("Login!")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.bottom, 20)
-            
+                
             TextField("Email", text: $email)
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
@@ -43,15 +83,8 @@ struct LoginView: View {
                 .shadow(radius: 1)
                 .padding(.horizontal, 20)
             
-            if let error = errorMessage {
-                Text(error)
-                    .foregroundColor(.red)
-                    .font(.caption)
-                    .padding()
-            }
-            
             Button(action: {
-                SupabaseDataController.shared.signIn(email: email, password: password)
+                dataController.signIn(email: email, password: password, roleName: selectedRole)
             }) {
                 Text("Login")
                     .font(.headline)
@@ -66,17 +99,13 @@ struct LoginView: View {
             .disabled(isLoading || email.isEmpty || password.isEmpty)
         }
         .padding()
-        .alert(isPresented: Binding<Bool>(
-                    get: { dataController.authError != nil },  // Show alert when error exists
-                    set: { _ in dataController.authError = nil }  // Reset error on dismiss
-        )) {
-            Alert(title: Text("Login Failed"),
-                  message: Text(dataController.authError ?? "Unknown error."),
-                  dismissButton: .default(Text("OK")))
+        .alert(isPresented: $dataController.showAlert) {  // 🔹 Uses showAlert state from controller
+            Alert(title: Text("Alert"), message: Text(dataController.alertMessage), dismissButton: .default(Text("OK")))
         }
     }
 }
 
+
 #Preview {
-    LoginView()
+    RoleSelectionView()
 }
