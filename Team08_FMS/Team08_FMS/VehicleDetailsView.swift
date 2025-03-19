@@ -177,6 +177,7 @@ private struct DocumentUploadRow: View {
 struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var vehicleManager: VehicleManager
+    @State private var isEditing = false
 
     var vehicle: Vehicle?
     @State private var name: String = ""
@@ -185,9 +186,9 @@ struct VehicleDetailView: View {
     @State private var model: String = ""
     @State private var vin: String = ""
     @State private var licensePlate: String = ""
-    @State private var vehicleType: VehicleType = .car
+    @State private var vehicleType: VehicleType = .truck
     @State private var color: String = ""
-    @State private var bodyType: BodyType = .sedan
+    @State private var bodyType: BodyType = .cargo
     @State private var bodySubtype: String = ""
     @State private var msrp: String = ""
     @State private var pollutionExpiry: Date = Date()
@@ -246,33 +247,61 @@ struct VehicleDetailView: View {
     var body: some View {
         NavigationView {
             Form {
-                BasicInformationSection(
-                    name: $name,
-                    year: $year,
-                    make: $make,
-                    model: $model,
-                    vin: $vin,
-                    licensePlate: $licensePlate
-                )
+                if isEditing {
+                    BasicInformationSection(
+                        name: $name,
+                        year: $year,
+                        make: $make,
+                        model: $model,
+                        vin: $vin,
+                        licensePlate: $licensePlate
+                    )
 
-                VehicleDetailsSection(
-                    vehicleType: $vehicleType,
-                    color: $color,
-                    bodyType: $bodyType,
-                    bodySubtype: $bodySubtype,
-                    msrp: $msrp
-                )
+                    VehicleDetailsSection(
+                        vehicleType: $vehicleType,
+                        color: $color,
+                        bodyType: $bodyType,
+                        bodySubtype: $bodySubtype,
+                        msrp: $msrp
+                    )
 
-                DocumentsSection(
-                    pollutionCertificate: $pollutionCertificate,
-                    rc: $rc,
-                    insurance: $insurance,
-                    pollutionExpiry: $pollutionExpiry,
-                    insuranceExpiry: $insuranceExpiry,
-                    showingPollutionPicker: $showingPollutionPicker,
-                    showingRCPicker: $showingRCPicker,
-                    showingInsurancePicker: $showingInsurancePicker
-                )
+                    DocumentsSection(
+                        pollutionCertificate: $pollutionCertificate,
+                        rc: $rc,
+                        insurance: $insurance,
+                        pollutionExpiry: $pollutionExpiry,
+                        insuranceExpiry: $insuranceExpiry,
+                        showingPollutionPicker: $showingPollutionPicker,
+                        showingRCPicker: $showingRCPicker,
+                        showingInsurancePicker: $showingInsurancePicker
+                    )
+                } else {
+                    // View Mode
+                    Section("Basic Information") {
+                        LabeledContent("Name", value: name)
+                        LabeledContent("Year", value: year)
+                        LabeledContent("Make", value: make)
+                        LabeledContent("Model", value: model)
+                        LabeledContent("VIN", value: vin)
+                        LabeledContent("License Plate", value: licensePlate)
+                    }
+
+                    Section("Vehicle Details") {
+                        LabeledContent("Type", value: vehicleType.rawValue.capitalized)
+                        LabeledContent("Color", value: color)
+                        LabeledContent("Body Type", value: bodyType.rawValue.capitalized)
+                        LabeledContent("Body Subtype", value: bodySubtype)
+                        LabeledContent("MSRP", value: msrp)
+                    }
+
+                    Section("Documents") {
+                        LabeledContent("Pollution Certificate", value: pollutionCertificate != nil ? "Attached" : "Not Attached")
+                        LabeledContent("RC", value: rc != nil ? "Attached" : "Not Attached")
+                        LabeledContent("Insurance", value: insurance != nil ? "Attached" : "Not Attached")
+                        LabeledContent("Pollution Expiry", value: pollutionExpiry.formatted(date: .long, time: .omitted))
+                        LabeledContent("Insurance Expiry", value: insuranceExpiry.formatted(date: .long, time: .omitted))
+                    }
+                }
 
                 if let vehicle = vehicle {
                     StatusSection(
@@ -281,17 +310,33 @@ struct VehicleDetailView: View {
                     )
                 }
             }
-            .navigationTitle(vehicle == nil ? "Add Vehicle" : "Edit Vehicle")
+            .navigationTitle(vehicle == nil ? "Add Vehicle" : "Vehicle Details")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        saveVehicle()
+                if vehicle != nil {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        if isEditing {
+                            Button("Save") {
+                                saveVehicle()
+                            }
+                            .disabled(!isFormValid)
+                        } else {
+                            Button("Edit") {
+                                isEditing = true
+                            }
+                        }
                     }
-                    .disabled(!isFormValid)
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                } else {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Save") {
+                            saveVehicle()
+                        }
+                        .disabled(!isFormValid)
+                    }
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
                 }
             }
@@ -326,20 +371,17 @@ struct VehicleDetailView: View {
     }
 
     private func saveVehicle() {
-        let yearInt = Int(year) ?? 0
-        let msrpDouble = Double(msrp) ?? 0.0
-
         let documents = VehicleDocuments(
-            pollutionCertificate: pollutionCertificate,
-            rc: rc,
-            insurance: insurance
+            pollutionCertificate: pollutionCertificate ?? Data(),
+            rc: rc ?? Data(),
+            insurance: insurance ?? Data()
         )
 
         if let vehicle = vehicle {
             vehicleManager.updateVehicle(
                 vehicle,
                 name: name,
-                year: yearInt,
+                year: Int(year) ?? 0,
                 make: make,
                 model: model,
                 vin: vin,
@@ -348,7 +390,7 @@ struct VehicleDetailView: View {
                 color: color,
                 bodyType: bodyType,
                 bodySubtype: bodySubtype,
-                msrp: msrpDouble,
+                msrp: Double(msrp) ?? 0,
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
                 documents: documents
@@ -356,7 +398,7 @@ struct VehicleDetailView: View {
         } else {
             vehicleManager.addVehicle(
                 name: name,
-                year: yearInt,
+                year: Int(year) ?? 0,
                 make: make,
                 model: model,
                 vin: vin,
@@ -365,13 +407,17 @@ struct VehicleDetailView: View {
                 color: color,
                 bodyType: bodyType,
                 bodySubtype: bodySubtype,
-                msrp: msrpDouble,
+                msrp: Double(msrp) ?? 0,
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
                 documents: documents
             )
         }
-
-        dismiss()
+        
+        if isEditing {
+            isEditing = false
+        } else {
+            dismiss()
+        }
     }
-} 
+}

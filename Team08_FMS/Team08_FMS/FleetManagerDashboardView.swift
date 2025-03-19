@@ -9,6 +9,7 @@ import SwiftUI
 
 struct FleetManagerDashboardView: View {
     @StateObject private var vehicleManager = VehicleManager()
+    @StateObject private var dataManager = CrewDataManager()
 
     var body: some View {
         TabView {
@@ -16,7 +17,12 @@ struct FleetManagerDashboardView: View {
                 .tabItem {
                     Label("Vehicles", systemImage: "car.fill")
                 }
-
+            // Crew Tab (only tab)
+            FleetCrewManagementView()
+            .environmentObject(dataManager)
+            .tabItem {
+                Label("Crew", systemImage: "person.3")
+            }
         }
     }
 }

@@ -14,15 +14,15 @@ enum VehicleStatus: String, Codable, CaseIterable {
 }
 
 enum VehicleType: String, Codable, CaseIterable {
-    case car = "Car"
+    
     case truck = "Truck"
     case van = "Van"
-    case bus = "Bus"
+    
 }
 
 enum BodyType: String, Codable, CaseIterable {
-    case sedan = "Sedan"
-    case suv = "SUV"
+    
+   
     case pickup = "Pickup"
     case cargo = "Cargo"
 }
@@ -47,8 +47,8 @@ struct Vehicle: Identifiable, Codable {
     var documents: VehicleDocuments
 
     init(id: UUID = UUID(), name: String = "", year: Int = 0, make: String = "", model: String = "",
-         vin: String = "", licensePlate: String = "", vehicleType: VehicleType = .car,
-         color: String = "", bodyType: BodyType = .sedan, bodySubtype: String = "",
+         vin: String = "", licensePlate: String = "", vehicleType: VehicleType = .truck,
+         color: String = "", bodyType: BodyType = .cargo, bodySubtype: String = "",
          msrp: Double = 0.0, pollutionExpiry: Date = Date(), insuranceExpiry: Date = Date(),
          status: VehicleStatus = .idle, driverId: UUID? = nil, documents: VehicleDocuments = VehicleDocuments()) {
         self.id = id
