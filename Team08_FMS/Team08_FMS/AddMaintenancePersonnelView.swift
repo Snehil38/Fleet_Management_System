@@ -20,6 +20,7 @@ struct AddMaintenancePersonnelView: View {
     @State private var phoneNumber = ""
     @State private var email = ""
     @State private var certification = ""
+    @State private var salary: String = ""
 
     // Available specialties
     let specialties = ["Engine Repair", "Electrical Systems", "Brake Systems", "Transmission", "HVAC", "General Maintenance"]
@@ -75,6 +76,18 @@ struct AddMaintenancePersonnelView: View {
                     
                     TextField("Certification", text: $certification)
                 }
+                
+                // Add Salary Section
+                Section("Compensation") {
+                    TextField("Monthly Salary", text: $salary)
+                        .keyboardType(.decimalPad)
+                        .onChange(of: salary) { newValue in
+                            let filtered = newValue.filter { "0123456789.".contains($0) }
+                            if filtered != newValue {
+                                salary = filtered
+                            }
+                        }
+                }
             }
             .navigationTitle("Add Maintenance Personnel")
             .navigationBarTitleDisplayMode(.inline)
@@ -102,13 +115,7 @@ struct AddMaintenancePersonnelView: View {
             avatar: avatar.isEmpty ? String(name.prefix(2).uppercased()) : avatar,
             role: "Maintenance",
             status: .available,
-            details: [
-                DetailItem(label: "Specialty", value: specialty),
-                DetailItem(label: "Experience", value: "\(experience) years"),
-                DetailItem(label: "Certification", value: certification),
-                DetailItem(label: "Phone", value: phoneNumber),
-                DetailItem(label: "Email", value: email)
-            ]
+            salary: Double(salary) ?? 0.0
         )
         dataManager.addMaintenancePersonnel(newPersonnel)
         presentationMode.wrappedValue.dismiss()

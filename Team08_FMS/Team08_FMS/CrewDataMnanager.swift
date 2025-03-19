@@ -18,12 +18,7 @@ class CrewDataManager: ObservableObject {
                 avatar: "JD",
                 role: "Driver",
                 status: .available,
-                details: [
-                    DetailItem(label: "Experience", value: "5 years"),
-                    DetailItem(label: "License", value: "Class A CDL"),
-                    DetailItem(label: "Last Active", value: "Today, 10:45 AM"),
-                    DetailItem(label: "Vehicle", value: "None assigned")
-                ]
+                salary: 5000.00
             ),
             CrewMember(
                 id: "DR-1982",
@@ -31,12 +26,7 @@ class CrewDataManager: ObservableObject {
                 avatar: "MS",
                 role: "Driver",
                 status: .busy,
-                details: [
-                    DetailItem(label: "Experience", value: "3 years"),
-                    DetailItem(label: "License", value: "Class B CDL"),
-                    DetailItem(label: "Vehicle", value: "Truck #103"),
-                    DetailItem(label: "ETA", value: "2:30 PM Today")
-                ]
+                salary: 5200.00
             ),
             CrewMember(
                 id: "DR-2133",
@@ -44,12 +34,7 @@ class CrewDataManager: ObservableObject {
                 avatar: "AW",
                 role: "Driver",
                 status: .offline,
-                details: [
-                    DetailItem(label: "Experience", value: "2 years"),
-                    DetailItem(label: "License", value: "Class A CDL"),
-                    DetailItem(label: "Next Shift", value: "Tomorrow, 8:00 AM"),
-                    DetailItem(label: "Hours This Week", value: "32 / 40")
-                ]
+                salary: 5000.00
             )
         ]
 
@@ -60,12 +45,7 @@ class CrewDataManager: ObservableObject {
                 avatar: "SJ",
                 role: "Maintenance",
                 status: .available,
-                details: [
-                    DetailItem(label: "Specialty", value: "Engine Repair"),
-                    DetailItem(label: "Experience", value: "7 years"),
-                    DetailItem(label: "Certification", value: "ASE Master Tech"),
-                    DetailItem(label: "Last Job", value: "Yesterday")
-                ]
+                salary: 4800.00
             ),
             CrewMember(
                 id: "MT-0391",
@@ -73,12 +53,7 @@ class CrewDataManager: ObservableObject {
                 avatar: "RT",
                 role: "Maintenance",
                 status: .busy,
-                details: [
-                    DetailItem(label: "Specialty", value: "Electrical Systems"),
-                    DetailItem(label: "Current Task", value: "Truck #108 Repair"),
-                    DetailItem(label: "Location", value: "Main Garage"),
-                    DetailItem(label: "ETA Completion", value: "1:15 PM Today")
-                ]
+                salary: 5000.00
             ),
             CrewMember(
                 id: "MT-0512",
@@ -86,12 +61,7 @@ class CrewDataManager: ObservableObject {
                 avatar: "EH",
                 role: "Maintenance",
                 status: .offline,
-                details: [
-                    DetailItem(label: "Specialty", value: "Brake Systems"),
-                    DetailItem(label: "Experience", value: "4 years"),
-                    DetailItem(label: "Next Shift", value: "Tomorrow, 9:00 AM"),
-                    DetailItem(label: "Last Job", value: "Yesterday, Bus #24")
-                ]
+                salary: 4900.00
             )
         ]
     }
@@ -124,27 +94,17 @@ class CrewDataManager: ObservableObject {
 
     func updateDriverStatus(_ id: String, status: CrewMember.Status) {
         if let index = drivers.firstIndex(where: { $0.id == id }) {
-            drivers[index] = CrewMember(
-                id: drivers[index].id,
-                name: drivers[index].name,
-                avatar: drivers[index].avatar,
-                role: drivers[index].role,
-                status: status,
-                details: drivers[index].details
-            )
+            var updatedDriver = drivers[index]
+            updatedDriver.status = status
+            drivers[index] = updatedDriver
         }
     }
     
     func updateMaintenancePersonnelStatus(_ id: String, status: CrewMember.Status) {
         if let index = maintenancePersonnel.firstIndex(where: { $0.id == id }) {
-            maintenancePersonnel[index] = CrewMember(
-                id: maintenancePersonnel[index].id,
-                name: maintenancePersonnel[index].name,
-                avatar: maintenancePersonnel[index].avatar,
-                role: maintenancePersonnel[index].role,
-                status: status,
-                details: maintenancePersonnel[index].details
-            )
+            var updatedPersonnel = maintenancePersonnel[index]
+            updatedPersonnel.status = status
+            maintenancePersonnel[index] = updatedPersonnel
         }
     }
     
@@ -156,31 +116,37 @@ class CrewDataManager: ObservableObject {
         maintenancePersonnel.removeAll { $0.id == id }
     }
 
-    func updateDriver(_ id: String, name: String, details: [DetailItem]) {
-        if let index = drivers.firstIndex(where: { $0.id == id }) {
-            let updatedDriver = CrewMember(
-                id: drivers[index].id,
-                name: name,
-                avatar: String(name.prefix(2).uppercased()),
-                role: drivers[index].role,
-                status: drivers[index].status,
-                details: details
+    func updateDriver(_ updatedDriver: CrewMember) {
+        if let index = drivers.firstIndex(where: { $0.id == updatedDriver.id }) {
+            let driver = CrewMember(
+                id: updatedDriver.id,
+                name: updatedDriver.name,
+                avatar: updatedDriver.avatar,
+                role: updatedDriver.role,
+                status: updatedDriver.status,
+                salary: updatedDriver.salary
             )
-            drivers[index] = updatedDriver
+            drivers[index] = driver
         }
     }
     
-    func updateMaintenancePersonnel(_ id: String, name: String, details: [DetailItem]) {
-        if let index = maintenancePersonnel.firstIndex(where: { $0.id == id }) {
-            let updatedPersonnel = CrewMember(
-                id: maintenancePersonnel[index].id,
-                name: name,
-                avatar: String(name.prefix(2).uppercased()),
-                role: maintenancePersonnel[index].role,
-                status: maintenancePersonnel[index].status,
-                details: details
+    func updateMaintenancePersonnel(_ updatedPersonnel: CrewMember) {
+        if let index = maintenancePersonnel.firstIndex(where: { $0.id == updatedPersonnel.id }) {
+            let personnel = CrewMember(
+                id: updatedPersonnel.id,
+                name: updatedPersonnel.name,
+                avatar: updatedPersonnel.avatar,
+                role: updatedPersonnel.role,
+                status: updatedPersonnel.status,
+                salary: updatedPersonnel.salary
             )
-            maintenancePersonnel[index] = updatedPersonnel
+            maintenancePersonnel[index] = personnel
         }
+    }
+
+    var totalSalaryExpenses: Double {
+        let driversSalaries = drivers.reduce(0) { $0 + $1.salary }
+        let maintenanceSalaries = maintenancePersonnel.reduce(0) { $0 + $1.salary }
+        return driversSalaries + maintenanceSalaries
     }
 }

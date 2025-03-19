@@ -15,23 +15,22 @@ struct DetailItem: Identifiable {
 
 struct CrewProfileView: View {
     let crewMember: CrewMember
-    @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var dataManager: CrewDataManager
+    @Environment(\.presentationMode) private var presentationMode
+    @EnvironmentObject private var dataManager: CrewDataManager
     @State private var showingDeleteAlert = false
-    @State private var showingMessageSheet = false
     @State private var isEditing = false
+    
+    // Editing states
     @State private var editedName: String = ""
-    @State private var editedDetails: [DetailItem] = []
-
-    init(crewMember: CrewMember) {
-        self.crewMember = crewMember
-        _editedName = State(initialValue: crewMember.name)
-        _editedDetails = State(initialValue: crewMember.details)
-    }
-
+    @State private var editedPhone: String = ""
+    @State private var editedEmail: String = ""
+    @State private var editedExperience: String = ""
+    @State private var editedSalary: String = ""
+    @State private var editedLicense: String = ""  // For drivers
+    @State private var editedSpecialty: String = "" // For maintenance
+    
     var body: some View {
         Form {
-            // Basic Information Section
             Section("Basic Information") {
                 if isEditing {
                     TextField("Name", text: $editedName)
@@ -44,8 +43,8 @@ struct CrewProfileView: View {
                             .foregroundColor(crewMember.status.color)
                     }
                 } else {
-                    LabeledContent("ID", value: crewMember.id)
                     LabeledContent("Name", value: crewMember.name)
+                    LabeledContent("ID", value: crewMember.id)
                     LabeledContent("Role", value: crewMember.role)
                     HStack {
                         Text("Status")
@@ -55,41 +54,43 @@ struct CrewProfileView: View {
                     }
                 }
             }
-
-            // Details Section
-            Section("Details") {
+            
+            Section("Contact Information") {
                 if isEditing {
-                    ForEach($editedDetails) { $detail in
-                        HStack {
-                            Text(detail.label)
-                            Spacer()
-                            TextField("Value", text: $detail.value)
-                                .multilineTextAlignment(.trailing)
-                        }
-                    }
+                    TextField("Phone", text: $editedPhone)
+                        .keyboardType(.phonePad)
+                    TextField("Email", text: $editedEmail)
+                        .keyboardType(.emailAddress)
                 } else {
-                    ForEach(crewMember.details) { detail in
-                        LabeledContent(detail.label, value: detail.value)
-                    }
-                }
-            }
-
-            // Message Button Section
-            Section {
-                Button {
-                    showingMessageSheet = true
-                } label: {
-                    HStack {
-                        Spacer()
-                        Image(systemName: "message.fill")
-                        Text("Send Message")
-                        Spacer()
-                    }
-                    .foregroundColor(.blue)
+                    LabeledContent("Phone", value: getDetail(label: "Phone"))
+                    LabeledContent("Email", value: getDetail(label: "Email"))
                 }
             }
             
-            // Delete Section
+            Section("Professional Details") {
+                if isEditing {
+                    TextField("Experience (years)", text: $editedExperience)
+                        .keyboardType(.numberPad)
+                    
+                    if crewMember.role == "Driver" {
+                        TextField("License Type", text: $editedLicense)
+                    } else {
+                        TextField("Specialty", text: $editedSpecialty)
+                    }
+                    
+                    TextField("Monthly Salary", text: $editedSalary)
+                        .keyboardType(.decimalPad)
+                } else {
+                    LabeledContent("Experience", value: getDetail(label: "Experience"))
+                    if crewMember.role == "Driver" {
+                        LabeledContent("License", value: getDetail(label: "License"))
+                    } else {
+                        LabeledContent("Specialty", value: getDetail(label: "Specialty"))
+                    }
+                    LabeledContent("Salary", value: "$\(String(format: "%.2f", crewMember.salary))")
+                }
+            }
+            
             Section {
                 Button(role: .destructive) {
                     showingDeleteAlert = true
@@ -107,21 +108,16 @@ struct CrewProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                if isEditing {
-                    Button("Save") {
+                Button(isEditing ? "Save" : "Edit") {
+                    if isEditing {
                         saveChanges()
                     }
-                } else {
-                    Button("Edit") {
-                        isEditing = true
-                    }
+                    isEditing.toggle()
                 }
             }
         }
-        .sheet(isPresented: $showingMessageSheet) {
-            NavigationView {
-                ContactView()
-            }
+        .onAppear {
+            initializeEditingFields()
         }
         .alert("Delete \(crewMember.role)", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -133,14 +129,38 @@ struct CrewProfileView: View {
         }
     }
     
-    private func saveChanges() {
-        // Update the crew member with edited details
+    private func initializeEditingFields() {
+        editedName = crewMember.name
+        editedPhone = getDetail(label: "Phone")
+        editedEmail = getDetail(label: "Email")
+        editedExperience = getDetail(label: "Experience").replacingOccurrences(of: " years", with: "")
+        editedSalary = String(format: "%.2f", crewMember.salary)
         if crewMember.role == "Driver" {
-            dataManager.updateDriver(crewMember.id, name: editedName, details: editedDetails)
+            editedLicense = getDetail(label: "License")
         } else {
-            dataManager.updateMaintenancePersonnel(crewMember.id, name: editedName, details: editedDetails)
+            editedSpecialty = getDetail(label: "Specialty")
         }
-        isEditing = false
+    }
+    
+    private func getDetail(label: String) -> String {
+        crewMember.details.first(where: { $0.label == label })?.value ?? ""
+    }
+    
+    private func saveChanges() {
+        let updatedMember = CrewMember(
+            id: crewMember.id,
+            name: editedName,
+            avatar: String(editedName.prefix(2).uppercased()),
+            role: crewMember.role,
+            status: crewMember.status,
+            salary: Double(editedSalary) ?? crewMember.salary
+        )
+        
+        if crewMember.role == "Driver" {
+            dataManager.updateDriver(updatedMember)
+        } else {
+            dataManager.updateMaintenancePersonnel(updatedMember)
+        }
     }
     
     private func deleteCrew() {
@@ -153,7 +173,6 @@ struct CrewProfileView: View {
     }
 }
 
-// Add this view for task assignment
 struct AssignTaskView: View {
     let crewMember: CrewMember
     @Environment(\.presentationMode) var presentationMode
@@ -190,18 +209,16 @@ struct AssignTaskView: View {
 
 #Preview {
     NavigationView {
-        CrewProfileView(crewMember: CrewMember(
-            id: "DR-2025",
-            name: "John Doe",
-            avatar: "JD",
-            role: "Driver",
-            status: CrewMember.Status.available,
-            details: [
-                DetailItem(label: "Experience", value: "5 years"),
-                DetailItem(label: "License", value: "Class A CDL"),
-                DetailItem(label: "Last Active", value: "Today, 10:45 AM"),
-                DetailItem(label: "Vehicle", value: "None assigned")
-            ]
-        ))
+        CrewProfileView(
+            crewMember: CrewMember(
+                id: "TEST-001",
+                name: "John Doe",
+                avatar: "JD",
+                role: "Driver",
+                status: .available,
+                salary: 5000.0
+            )
+        )
+        .environmentObject(CrewDataManager())
     }
 }
