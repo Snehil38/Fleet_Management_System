@@ -22,7 +22,7 @@ struct ContentView: View {
                     case "fleet_manager":
                         FleetManagerDashboardView()
                     case "driver":
-                        DriverDashboardView()
+                        HomeView()
                     case "maintenance_personnel":
                         MaintenancePersonnelDashboardView()
                     default:
