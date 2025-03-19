@@ -13,12 +13,12 @@ struct FleetManagerTabView: View {
 
     var body: some View {
         TabView {
-            FleetManagerDashboardTabView()
-                .environmentObject(dataManager)
-                .environmentObject(vehicleManager)
-                .tabItem {
-                    Label("Dashboard", systemImage: "car.fill")
-                }
+//            FleetManagerDashboardTabView()
+//                .environmentObject(dataManager)
+//                .environmentObject(vehicleManager)
+//                .tabItem {
+//                    Label("Dashboard", systemImage: "car.fill")
+//                }
             
             VehiclesView()
                 .environmentObject(dataManager)

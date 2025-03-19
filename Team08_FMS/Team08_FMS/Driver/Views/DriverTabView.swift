@@ -45,12 +45,12 @@ struct DriverTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            mainContentView
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
-                }
-                .tag(0)
-            
+//            mainContentView
+//                .tabItem {
+//                    Label("Home", systemImage: "house.fill")
+//                }
+//                .tag(0)
+//            
             NavigationView {
                 TripsView()
             }
