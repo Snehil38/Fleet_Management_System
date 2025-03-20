@@ -3,6 +3,7 @@ import CoreLocation
 
 struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
+    @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @State private var selectedFilter: TripFilter = .all
     
     enum TripFilter {
@@ -38,15 +39,21 @@ struct TripsView: View {
         switch selectedFilter {
         case .all:
             var allTrips: [Trip] = []
-            if tripController.currentTrip.status == .current {
+            if tripController.currentTrip.status == .current && availabilityManager.isAvailable {
                 allTrips.append(tripController.currentTrip)
             }
-            allTrips.append(contentsOf: tripController.upcomingTrips)
+            
+            // Only include upcoming trips if driver is available
+            if availabilityManager.isAvailable {
+                allTrips.append(contentsOf: tripController.upcomingTrips)
+            }
+            
             return allTrips
         case .current:
-            return tripController.currentTrip.status == .current ? [tripController.currentTrip] : []
+            return tripController.currentTrip.status == .current && availabilityManager.isAvailable ? 
+                [tripController.currentTrip] : []
         case .upcoming:
-            return tripController.upcomingTrips
+            return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
             // Filter recent deliveries to show only delivered trips
             return tripController.recentDeliveries.map { delivery in

@@ -9,6 +9,7 @@ import SwiftUI
 struct DriverTabView: View {
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
+
     @State private var showingChatBot = false
     @State private var showingPreTripInspection = false
     @State private var showingPostTripInspection = false
@@ -16,6 +17,7 @@ struct DriverTabView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var selectedTab = 0
+    @State private var showingProfileView = false
     
     // State properties for trip data
     @State private var currentTrip: Trip
@@ -58,28 +60,25 @@ struct DriverTabView: View {
                 Label("Trips", systemImage: "car.fill")
             }
             .tag(1)
-            
-            NavigationView {
-                DriverProfileView()
-            }
-            .tabItem {
-                Label("Profile", systemImage: "person.fill")
-            }
-            .tag(2)
         }
+        .animation(.easeInOut(duration: 0.3), value: selectedTab)
     }
     
     private var mainContentView: some View {
         ZStack {
+            // Background gradient
+            LinearGradient(
+                gradient: Gradient(colors: [Color.blue.opacity(0.05), Color.white]),
+                startPoint: .top,
+                endPoint: .center
+            )
+            .edgesIgnoringSafeArea(.all)
+            
             NavigationView {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 24) {
-                        if !availabilityManager.isAvailable {
-                            unavailableBanner
-                        }
-
                         // Current Delivery Card
-                        if currentTrip.status == .current {
+                        if currentTrip.status == .current && availabilityManager.isAvailable {
                             currentDeliveryCard
                         }
                         
@@ -92,26 +91,47 @@ struct DriverTabView: View {
 
                             // Upcoming Trips
                             upcomingTripsSection
+                        } else {
+                            // Display message when driver is unavailable
+                            unavailableDriverSection
                         }
 
                         // Recent Deliveries
                         recentDeliveriesSection
+                        
+                        // Bottom padding for better scrolling experience
+                        Spacer().frame(height: 20)
                     }
-                    .padding(.vertical, 16)
+                    .padding(.top, 8)
                 }
                 .navigationTitle("Home")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            showingChatBot = true
-                        }) {
-                            Label("SOS", systemImage: "exclamationmark.circle.fill")
-                                .foregroundColor(.red)
+                        HStack(spacing: 16) {
+                            Button(action: {
+                                showingChatBot = true
+                            }) {
+                                Image(systemName: "message.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Button(action: {
+                                showingProfileView = true
+                            }) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.blue)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.blue.opacity(0.2), lineWidth: 2)
+                                            .frame(width: 30, height: 30)
+                                    )
+                            }
                         }
                     }
                 }
-                .background(Color(.systemGroupedBackground))
             }
             
             // Full-screen navigation view
@@ -123,11 +143,16 @@ struct DriverTabView: View {
         .sheet(isPresented: $showingChatBot) {
             ChatBotView()
         }
+        .sheet(isPresented: $showingProfileView) {
+            DriverProfileView()
+        }
         .sheet(isPresented: $showingPreTripInspection) {
             VehicleInspectionView(isPreTrip: true) { success in
                 if success {
+                    // Only mark as completed if successful
                     currentTrip.hasCompletedPreTrip = true
                 } else {
+                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before starting the trip"
                     showingAlert = true
                 }
@@ -136,9 +161,11 @@ struct DriverTabView: View {
         .sheet(isPresented: $showingPostTripInspection) {
             VehicleInspectionView(isPreTrip: false) { success in
                 if success {
+                    // Only mark as completed and mark delivered if successful
                     currentTrip.hasCompletedPostTrip = true
                     markCurrentTripDelivered()
                 } else {
+                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before completing delivery"
                     showingAlert = true
                 }
@@ -159,24 +186,6 @@ struct DriverTabView: View {
                 DeliveryDetailsView(delivery: delivery)
             }
         }
-    }
-    
-    private var unavailableBanner: some View {
-        HStack {
-            Image(systemName: "moon.fill")
-                .foregroundColor(.gray)
-            Text("You are currently unavailable for trips")
-                .foregroundColor(.gray)
-            Spacer()
-            Button("Go Available") {
-                availabilityManager.isAvailable = true
-            }
-            .foregroundColor(.blue)
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .padding(.horizontal)
     }
     
     private var navigationOverlay: some View {
@@ -496,6 +505,9 @@ struct DriverTabView: View {
                     if !currentTrip.hasCompletedPreTrip {
                         alertMessage = "Please complete pre-trip inspection before marking as delivered"
                         showingAlert = true
+                    } else if currentTrip.hasCompletedPostTrip {
+                        // Already completed post-trip
+                        markCurrentTripDelivered()
                     } else {
                         showingPostTripInspection = true
                     }
@@ -663,6 +675,31 @@ struct DriverTabView: View {
         .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .padding(.horizontal)
+    }
+    
+    private var unavailableDriverSection: some View {
+        VStack(alignment: .center, spacing: 16) {
+            Image(systemName: "car.fill.badge.xmark")
+                .font(.system(size: 48))
+                .foregroundColor(.gray)
+                .padding()
+            
+            Text("You are currently unavailable for trips")
+                .font(.headline)
+                .foregroundColor(.gray)
+            
+            Text("Your status will automatically change back to available tomorrow.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
         .padding(.horizontal)
     }
     

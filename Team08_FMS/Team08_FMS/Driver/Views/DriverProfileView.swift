@@ -3,6 +3,9 @@ import SwiftUI
 struct DriverProfileView: View {
     @StateObject private var auth = SupabaseDataController.shared
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var showingStatusChangeAlert = false
+    @State private var pendingAvailabilityChange = false
     
     // Sample data for fields not available from auth
     private let driverName = "John Anderson"
@@ -16,124 +19,255 @@ struct DriverProfileView: View {
     private let specializedTerrain = "Mountain, Highway"
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Profile header section
-                VStack(spacing: 16) {
-                    Text("Profile")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                    
-                    VStack(spacing: 20) {
-                        // Avatar and name
-                        VStack(spacing: 8) {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 100, height: 100)
-                                .foregroundColor(.blue)
-                            
-                            Text(driverName)
-                                .font(.title)
-                                .fontWeight(.bold)
-                            
-                            Text(driverTitle)
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                        }
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Profile header with photo, name and availability toggle
+                    VStack(spacing: 16) {
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 100, height: 100)
+                            .foregroundColor(.blue)
                         
-                        // Available toggle
+                        Text(driverName)
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        Text(driverTitle)
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
                         HStack {
-                            Text("Available for Trips")
+                            Text("Availability Status")
                                 .font(.headline)
                             
                             Spacer()
                             
-                            Toggle("", isOn: $availabilityManager.isAvailable)
-                                .tint(.green)
+                            if !availabilityManager.isAvailable {
+                                Text("Unavailable")
+                                    .foregroundColor(.red)
+                                    .padding(.trailing, 8)
+                            } else {
+                                Text("Available")
+                                    .foregroundColor(.green)
+                                    .padding(.trailing, 8)
+                            }
+                            
+                            Toggle("", isOn: Binding(
+                                get: { availabilityManager.isAvailable },
+                                set: { newValue in
+                                    // Only allow showing the alert if they're trying to change status
+                                    if newValue != availabilityManager.isAvailable {
+                                        pendingAvailabilityChange = newValue
+                                        showingStatusChangeAlert = true
+                                    }
+                                }
+                            ))
+                            .tint(.green)
                         }
-                        .padding(.horizontal)
                     }
                     .padding()
                     .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                }
-                .padding(.bottom, 20)
-                
-                // Contact Information
-                SectionHeader(title: "CONTACT INFORMATION")
-                
-                VStack(spacing: 0) {
-                    ProfileRow(title: "Phone", value: phoneNumber)
-                    Divider()
-                    ProfileRow(title: "Email", value: driverEmail)
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .padding(.bottom, 20)
-                
-                // License Information
-                SectionHeader(title: "LICENSE INFORMATION")
-                
-                VStack(spacing: 0) {
-                    NavigationLink {
-                        LicenseDetailView(
-                            name: driverName,
-                            licenseNumber: licenseNumber,
-                            expiryDate: licenseExpiry
-                        )
-                    } label: {
-                        HStack {
-                            Text("Driver License")
-                                .foregroundColor(.blue)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
+                    .cornerRadius(16)
+                    
+                    // CONTACT INFORMATION
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("CONTACT INFORMATION")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                            .padding(.bottom, 4)
+                        
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Phone")
+                                    .font(.headline)
+                                Spacer()
+                                Text(phoneNumber)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            
+                            Divider()
+                                .padding(.leading)
+                            
+                            HStack {
+                                Text("Email")
+                                    .font(.headline)
+                                Spacer()
+                                Text(driverEmail)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
                         }
-                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
                     }
                     
-                    Divider()
-                    ProfileRow(title: "License Number", value: licenseNumber)
-                    Divider()
-                    ProfileRow(title: "Expiry Date", value: licenseExpiry)
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .padding(.bottom, 20)
-                
-                // Experience & Expertise
-                SectionHeader(title: "EXPERIENCE & EXPERTISE")
-                
-                VStack(spacing: 0) {
-                    ProfileRow(title: "Experience", value: experience)
-                    Divider()
-                    ProfileRow(title: "Vehicle Type", value: vehicleType)
-                    Divider()
-                    ProfileRow(title: "Specialized Terrain", value: specializedTerrain)
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .padding(.bottom, 20)
-                
-                // Logout Button
-                Button(action: {
-                    auth.signOut()
-                }) {
-                    Text("Logout")
-                        .font(.headline)
-                        .foregroundColor(.red)
-                        .padding()
-                        .frame(maxWidth: .infinity)
+                    // LICENSE INFORMATION
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("LICENSE INFORMATION")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                            .padding(.bottom, 4)
+                        
+                        VStack(spacing: 0) {
+                            NavigationLink {
+                                LicenseDetailView(
+                                    name: driverName,
+                                    licenseNumber: licenseNumber,
+                                    expiryDate: licenseExpiry
+                                )
+                            } label: {
+                                HStack {
+                                    Text("Driver License")
+                                        .font(.headline)
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                            }
+                            
+                            Divider()
+                                .padding(.leading)
+                            
+                            HStack {
+                                Text("License Number")
+                                    .font(.headline)
+                                Spacer()
+                                Text(licenseNumber)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            
+                            Divider()
+                                .padding(.leading)
+                            
+                            HStack {
+                                Text("Expiry Date")
+                                    .font(.headline)
+                                Spacer()
+                                Text(licenseExpiry)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                        }
                         .background(Color(.systemBackground))
-                        .cornerRadius(12)
+                        .cornerRadius(16)
+                    }
+                    
+                    // EXPERIENCE & EXPERTISE
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("EXPERIENCE & EXPERTISE")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                            .padding(.bottom, 4)
+                        
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Experience")
+                                    .font(.headline)
+                                Spacer()
+                                Text(experience)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            
+                            Divider()
+                                .padding(.leading)
+                            
+                            HStack {
+                                Text("Vehicle Type")
+                                    .font(.headline)
+                                Spacer()
+                                Text(vehicleType)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            
+                            Divider()
+                                .padding(.leading)
+                            
+                            HStack {
+                                Text("Specialized Terrain")
+                                    .font(.headline)
+                                Spacer()
+                                Text(specializedTerrain)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                        }
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                    }
+                    
+                    // Logout Button
+                    Button {
+                        auth.signOut()
+                    } label: {
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .foregroundColor(.red)
+                            Text("Logout")
+                                .font(.headline)
+                                .foregroundColor(.red)
+                            Spacer()
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                    }
                 }
-                .padding(.bottom, 20)
+                .padding()
+                .background(Color(.systemGroupedBackground))
             }
-            .padding()
-            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+            .alert(isPresented: $showingStatusChangeAlert) {
+                if pendingAvailabilityChange {
+                    // Going from unavailable to available - show the same style alert as when already unavailable
+                    return Alert(
+                        title: Text("Status Change"),
+                        message: Text("Your status will automatically change back to available tomorrow."),
+                        dismissButton: .default(Text("OK")) {
+                            // Don't change status - keep as unavailable
+                        }
+                    )
+                } else {
+                    // Going from available to unavailable
+                    if availabilityManager.isAvailable {
+                        return Alert(
+                            title: Text("Status Change"),
+                            message: Text("Are you sure you want to change your status to unavailable? You won't be able to change it back until tomorrow."),
+                            primaryButton: .cancel(Text("Cancel")),
+                            secondaryButton: .default(Text("Continue")) {
+                                availabilityManager.updateAvailability(newStatus: false)
+                            }
+                        )
+                    } else {
+                        // Already unavailable, showing confirmation
+                        return Alert(
+                            title: Text("Status Change"),
+                            message: Text("Your status will automatically change back to available tomorrow."),
+                            dismissButton: .default(Text("OK")) {
+                                // Do nothing, already unavailable
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }
