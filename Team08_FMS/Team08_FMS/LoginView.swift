@@ -29,14 +29,6 @@ struct RoleSelectionView: View {
                             selectedRole = role
                             UserDefaults.standard.set(role, forKey: "selectedRole")
                             navigateToLogin = true
-//                            Task {
-//                                do {
-//                                    let driver = try await SupabaseDataController.shared.fetchMaintenancePersonnelByUserID(userID: UUID(uuidString: "44d7842e-ad21-4139-be18-12c21103efde")!)
-//                                    print(driver!)
-//                                } catch {
-//                                    print(error.localizedDescription)
-//                                }
-//                            }
                         }) {
                             Text(role)
                                 .font(.headline)

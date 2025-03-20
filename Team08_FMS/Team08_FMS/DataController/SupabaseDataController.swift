@@ -374,6 +374,7 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("driver")
                 .select()
+                .eq("isDeleted", value: false)
                 .execute()
             
             let data = response.data
@@ -421,8 +422,9 @@ class SupabaseDataController: ObservableObject {
     func fetchMaintenancePersonnel() async throws -> [MaintenancePersonnel] {
         do {
             let response = try await supabase
-                .from("maintenance_personnel") // Corrected table name
+                .from("maintenance_personnel")
                 .select()
+                .eq("isDeleted", value: false)
                 .execute()
             
             let data = response.data
