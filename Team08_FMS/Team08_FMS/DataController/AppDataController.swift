@@ -15,7 +15,7 @@ class AppDataController {
     }
     
     func randomPasswordGenerator(length: Int) -> String {
-        let character = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        let character = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*"
         
         return String((0..<length).map { _ in character.randomElement()! })
     }
