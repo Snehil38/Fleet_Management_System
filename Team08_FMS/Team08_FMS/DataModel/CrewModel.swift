@@ -67,10 +67,10 @@ struct FleetManager: Identifiable, Codable {
     var userID: UUID?
     let id: UUID
     var name: String
-    var profileImage: String
+    var profileImage: String?
     var email: String
     var phoneNumber: Int
-    var createdAt: Date
+    var createdAt: Date?
     var updatedAt: Date?
 }
 

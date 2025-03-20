@@ -274,6 +274,11 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
+    func getUserID() async -> UUID? {
+        guard let userID = supabase.auth.currentUser?.id else { return nil }
+        return userID
+    }
+    
     // MARK: - Fetch User Role
     private func fetchUserRole(userID: UUID) async {
         do {
@@ -442,7 +447,7 @@ class SupabaseDataController: ObservableObject {
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             
             let decoder = JSONDecoder()
@@ -723,5 +728,42 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
+    func updateDriverStatus(newStatus: Status, for userID: UUID) async {
+        // Use [String: String] since newStatus.rawValue is a String.
+        let payload: [String: String] = ["status": newStatus.rawValue]
+        
+        do {
+            let response = try await supabase
+                .from("driver")
+                .update(payload)
+                .eq("userID", value: userID)
+                .execute()
+            
+            let data = response.data
+            let jsonString = String(data: data, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")")
+        } catch {
+            print("Exception updating driver status: \(error.localizedDescription)")
+        }
+    }
+    
+    func updateMaintenancePersonnelStatus(newStatus: Status, for userID: UUID) async {
+        // Use [String: String] since newStatus.rawValue is a String.
+        let payload: [String: String] = ["status": newStatus.rawValue]
+        
+        do {
+            let response = try await supabase
+                .from("driver")
+                .update(payload)
+                .eq("userID", value: userID)
+                .execute()
+            
+            let data = response.data
+            let jsonString = String(data: data, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")")
+        } catch {
+            print("Exception updating driver status: \(error.localizedDescription)")
+        }
+    }
 
 }

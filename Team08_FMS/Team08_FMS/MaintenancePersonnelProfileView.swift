@@ -1,314 +1,250 @@
 import SwiftUI
 
 struct MaintenancePersonnelProfileView: View {
-    
-    @Environment(\.dismiss) var dismiss
-    @State private var isAvailable: Bool = true
-    @State private var showingPasswordReset = false
-    @State private var currentPassword: String = ""
-    @State private var newPassword: String = ""
-    @State private var confirmPassword: String = ""
-    @State private var showingPasswordAlert = false
-    @State private var passwordAlertMessage: String = ""
-    @State private var showingLogoutAlert = false
-    @State private var showingStatusAlert = false
-    @State private var lastStatusChangeDate: Date = Date()
-    @State private var pendingStatusChange: Bool = false
-    
-    let user = MaintenancePersonnel(
-        userID: UUID(),
-        name: "John Doe",
-        profileImage: "person.circle.fill",
-        email: "john.doe@fleetmanagement.com",
-        phoneNumber: 1234567890,
-        certifications: .aseCertified,
-        yearsOfExperience: 2,
-        specialty: .generalMaintenance,
-        salary: 4000.0,
-        address: nil,
-        createdAt: Date(),
-        updatedAt: nil,
-        isDeleted: false,
-        status: .available
-    )
-    
-    // Computed binding for the availability toggle.
-    private var availabilityBinding: Binding<Bool> {
-        Binding<Bool>(
-            get: { isAvailable },
-            set: { newValue in
-                if newValue == false {
-                    showingStatusAlert = true
-                    pendingStatusChange = true
-                } else {
-                    let calendar = Calendar.current
-                    let now = Date()
-                    if let nextDay = calendar.date(byAdding: .day, value: 1, to: lastStatusChangeDate),
-                       now >= nextDay {
-                        isAvailable = newValue
-                        lastStatusChangeDate = now
-                    } else {
-                        showingStatusAlert = true
-                        pendingStatusChange = false
+    @StateObject private var supabaseDataController = SupabaseDataController.shared
+    @State private var personnel: MaintenancePersonnel?
+    @State private var showingStatusChangeAlert = false
+    @State private var pendingStatus: Status?
+    @Environment(\.presentationMode) private var presentationMode
+
+    var body: some View {
+        NavigationView {
+            Group {
+                if let personnel = personnel {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            profileHeader(for: personnel)
+                            statusToggle(for: personnel)
+                            contactInformation(for: personnel)
+                            experienceDetails(for: personnel)
+                            logoutButton
+                        }
+                        .padding()
+                        .background(Color(.systemGroupedBackground))
                     }
+                } else {
+                    ProgressView("Loading...")
+                        .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                }
+            }
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { backButton }
+            .alert(isPresented: $showingStatusChangeAlert, content: { statusChangeAlert })
+            .task { await loadPersonnelData() }
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private func profileHeader(for personnel: MaintenancePersonnel) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: personnel.profileImage ?? "person.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 110, height: 110)
+                .foregroundColor(.blue)
+                .padding(8)
+                .background(Color.blue.opacity(0.1))
+                .clipShape(Circle())
+            
+            Text(personnel.name)
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text(personnel.email)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    private func statusToggle(for personnel: MaintenancePersonnel) -> some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("Status")
+                    .font(.headline)
+                Spacer()
+                Text(statusText(for: personnel))
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(personnel.status.color)
+                
+                Toggle("", isOn: statusToggleBinding(for: personnel))
+                    .tint(.green)
+                    .disabled(personnel.status == .offDuty)
+            }
+            .padding(.horizontal)
+            
+            if personnel.status == .offDuty {
+                Text("Your status will automatically change back to Available tomorrow.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .italic()
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    private func contactInformation(for personnel: MaintenancePersonnel) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("CONTACT INFORMATION")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.horizontal)
+            
+            VStack(spacing: 0) {
+                infoRow(title: "Phone", value: "\(personnel.phoneNumber)")
+                Divider()
+                infoRow(title: "Email", value: personnel.email)
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+    }
+    
+    private func experienceDetails(for personnel: MaintenancePersonnel) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("EXPERIENCE & DETAILS")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.horizontal)
+            
+            VStack(spacing: 0) {
+                infoRow(title: "Experience", value: "\(personnel.yearsOfExperience) Years")
+                Divider()
+                infoRow(title: "Salary", value: "$\(personnel.salary)")
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+    }
+    
+    private var logoutButton: some View {
+        Button {
+            Task { supabaseDataController.signOut() }
+        } label: {
+            HStack {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .foregroundColor(.red)
+                Text("Logout")
+                    .font(.headline)
+                    .foregroundColor(.red)
+                Spacer()
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+        }
+        .padding(.top, 20)
+        .padding(.horizontal)
+    }
+    
+    private var backButton: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button("Back") {
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func infoRow(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.headline)
+            Spacer()
+            Text(value)
+                .foregroundColor(.gray)
+                .font(.subheadline)
+        }
+        .padding()
+    }
+    
+    private func statusText(for personnel: MaintenancePersonnel) -> String {
+        switch personnel.status {
+        case .available:
+            return "Available"
+        case .offDuty:
+            return "Off Duty"
+        case .busy:
+            return "Busy"
+        }
+    }
+    
+    private func statusToggleBinding(for personnel: MaintenancePersonnel) -> Binding<Bool> {
+        Binding<Bool>(
+            get: { personnel.status == .available },
+            set: { newValue in
+                if personnel.status == .offDuty { return }
+                let newStatus: Status = newValue ? .available : .offDuty
+                if newStatus != personnel.status {
+                    updatePendingStatus(newStatus: newStatus)
                 }
             }
         )
     }
     
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    
-                    ProfileHeaderView(user: user)
-                    
-                    AvailabilityView(isAvailable: isAvailable, binding: availabilityBinding)
-                    
-                    ActionButtonsView(
-                        onResetPassword: { showingPasswordReset = true },
-                        onLogout: { showingLogoutAlert = true }
-                    )
-                }
-                .padding(.vertical)
-            }
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        HStack {
-                            Image(systemName: "chevron.left")
-                            Text("Back")
+    private func updatePendingStatus(newStatus: Status) {
+        pendingStatus = newStatus
+        showingStatusChangeAlert = true
+    }
+    
+    // MARK: - Alert Computed Property
+    
+    private var statusChangeAlert: Alert {
+        if pendingStatus == .available {
+            return Alert(
+                title: Text("Confirm Status Change"),
+                message: Text("Your status will be updated to Available."),
+                dismissButton: .default(Text("OK"), action: {
+                    Task {
+                        if let userID = await supabaseDataController.getUserID() {
+                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, for: userID)
+                            self.personnel?.status = .available
                         }
                     }
-                }
-            }
-            // Status Change Alert
-            .alert("Status Change", isPresented: $showingStatusAlert) {
-                if pendingStatusChange {
-                    Button("Continue", role: .none) {
-                        isAvailable = false
-                        lastStatusChangeDate = Date()
+                })
+            )
+        } else {
+            return Alert(
+                title: Text("Confirm Status Change"),
+                message: Text("Are you sure you want to set your status to Off Duty?"),
+                primaryButton: .cancel(Text("Cancel")),
+                secondaryButton: .default(Text("Confirm"), action: {
+                    Task {
+                        if let userID = await supabaseDataController.getUserID() {
+                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, for: userID)
+                            self.personnel?.status = .offDuty
+                        }
                     }
-                    Button("Cancel", role: .cancel) {
-                        isAvailable = true
-                    }
-                } else {
-                    Button("OK", role: .cancel) { }
+                })
+            )
+        }
+    }
+    
+    // MARK: - Data Loading
+    
+    private func loadPersonnelData() async {
+        if let userID = await supabaseDataController.getUserID() {
+            do {
+                if let fetchedPersonnel = try await supabaseDataController.fetchMaintenancePersonnelByUserID(userID: userID) {
+                    self.personnel = fetchedPersonnel
                 }
-            } message: {
-                if pendingStatusChange {
-                    Text("Are you sure you want to change your status to unavailable? You won't be able to change it back until tomorrow.")
-                } else {
-                    Text("Your status will automatically change back to available tomorrow.")
-                }
-            }
-            // Logout Alert
-            .alert("Logout", isPresented: $showingLogoutAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Logout", role: .destructive) {
-                    SupabaseDataController.shared.signOut()
-                }
-            } message: {
-                Text("Are you sure you want to logout?")
-            }
-            // Password Reset Sheet
-            .sheet(isPresented: $showingPasswordReset) {
-                PasswordResetView(
-                    isPresented: $showingPasswordReset,
-                    currentPassword: $currentPassword,
-                    newPassword: $newPassword,
-                    confirmPassword: $confirmPassword,
-                    showingAlert: $showingPasswordAlert,
-                    alertMessage: $passwordAlertMessage
-                )
-            }
-            // Password Reset Alert
-            .alert("Password Reset", isPresented: $showingPasswordAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(passwordAlertMessage)
+            } catch {
+                print("Error fetching personnel: \(error)")
             }
         }
     }
 }
-
-struct ProfileHeaderView: View {
-    let user: MaintenancePersonnel
-    
-    var body: some View {
-        VStack(spacing: 15) {
-            Image(systemName: user.profileImage ?? "person.circle.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 120, height: 120)
-                .foregroundColor(.blue)
-                .padding()
-            
-            Text(user.name)
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text(user.email)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            
-            Text(String(user.phoneNumber))  // Ensure this matches your model
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            
-            // Displaying specialty as the role; adjust as needed.
-            Text(user.specialty.rawValue)
-                .font(.subheadline)
-                .foregroundColor(.blue)
-        }
-        .padding()
-    }
-}
-
-struct AvailabilityView: View {
-    let isAvailable: Bool
-    let binding: Binding<Bool>
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Availability Status")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            HStack {
-                Text(isAvailable ? "Available" : "Unavailable")
-                    .foregroundColor(isAvailable ? .green : .red)
-                Spacer()
-                Toggle("", isOn: binding)
-                    .tint(isAvailable ? .green : .red)
-            }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(10)
-            .padding(.horizontal)
-        }
-        .padding(.vertical)
-    }
-}
-
-struct ActionButtonsView: View {
-    var onResetPassword: () -> Void
-    var onLogout: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 10) {
-            Button(action: onResetPassword) {
-                HStack {
-                    Image(systemName: "lock.rotation")
-                    Text("Reset Password")
-                }
-                .foregroundColor(.blue)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
-            }
-            .padding(.horizontal)
-            
-            Button(action: onLogout) {
-                HStack {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                    Text("Logout")
-                }
-                .foregroundColor(.red)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
-            }
-            .padding(.horizontal)
-            .padding(.top, 20)
-        }
-    }
-}
-
-struct PasswordResetView: View {
-    @Binding var isPresented: Bool
-    @Binding var currentPassword: String
-    @Binding var newPassword: String
-    @Binding var confirmPassword: String
-    @Binding var showingAlert: Bool
-    @Binding var alertMessage: String
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Current Password")) {
-                    SecureField("Enter current password", text: $currentPassword)
-                }
-                
-                Section(header: Text("New Password")) {
-                    SecureField("Enter new password", text: $newPassword)
-                    SecureField("Confirm new password", text: $confirmPassword)
-                }
-            }
-            .navigationTitle("Reset Password")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Reset") {
-                        resetPassword()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func resetPassword() {
-        // Validate passwords
-        if currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty {
-            alertMessage = "Please fill in all fields"
-            showingAlert = true
-            return
-        }
-        
-        if newPassword != confirmPassword {
-            alertMessage = "New passwords do not match"
-            showingAlert = true
-            return
-        }
-        
-        if newPassword.count < 8 {
-            alertMessage = "New password must be at least 8 characters long"
-            showingAlert = true
-            return
-        }
-        
-        // Here you would typically make an API call to reset the password
-        // For now, we'll just show a success message
-        alertMessage = "Password reset successful"
-        showingAlert = true
-        isPresented = false
-        
-        // Clear the fields
-        currentPassword = ""
-        newPassword = ""
-        confirmPassword = ""
-    }
-}
-
-//struct MaintenancePersonnel {
-//    let name: String
-//    let email: String
-//    let phone: String
-//    let role: String
-//    let profileImage: String
-//}
-
-#Preview {
-    MaintenancePersonnelProfileView()
-} 
