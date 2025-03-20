@@ -9,7 +9,7 @@ import SwiftUI
 
 struct FleetManagerTabView: View {
     @StateObject private var vehicleManager = VehicleManager()
-    @StateObject private var dataManager = CrewDataManager()
+    @StateObject private var dataManager = CrewDataController.shared
 
     var body: some View {
         TabView {

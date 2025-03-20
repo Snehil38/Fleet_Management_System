@@ -162,8 +162,12 @@ class SupabaseDataController: ObservableObject {
                 }
                 completion(true, nil)
             } catch {
-                signOut()
                 completion(false, error.localizedDescription)
+                await MainActor.run {
+                    authError = "Login failed: \(error.localizedDescription)"
+                    alertMessage = authError!
+                    showAlert = true
+                }
             }
         }
     }
@@ -273,5 +277,192 @@ class SupabaseDataController: ObservableObject {
         } catch {
             print("Error fetching user role: \(error.localizedDescription)")
         }
+    }
+    
+    // MARK: - Manage Crew Record
+    func fetchDriverByUserID(userID: UUID) async throws -> Driver? {
+        do {
+            let response = try await supabase
+                .from("driver")
+                .select()
+                .eq("userID", value: userID)
+                .execute()
+            
+            let data = response.data
+            
+            // Print raw JSON response for debugging
+            if let rawJSON = String(data: data, encoding: .utf8) {
+                print("Raw JSON Response for Driver: \(rawJSON)")
+            }
+            
+            // Decode JSON as an array of dictionaries and extract the first record
+            guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]],
+                  !jsonArray.isEmpty else {
+                print("No driver found for userID: \(userID)")
+                return nil
+            }
+            
+            // Fix date format for driverLicenseExpiry if present
+            if let expiryDate = jsonArray[0]["driverLicenseExpiry"] as? String {
+                jsonArray[0]["driverLicenseExpiry"] = expiryDate + "T00:00:00.000Z" // Ensure full ISO8601 with milliseconds
+            }
+            
+            // Convert the first record back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray[0], options: [])
+            
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            
+            // Decode into Driver model
+            let driver = try decoder.decode(Driver.self, from: transformedData)
+            print("Decoded Driver: \(driver)")
+            return driver
+        } catch {
+            print("Error fetching driver: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    func fetchMaintenancePersonnelByUserID(userID: UUID) async throws -> MaintenancePersonnel? {
+        do {
+            let response = try await supabase
+                .from("maintenance_personnel")
+                .select()
+                .eq("userID", value: userID)
+                .execute()
+            
+            let data = response.data
+            
+            // Print raw JSON response for debugging
+            if let rawJSON = String(data: data, encoding: .utf8) {
+                print("Raw JSON Response for Maintenance Personnel: \(rawJSON)")
+            }
+            
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            
+            // Decode JSON as an array of dictionaries and extract the first record
+            guard let jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]],
+                  !jsonArray.isEmpty else {
+                print("No maintenance personnel found for userID: \(userID)")
+                return nil
+            }
+            
+            // Convert the first record back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray[0], options: [])
+            
+            // Decode into MaintenancePersonnel model
+            let personnel = try decoder.decode(MaintenancePersonnel.self, from: transformedData)
+            print("Decoded Maintenance Personnel: \(personnel)")
+            return personnel
+        } catch {
+            print("Error fetching maintenance personnel: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    func fetchDrivers() async throws -> [Driver] {
+        do {
+            let response = try await supabase
+                .from("driver")
+                .select()
+                .eq("isDeleted", value: false)
+                .execute()
+            
+            let data = response.data
+
+            // Decode JSON as an array of dictionaries first
+            guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
+                print("Invalid JSON structure")
+                return []
+            }
+
+            // Fix date format for driverLicenseExpiry
+            for i in 0..<jsonArray.count {
+                if let expiryDate = jsonArray[i]["driverLicenseExpiry"] as? String {
+                    jsonArray[i]["driverLicenseExpiry"] = expiryDate + "T00:00:00.000Z" // Ensure full ISO8601 with milliseconds
+                }
+            }
+
+            // Convert transformed array back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
+
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX" // Allows fractional seconds
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+            // Decode into Driver model
+            let drivers = try decoder.decode([Driver].self, from: transformedData)
+            print("Decoded Drivers: \(drivers)")
+            return drivers
+        } catch {
+            print("Error fetching drivers: \(error)")
+            return []
+        }
+    }
+    
+    func fetchMaintenancePersonnel() async throws -> [MaintenancePersonnel] {
+        do {
+            let response = try await supabase
+                .from("maintenance_personnel")
+                .select()
+                .eq("isDeleted", value: false)
+                .execute()
+            
+            let data = response.data
+
+            // Custom Date Formatter
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX" // Fractional seconds support
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            
+            
+
+            // Decode data
+            let personnels = try decoder.decode([MaintenancePersonnel].self, from: data)
+            return personnels
+        } catch {
+            print("Error fetching maintenance personnel: \(error)")
+            return []
+        }
+    }
+
+    func insertDriver(driver: Driver) async throws {
+        let response = try await supabase
+            .from("driver")
+            .insert(driver)
+            .execute()
+        // Optionally, you can process the response here
+        print("Insert response: \(response)")
+    }
+    
+    func insertMaintenancePersonnel(personnel: MaintenancePersonnel) async throws {
+        let response = try await supabase
+            .from("maintenance_personnel")
+            .insert(personnel)
+            .execute()
+        // Optionally, you can process the response here
+        print("Insert response: \(response)")
     }
 }

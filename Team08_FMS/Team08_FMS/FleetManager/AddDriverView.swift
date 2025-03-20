@@ -1,29 +1,21 @@
-//
-//  AddDriverView.swift
-//  Team08_FMS
-//
-//  Created by Snehil on 19/03/25.
-//
-
 import SwiftUI
+import Supabase
 
 struct AddDriverView: View {
     
     @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var dataManager: CrewDataManager
+    @EnvironmentObject var supabaseDataController: SupabaseDataController
     
     // Driver information
-    @State private var driverID = ""
     @State private var name = ""
     @State private var avatar = ""
     @State private var experience = ""
-    @State private var licenseType = "Class A CDL"
+    @State private var licenseNumber = ""
     @State private var phoneNumber = ""
     @State private var email = ""
     @State private var address = ""
-    @State private var dateOfBirth = Date()
     @State private var licenseExpiration = Date()
-    @State private var salary: String = ""
+    @State private var salary = ""
     
     let licenseTypes = ["Class A CDL", "Class B CDL", "Class C CDL", "Non-CDL"]
     
@@ -33,7 +25,9 @@ struct AddDriverView: View {
         !phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !salary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        Double(salary) ?? 0 > 0
+        Double(salary) ?? 0 > 0 &&
+        Int(experience) != nil &&
+        !licenseNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
     var body: some View {
@@ -41,16 +35,9 @@ struct AddDriverView: View {
             Form {
                 // Basic Information
                 Section("Basic Information") {
-                    TextField("Driver ID", text: $driverID)
-                        .textInputAutocapitalization(.never)
-                        .onChange(of: driverID) { oldValue, newValue in
-                            if !newValue.isEmpty {
-                                driverID = newValue.uppercased()
-                            }
-                        }
                     TextField("Full Name", text: $name)
-                    TextField("Avatar Initials", text: $avatar)
-                        .onChange(of: name) {
+                    TextField("Avatar (optional)", text: $avatar)
+                        .onChange(of: name) { _, _ in
                             if avatar.isEmpty {
                                 let words = name.components(separatedBy: " ")
                                 avatar = words.compactMap { $0.first }.map(String.init).joined()
@@ -72,25 +59,16 @@ struct AddDriverView: View {
                     TextField("Experience (years)", text: $experience)
                         .keyboardType(.numberPad)
                     
-                    Picker("License Type", selection: $licenseType) {
-                        ForEach(licenseTypes, id: \.self) {
-                            Text($0)
-                        }
-                    }
+                    TextField("Driver License Number", text: $licenseNumber)
                     
                     DatePicker("License Expiration", selection: $licenseExpiration, displayedComponents: .date)
                 }
                 
-                // Personal Information
-                Section("Personal Information") {
-                    DatePicker("Date of Birth", selection: $dateOfBirth, displayedComponents: .date)
-                }
-                
-                // Add Salary Section
+                // Compensation
                 Section("Compensation") {
                     TextField("Monthly Salary", text: $salary)
                         .keyboardType(.decimalPad)
-                        .onChange(of: salary) { oldValue, newValue in
+                        .onChange(of: salary) { _, newValue in
                             let filtered = newValue.filter { "0123456789.".contains($0) }
                             if filtered != newValue {
                                 salary = filtered
@@ -106,7 +84,6 @@ struct AddDriverView: View {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         saveDriver()
@@ -118,28 +95,48 @@ struct AddDriverView: View {
     }
     
     private func saveDriver() {
-        let newDriver = CrewMember(
-            id: driverID.isEmpty ? "DR-\(Int.random(in: 1000...9999))" : driverID,
-            name: name,
-            avatar: avatar.isEmpty ? String(name.prefix(2).uppercased()) : avatar,
-            role: "Driver",
-            status: .available,
-            salary: 5000.0,
-            details: [
-                DetailItem(label: "Experience", value: "\(experience) years"),
-                DetailItem(label: "License", value: licenseType),
-                DetailItem(label: "Phone", value: phoneNumber),
-                DetailItem(label: "Email", value: email)
-            ]
-        )
-        dataManager.addDriver(newDriver)
-        presentationMode.wrappedValue.dismiss()
+        Task {
+            guard let salaryDouble = Double(salary),
+                  let experienceInt = Int(experience),
+                let phoneNumberInt = Int(phoneNumber) else {
+                print("Invalid salary or experience format.")
+                return
+            }
+            
+            // Create a new Driver instance. Make sure your Driver model conforms to Codable.
+            let newDriver = Driver(
+                userID: UUID(),
+                name: name,
+                profileImage: avatar.isEmpty ? nil : avatar,
+                email: email,
+                phoneNumber: phoneNumberInt,
+                driverLicenseNumber: licenseNumber,
+                driverLicenseExpiry: licenseExpiration,
+                assignedVehicleID: nil,
+                address: address,
+                salary: salaryDouble,
+                yearsOfExperience: experienceInt,
+                createdAt: Date(),
+                updatedAt: Date(),
+                isDeleted: false,
+                status: .available
+            )
+            
+            do {
+                // Call the SupabaseDataController function to insert the driver
+                try await supabaseDataController.insertDriver(driver: newDriver)
+                await supabaseDataController.signUp(name: newDriver.name, email: newDriver.email, phoneNo: newDriver.phoneNumber, role: "driver")
+                await MainActor.run {
+                    presentationMode.wrappedValue.dismiss()
+                }
+            } catch {
+                print("Error saving driver: \(error.localizedDescription)")
+            }
+        }
     }
-    
-  
 }
 
 #Preview {
     AddDriverView()
-        .environmentObject(CrewDataManager())
+        .environmentObject(SupabaseDataController.shared)
 }
