@@ -126,7 +126,7 @@ struct AddDriverView: View {
             
             Task {
                 do {
-                    guard let signUpID = await supabase.signUp(name: newDriver.name, email: newDriver.email, phoneNo: newDriver.phoneNumber, role: "maintenance_personnel") else { return }
+                    guard let signUpID = await supabase.signUp(name: newDriver.name, email: newDriver.email, phoneNo: newDriver.phoneNumber, role: "driver") else { return }
                     newDriver.userID = signUpID
                     // Call the SupabaseDataController function to insert the driver
                     try await supabase.insertDriver(driver: newDriver, password: AppDataController.shared.randomPasswordGenerator(length: 6))
