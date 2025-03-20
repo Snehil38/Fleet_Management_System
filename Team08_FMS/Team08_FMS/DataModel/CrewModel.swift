@@ -46,6 +46,7 @@ enum Certification: String, CaseIterable, Codable, Identifiable {
 }
 
 struct FleetManager: Identifiable, Codable {
+    let userID: UUID?
     let id: UUID
     var name: String
     var profileImage: String
@@ -56,6 +57,7 @@ struct FleetManager: Identifiable, Codable {
 }
 
 struct Driver: Identifiable, Codable {
+    let userID: UUID?
     var id: UUID = UUID()
     var name: String
     var profileImage: String?
@@ -74,6 +76,7 @@ struct Driver: Identifiable, Codable {
 }
 
 struct MaintenancePersonnel: Identifiable, Codable {
+    let userID: UUID?
     var id: UUID = UUID()
     var name: String
     var profileImage: String
