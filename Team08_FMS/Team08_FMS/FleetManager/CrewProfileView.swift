@@ -228,6 +228,7 @@ struct AssignTaskView: View {
     NavigationView {
         // Example preview using a Driver. You can substitute with a MaintenancePersonnel instance as needed.
         CrewProfileView(crewMember: Driver(
+            userID: UUID(),
             name: "Charlie Davis",
             profileImage: "DR",
             email: "charlie.davis@example.com",

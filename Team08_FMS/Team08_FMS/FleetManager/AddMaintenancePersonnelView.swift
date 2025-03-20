@@ -95,6 +95,7 @@ struct AddMaintenancePersonnelView: View {
 
     private func saveMaintenancePersonnel() {
         let newPersonnel = MaintenancePersonnel(
+            userID: UUID(),
             name: name,
             profileImage: avatar.isEmpty ? String(name.prefix(2).uppercased()) : avatar,
             email: email,

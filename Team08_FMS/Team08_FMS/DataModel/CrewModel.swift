@@ -23,6 +23,12 @@ enum Status: String, Codable, Identifiable {
     }
     
     var id: String { self.rawValue }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = Status(rawValue: rawValue) ?? .available
+    }
 }
 
 enum Specialization: String, CaseIterable, Codable, Identifiable {
@@ -33,6 +39,12 @@ enum Specialization: String, CaseIterable, Codable, Identifiable {
     case generalMaintenance = "General Maintenance"
     
     var id: String { self.rawValue }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = Specialization(rawValue: rawValue) ?? .generalMaintenance
+    }
 }
 
 enum Certification: String, CaseIterable, Codable, Identifiable {
@@ -43,6 +55,12 @@ enum Certification: String, CaseIterable, Codable, Identifiable {
     case heavyEquipmentTechnician = "Heavy Equipment Technician"
     
     var id: String { self.rawValue }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = Certification(rawValue: rawValue) ?? .dieselMechanic
+    }
 }
 
 struct FleetManager: Identifiable, Codable {
@@ -64,7 +82,7 @@ struct Driver: Identifiable, Codable {
     var email: String
     var phoneNumber: Int
     var driverLicenseNumber: String
-    var driverLicenseExpiry: Date
+    var driverLicenseExpiry: Date?
     var assignedVehicleID: UUID?
     var address: String?
     var salary: Double
@@ -79,7 +97,7 @@ struct MaintenancePersonnel: Identifiable, Codable {
     let userID: UUID?
     var id: UUID = UUID()
     var name: String
-    var profileImage: String
+    var profileImage: String?
     var email: String
     var phoneNumber: Int
     var certifications: Certification
@@ -112,7 +130,7 @@ extension Driver: CrewMemberProtocol {
 
 extension MaintenancePersonnel: CrewMemberProtocol {
     var avatar: String {
-        get { profileImage }
+        get { profileImage ?? "" }
         set { profileImage = newValue }
     }
 }

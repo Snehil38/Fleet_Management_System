@@ -16,6 +16,7 @@ struct MaintenancePersonnelProfileView: View {
     @State private var pendingStatusChange: Bool = false
     
     let user = MaintenancePersonnel(
+        userID: UUID(),
         name: "John Doe",
         profileImage: "person.circle.fill",
         email: "john.doe@fleetmanagement.com",
@@ -140,7 +141,7 @@ struct ProfileHeaderView: View {
     
     var body: some View {
         VStack(spacing: 15) {
-            Image(systemName: user.profileImage)
+            Image(systemName: user.profileImage ?? "person.circle.fill")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 120, height: 120)

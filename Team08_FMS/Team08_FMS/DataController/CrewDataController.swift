@@ -28,6 +28,7 @@ class CrewDataController: ObservableObject {
     private func loadFleetManagers() {
         fleetManagers = [
             FleetManager(
+                userID: UUID(),
                 id: UUID(),
                 name: "Alice Johnson",
                 profileImage: "fleetManager1",
@@ -37,6 +38,7 @@ class CrewDataController: ObservableObject {
                 updatedAt: Date()
             ),
             FleetManager(
+                userID: UUID(),
                 id: UUID(),
                 name: "Bob Williams",
                 profileImage: "fleetManager2",
@@ -51,6 +53,7 @@ class CrewDataController: ObservableObject {
     private func loadDrivers() {
         drivers = [
             Driver(
+                userID: UUID(),
                 name: "Charlie Davis",
                 profileImage: "DR", // or "driver1"
                 email: "charlie.davis@example.com",
@@ -67,6 +70,7 @@ class CrewDataController: ObservableObject {
                 status: .available
             ),
             Driver(
+                userID: UUID(),
                 name: "Diana Prince",
                 profileImage: "DI", // or "driver2"
                 email: "diana.prince@example.com",
@@ -88,6 +92,7 @@ class CrewDataController: ObservableObject {
     private func loadMaintenancePersonnel() {
         maintenancePersonnel = [
             MaintenancePersonnel(
+                userID: UUID(),
                 name: "Edward King",
                 profileImage: "EK", // or "maintenance1"
                 email: "edward.king@example.com",
@@ -103,6 +108,7 @@ class CrewDataController: ObservableObject {
                 status: .available
             ),
             MaintenancePersonnel(
+                userID: UUID(),
                 name: "Fiona Queen",
                 profileImage: "FQ", // or "maintenance2"
                 email: "fiona.queen@example.com",

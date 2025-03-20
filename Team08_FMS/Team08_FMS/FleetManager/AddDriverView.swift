@@ -105,6 +105,7 @@ struct AddDriverView: View {
             
             // Create a new Driver instance. Make sure your Driver model conforms to Codable.
             let newDriver = Driver(
+                userID: UUID(),
                 name: name,
                 profileImage: avatar.isEmpty ? nil : avatar,
                 email: email,
