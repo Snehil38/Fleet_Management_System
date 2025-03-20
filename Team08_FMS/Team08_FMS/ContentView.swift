@@ -13,17 +13,21 @@ struct ContentView: View {
     var body: some View {
         VStack {
             if !auth.isAuthenticated {
-                LoginView()
+                RoleSelectionView()
             } else {
-                switch auth.userRole {
-                case "fleet_manager":
-                    FleetManagerDashboardView()
-                case "driver":
-                    DriverDashboardView()
-                case "maintenance_personnel":
-                    MaintenancePersonnelDashboardView()
-                default:
-                    LoginView() // Handles unknown role case
+                if let userID = auth.userID, auth.isGenPass {
+                    ResetGeneratedPasswordView(userID: userID)
+                } else {
+                    switch auth.userRole {
+                    case "fleet_manager":
+                        FleetManagerTabView()
+                    case "driver":
+                        DriverTabView()
+                    case "maintenance_personnel":
+                        MaintenancePersonnelTabView()
+                    default:
+                        RoleSelectionView() // Handles unknown role case
+                    }
                 }
             }
         }

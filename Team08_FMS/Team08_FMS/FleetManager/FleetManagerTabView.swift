@@ -1,0 +1,42 @@
+//
+//  FleetManagerHomeScreen.swift
+//  Team08_FMS
+//
+//  Created by Snehil on 18/03/25.
+//
+
+import SwiftUI
+
+struct FleetManagerTabView: View {
+    @StateObject private var vehicleManager = VehicleManager()
+    @StateObject private var dataManager = CrewDataManager()
+
+    var body: some View {
+        TabView {
+            FleetManagerDashboardTabView()
+                .environmentObject(dataManager)
+                .environmentObject(vehicleManager)
+                .tabItem {
+                    Label("Dashboard", systemImage: "car.fill")
+                }
+            
+            VehiclesView()
+                .environmentObject(dataManager)
+                .environmentObject(vehicleManager)
+                .tabItem {
+                    Label("Vehicles", systemImage: "car.fill")
+                }
+            // Crew Tab (only tab)
+            FleetCrewManagementView()
+                .environmentObject(dataManager)
+                .environmentObject(vehicleManager)
+                .tabItem {
+                    Label("Crew", systemImage: "person.3")
+                }
+        }
+    }
+}
+
+#Preview {
+    FleetManagerTabView()
+}
