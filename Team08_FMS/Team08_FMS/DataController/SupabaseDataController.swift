@@ -162,8 +162,12 @@ class SupabaseDataController: ObservableObject {
                 }
                 completion(true, nil)
             } catch {
-                signOut()
                 completion(false, error.localizedDescription)
+                await MainActor.run {
+                    authError = "Login failed: \(error.localizedDescription)"
+                    alertMessage = authError!
+                    showAlert = true
+                }
             }
         }
     }
@@ -378,11 +382,6 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             let data = response.data
-            
-            // Print raw JSON response for debugging
-            if let rawJSON = String(data: data, encoding: .utf8) {
-                print("Raw JSON Response: \(rawJSON)")
-            }
 
             // Decode JSON as an array of dictionaries first
             guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
@@ -428,11 +427,6 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             let data = response.data
-            
-            // Print raw JSON response for debugging
-            if let rawJSON = String(data: data, encoding: .utf8) {
-                print("Raw JSON Response: \(rawJSON)")
-            }
 
             // Custom Date Formatter
             let dateFormatter = DateFormatter()
@@ -447,7 +441,6 @@ class SupabaseDataController: ObservableObject {
 
             // Decode data
             let personnels = try decoder.decode([MaintenancePersonnel].self, from: data)
-            print("Decoded Maintenance Personnel: \(personnels)")
             return personnels
         } catch {
             print("Error fetching maintenance personnel: \(error)")
