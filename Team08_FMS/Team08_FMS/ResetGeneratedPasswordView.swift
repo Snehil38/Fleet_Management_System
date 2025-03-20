@@ -92,6 +92,73 @@ struct ResetGeneratedPasswordView: View {
     }
 }
 
+struct ResetPasswordView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @State private var currentPassword = ""
+    @State private var newPassword = ""
+    @State private var confirmPassword = ""
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Current Password")) {
+                    SecureField("Enter current password", text: $currentPassword)
+                }
+                
+                Section(header: Text("New Password")) {
+                    SecureField("Enter new password", text: $newPassword)
+                    SecureField("Confirm new password", text: $confirmPassword)
+                }
+                
+                Section {
+                    Button("Reset Password") {
+                        if newPassword.isEmpty || confirmPassword.isEmpty {
+                            alertMessage = "Please enter a new password and confirm it."
+                            showingAlert = true
+                            return
+                        }
+                        
+                        if newPassword != confirmPassword {
+                            alertMessage = "New passwords don't match."
+                            showingAlert = true
+                            return
+                        }
+                        
+                        // Here you would actually handle the password reset
+                        // For now, we'll just show a success message
+                        alertMessage = "Password successfully reset."
+                        showingAlert = true
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(.blue)
+                }
+            }
+            .navigationTitle("Reset Password")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+            .alert(isPresented: $showingAlert) {
+                Alert(
+                    title: Text("Reset Password"),
+                    message: Text(alertMessage),
+                    dismissButton: .default(Text("OK")) {
+                        if alertMessage == "Password successfully reset." {
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
 #Preview {
     ResetGeneratedPasswordView(userID: UUID())
 }

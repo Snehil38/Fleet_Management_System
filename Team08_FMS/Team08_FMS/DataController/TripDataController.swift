@@ -187,6 +187,19 @@ class TripDataController: ObservableObject {
         return upcomingTrips
     }
     
+    // Add a function to get filtered trips based on driver availability
+    func getAvailabilityFilteredTrips() -> [Trip] {
+        let availabilityManager = DriverAvailabilityManager.shared
+        
+        // If driver is unavailable, return empty array
+        if !availabilityManager.isAvailable {
+            return []
+        }
+        
+        // Otherwise return all upcoming trips
+        return upcomingTrips
+    }
+    
     // Add a function to get recentDeliveries data
     func getRecentDeliveries() -> [DeliveryDetails] {
         return recentDeliveries
