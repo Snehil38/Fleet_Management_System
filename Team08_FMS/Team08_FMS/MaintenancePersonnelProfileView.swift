@@ -19,10 +19,16 @@ struct MaintenancePersonnelProfileView: View {
         name: "John Doe",
         profileImage: "person.circle.fill",
         email: "john.doe@fleetmanagement.com",
-        phoneNumber: "+1 234 567 8900",
+        phoneNumber: 1234567890,
+        certifications: .aseCertified,
         yearsOfExperience: 2,
-        specialty: "Truck Maintenance",
-        avatar: ""
+        specialty: .generalMaintenance,
+        salary: 4000.0,
+        address: nil,
+        createdAt: Date(),
+        updatedAt: nil,
+        isDeleted: false,
+        status: .available
     )
     
     // Computed binding for the availability toggle.
@@ -149,12 +155,12 @@ struct ProfileHeaderView: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
             
-            Text(user.phoneNumber)  // Ensure this matches your model
+            Text(String(user.phoneNumber))  // Ensure this matches your model
                 .font(.subheadline)
                 .foregroundColor(.gray)
             
             // Displaying specialty as the role; adjust as needed.
-            Text(user.specialty)
+            Text(user.specialty.rawValue)
                 .font(.subheadline)
                 .foregroundColor(.blue)
         }

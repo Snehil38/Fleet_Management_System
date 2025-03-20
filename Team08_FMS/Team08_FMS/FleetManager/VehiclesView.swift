@@ -279,7 +279,7 @@ private struct DeleteVehiclesView: View {
 }
 
 struct VehiclesView: View {
-    @EnvironmentObject private var dataManager: CrewDataManager
+    @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
     @State private var showingAddVehicle = false
     @State private var showingDeleteMode = false

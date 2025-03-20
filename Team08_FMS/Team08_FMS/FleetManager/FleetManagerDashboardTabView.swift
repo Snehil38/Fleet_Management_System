@@ -8,18 +8,18 @@
 import SwiftUI
 
 struct FleetManagerDashboardTabView: View {
-    @EnvironmentObject private var dataManager: CrewDataManager
+    @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
     @State private var showingProfile = false
     @State private var showingMessages = false
-
+    
     // Computed properties for counts and expenses
     private var availableVehiclesCount: Int {
         vehicleManager.vehicles.filter { $0.status == .available }.count
     }
 
     private var availableDriversCount: Int {
-        dataManager.drivers.filter { $0.status == .available }.count
+        dataManager.drivers.filter { $0.status == Status.available }.count
     }
 
     private var vehiclesUnderMaintenanceCount: Int {
