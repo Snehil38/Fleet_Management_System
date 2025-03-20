@@ -36,6 +36,12 @@ struct HomeView: View {
     ]
     @State private var selectedRouteId: String = "1"
     
+    // Add a NavigationManager property to access real navigation data
+    @StateObject private var navigationManager = NavigationManager(
+        destination: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+        sourceCoordinate: nil
+    )
+    
     init() {
         // Initialize from the TripDataController instead
         _currentTrip = State(initialValue: TripDataController.shared.currentTrip)
@@ -45,11 +51,13 @@ struct HomeView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            mainContentView
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
-                }
-                .tag(0)
+            VStack(spacing: 16) {
+                mainContentView
+            }
+            .tabItem {
+                Label("Home", systemImage: "house.fill")
+            }
+            .tag(0)
             
             NavigationView {
                 TripsView()
@@ -66,6 +74,61 @@ struct HomeView: View {
                 Label("Profile", systemImage: "person.fill")
             }
             .tag(2)
+        }
+        .onAppear {
+            // Setup trip data when view appears
+            if !isCurrentTripDeclined && currentTrip.id != UUID() {
+                // Initialize navigation manager with the current trip details
+                navigationManager.setupNavigation(
+                    destination: currentTrip.destinationCoordinate,
+                    sourceCoordinate: currentTrip.sourceCoordinate
+                )
+            }
+        }
+        .onDisappear {
+            // Cleanup resources
+            if !showingNavigation {
+                navigationManager.stopNavigation()
+            }
+        }
+        .alert(isPresented: $showingAlert) {
+            Alert(
+                title: Text("Action Required"),
+                message: Text(alertMessage),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .sheet(isPresented: $showingChatBot) {
+            ChatBotView()
+        }
+        .sheet(isPresented: $showingPreTripInspection) {
+            VehicleInspectionView(isPreTrip: true) { success in
+                if success {
+                    currentTrip.hasCompletedPreTrip = true
+                } else {
+                    alertMessage = "Please resolve all issues before starting the trip"
+                    showingAlert = true
+                }
+            }
+        }
+        .sheet(isPresented: $showingPostTripInspection) {
+            VehicleInspectionView(isPreTrip: false) { success in
+                if success {
+                    currentTrip.hasCompletedPostTrip = true
+                    markCurrentTripDelivered()
+                } else {
+                    alertMessage = "Please resolve all issues before completing delivery"
+                    showingAlert = true
+                }
+            }
+        }
+        .sheet(isPresented: $showingVehicleDetails) {
+            VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
+        }
+        .sheet(isPresented: $showingDeliveryDetails) {
+            if let delivery = selectedDelivery {
+                DeliveryDetailsView(delivery: delivery)
+            }
         }
     }
     
@@ -120,45 +183,6 @@ struct HomeView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: showingNavigation)
-        .sheet(isPresented: $showingChatBot) {
-            ChatBotView()
-        }
-        .sheet(isPresented: $showingPreTripInspection) {
-            VehicleInspectionView(isPreTrip: true) { success in
-                if success {
-                    currentTrip.hasCompletedPreTrip = true
-                } else {
-                    alertMessage = "Please resolve all issues before starting the trip"
-                    showingAlert = true
-                }
-            }
-        }
-        .sheet(isPresented: $showingPostTripInspection) {
-            VehicleInspectionView(isPreTrip: false) { success in
-                if success {
-                    currentTrip.hasCompletedPostTrip = true
-                    markCurrentTripDelivered()
-                } else {
-                    alertMessage = "Please resolve all issues before completing delivery"
-                    showingAlert = true
-                }
-            }
-        }
-        .sheet(isPresented: $showingVehicleDetails) {
-            VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
-        }
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Action Required"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
-        }
-        .sheet(isPresented: $showingDeliveryDetails) {
-            if let delivery = selectedDelivery {
-                DeliveryDetailsView(delivery: delivery)
-            }
-        }
     }
     
     private var unavailableBanner: some View {
@@ -300,11 +324,31 @@ struct HomeView: View {
     
     // Route Information
     private var selectedRouteEta: String {
-        availableRoutes.first(where: { $0.id == selectedRouteId })?.eta ?? currentTrip.eta
+        if let route = navigationManager.route {
+            // Format time from real navigation data
+            let time = Int(route.expectedTravelTime / 60) // Convert to minutes
+            if time >= 60 {
+                let hours = time / 60
+                let minutes = time % 60
+                return "\(hours)h \(minutes)m"
+            } else {
+                return "\(time) mins"
+            }
+        } else {
+            // Use stored route data as fallback
+            return availableRoutes.first(where: { $0.id == selectedRouteId })?.eta ?? currentTrip.eta
+        }
     }
     
     private var selectedRouteDistance: String {
-        availableRoutes.first(where: { $0.id == selectedRouteId })?.distance ?? currentTrip.distance
+        if let route = navigationManager.route {
+            // Format distance from real navigation data
+            let distance = route.distance / 1000 // Convert to kilometers
+            return String(format: "%.1f km", distance)
+        } else {
+            // Use stored route data as fallback
+            return availableRoutes.first(where: { $0.id == selectedRouteId })?.distance ?? currentTrip.distance
+        }
     }
     
     private var routeSelectionView: some View {
@@ -471,8 +515,17 @@ struct HomeView: View {
                             alertMessage = "Please complete pre-trip inspection before starting navigation"
                             showingAlert = true
                         } else {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingNavigation = true
+                            // Initialize navigation with correct coordinates before showing the view
+                            navigationManager.setupNavigation(
+                                destination: currentTrip.destinationCoordinate,
+                                sourceCoordinate: currentTrip.sourceCoordinate
+                            )
+                            
+                            // Wait a moment for the route to be calculated
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                withAnimation {
+                                    showingNavigation = true
+                                }
                             }
                         }
                     }

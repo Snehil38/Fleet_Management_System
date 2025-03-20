@@ -14,8 +14,8 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var alternativeRoutes: [MKRoute] = []
     
     private let locationManager: CLLocationManager
-    private let _destination: CLLocationCoordinate2D
-    private let _sourceCoordinate: CLLocationCoordinate2D?
+    private var _destination: CLLocationCoordinate2D
+    private var _sourceCoordinate: CLLocationCoordinate2D?
     private let vehicleType: VehicleType
     
     // Track both the last update time and the last location
@@ -260,8 +260,17 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func stopNavigation() {
+        // Stop location updates
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
+        
+        // Clear route data
+        route = nil
+        currentStep = nil
+        remainingDistance = 0
+        remainingTime = 0
+        nextStepDistance = 0
+        alternativeRoutes = []
     }
     
     func updateNavigation(from location: CLLocation) {
@@ -485,6 +494,28 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Cap to a reasonable number if we have too many
         if alternativeRoutes.count > 5 {
             alternativeRoutes = Array(alternativeRoutes.prefix(5))
+        }
+    }
+    
+    // MARK: - Public Methods
+    
+    func setupNavigation(destination: CLLocationCoordinate2D, sourceCoordinate: CLLocationCoordinate2D?) {
+        // Update internal properties
+        self._destination = destination
+        self._sourceCoordinate = sourceCoordinate
+        
+        // Clear existing route
+        self.route = nil
+        
+        // If we have a source coordinate, calculate the initial route
+        if let sourceCoord = sourceCoordinate {
+            self.userLocation = sourceCoord
+            let location = CLLocation(latitude: sourceCoord.latitude, longitude: sourceCoord.longitude)
+            self.lastLocation = location
+            self.updateRoute(from: location)
+        } else if let currentLocation = self.lastLocation {
+            // Use current location if available
+            self.updateRoute(from: currentLocation)
         }
     }
 }
