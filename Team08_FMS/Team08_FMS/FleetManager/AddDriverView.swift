@@ -4,7 +4,8 @@ import Supabase
 struct AddDriverView: View {
     
     @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var supabaseDataController: SupabaseDataController
+    @StateObject private var supabase = SupabaseDataController.shared
+    @StateObject private var crewDataController = CrewDataController.shared
     
     // Driver information
     @State private var name = ""
@@ -51,6 +52,7 @@ struct AddDriverView: View {
                         .keyboardType(.phonePad)
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
                     TextField("Address", text: $address)
                 }
                 
@@ -104,7 +106,7 @@ struct AddDriverView: View {
             }
             
             // Create a new Driver instance. Make sure your Driver model conforms to Codable.
-            let newDriver = Driver(
+            var newDriver = Driver(
                 userID: UUID(),
                 name: name,
                 profileImage: avatar.isEmpty ? nil : avatar,
@@ -122,15 +124,19 @@ struct AddDriverView: View {
                 status: .available
             )
             
-            do {
-                // Call the SupabaseDataController function to insert the driver
-                try await supabaseDataController.insertDriver(driver: newDriver)
-                await supabaseDataController.signUp(name: newDriver.name, email: newDriver.email, phoneNo: newDriver.phoneNumber, role: "driver")
-                await MainActor.run {
-                    presentationMode.wrappedValue.dismiss()
+            Task {
+                do {
+                    guard let signUpID = await supabase.signUp(name: newDriver.name, email: newDriver.email, phoneNo: newDriver.phoneNumber, role: "maintenance_personnel") else { return }
+                    newDriver.userID = signUpID
+                    // Call the SupabaseDataController function to insert the driver
+                    try await supabase.insertDriver(driver: newDriver, password: AppDataController.shared.randomPasswordGenerator(length: 6))
+                    await MainActor.run {
+                        crewDataController.update()
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                } catch {
+                    print("Error saving driver: \(error.localizedDescription)")
                 }
-            } catch {
-                print("Error saving driver: \(error.localizedDescription)")
             }
         }
     }

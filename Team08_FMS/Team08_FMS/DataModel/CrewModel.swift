@@ -2,9 +2,9 @@ import Foundation
 import SwiftUI
 
 enum Status: String, Codable, Identifiable {
-    case available = "Available"
-    case busy = "Busy"
-    case offDuty = "Off Duty"
+    case available = "available"
+    case busy = "busy"
+    case offDuty = "offDuty"
 
     var color: Color {
         switch self {
@@ -32,11 +32,11 @@ enum Status: String, Codable, Identifiable {
 }
 
 enum Specialization: String, CaseIterable, Codable, Identifiable {
-    case engineRepair = "Engine Repair"
-    case tireMaintenance = "Tire Maintenance"
-    case electricalSystems = "Electrical Systems"
-    case diagnostics = "Diagnostics"
-    case generalMaintenance = "General Maintenance"
+    case engineRepair = "engineRepair"
+    case tireMaintenance = "tireMaintenance"
+    case electricalSystems = "electricalSystems"
+    case diagnostics = "diagnostics"
+    case generalMaintenance = "generalMaintenance"
     
     var id: String { self.rawValue }
     
@@ -48,11 +48,11 @@ enum Specialization: String, CaseIterable, Codable, Identifiable {
 }
 
 enum Certification: String, CaseIterable, Codable, Identifiable {
-    case aseCertified = "ASE Certified"
-    case dieselMechanic = "Diesel Mechanic"
-    case hvacSpecialist = "HVAC Specialist"
-    case electricalSystemsCertified = "Electrical Systems Certified"
-    case heavyEquipmentTechnician = "Heavy Equipment Technician"
+    case aseCertified = "aseCertified"
+    case dieselMechanic = "dieselMechanic"
+    case hvacSpecialist = "hvacSpecialist"
+    case electricalSystemsCertified = "electricalSystemsCertified"
+    case heavyEquipmentTechnician = "heavyEquipmentTechnician"
     
     var id: String { self.rawValue }
     
@@ -64,7 +64,7 @@ enum Certification: String, CaseIterable, Codable, Identifiable {
 }
 
 struct FleetManager: Identifiable, Codable {
-    let userID: UUID?
+    var userID: UUID?
     let id: UUID
     var name: String
     var profileImage: String
@@ -75,7 +75,7 @@ struct FleetManager: Identifiable, Codable {
 }
 
 struct Driver: Identifiable, Codable {
-    let userID: UUID?
+    var userID: UUID?
     var id: UUID = UUID()
     var name: String
     var profileImage: String?
@@ -87,14 +87,14 @@ struct Driver: Identifiable, Codable {
     var address: String?
     var salary: Double
     var yearsOfExperience: Int
-    var createdAt: Date
+    var createdAt: Date?
     var updatedAt: Date?
     var isDeleted: Bool = false
     var status: Status
 }
 
 struct MaintenancePersonnel: Identifiable, Codable {
-    let userID: UUID?
+    var userID: UUID?
     var id: UUID = UUID()
     var name: String
     var profileImage: String?
@@ -105,7 +105,7 @@ struct MaintenancePersonnel: Identifiable, Codable {
     var specialty: Specialization
     var salary: Double
     var address: String?
-    var createdAt: Date
+    var createdAt: Date?
     var updatedAt: Date?
     var isDeleted: Bool = false
     var status: Status
