@@ -560,7 +560,7 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
-    func insertDriver(driver: Driver) async throws {
+    func insertDriver(driver: Driver, password: String) async throws {
         do {
             // Set up a custom JSONEncoder with ISO8601 format including milliseconds.
             let encoder = JSONEncoder()
@@ -588,13 +588,16 @@ class SupabaseDataController: ObservableObject {
             }
             
             print("Insert response: \(response)")
+            
+            try await supabase.auth.signUp(email: driver.email, password: password)
+            
         } catch {
             print("Error inserting driver: \(error.localizedDescription)")
             throw error
         }
     }
     
-    func insertMaintenancePersonnel(personnel: MaintenancePersonnel) async throws {
+    func insertMaintenancePersonnel(personnel: MaintenancePersonnel, password: String) async throws {
         do {
             // Set up a custom JSONEncoder with ISO8601 format including milliseconds.
             let encoder = JSONEncoder()
@@ -622,6 +625,9 @@ class SupabaseDataController: ObservableObject {
             }
             
             print("Insert response: \(response)")
+            
+            try await supabase.auth.signUp(email: personnel.email, password: password)
+            
         } catch {
             print("Error inserting maintenance personnel: \(error.localizedDescription)")
             throw error
