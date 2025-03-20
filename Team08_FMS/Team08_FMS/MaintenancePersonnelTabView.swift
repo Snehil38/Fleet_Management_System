@@ -50,42 +50,42 @@ struct MaintenancePersonnelTabView: View {
                 .padding()
                 
                 // Tab View for different sections
-                Picker("View", selection: $selectedTab) {
-                    Text("Service Requests").tag(0)
-                    Text("Schedule").tag(1)
-                    Text("Vehicle Status").tag(2)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
+//                Picker("View", selection: $selectedTab) {
+//                    Text("Service Requests").tag(0)
+//                    Text("Schedule").tag(1)
+//                    Text("Vehicle Status").tag(2)
+//                }
+//                .pickerStyle(SegmentedPickerStyle())
+//                .padding()
                 
                 // Content based on selected tab
                 TabView(selection: $selectedTab) {
                     // Service Requests Tab
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            // Pre-Trip Requests Section
-                            VStack(alignment: .leading) {
-                                Text("Pre-Trip Service Requests")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                
-                                ForEach(preTripRequests) { request in
-                                    ServiceRequestCard(request: request)
-                                }
-                            }
-                            
-                            // Post-Trip Requests Section
-                            VStack(alignment: .leading) {
-                                Text("Post-Trip Service Requests")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                
-                                ForEach(postTripRequests) { request in
-                                    ServiceRequestCard(request: request)
-                                }
-                            }
-                        }
-                        .padding(.vertical)
+//                        VStack(alignment: .leading, spacing: 20) {
+//                            // Pre-Trip Requests Section
+//                            VStack(alignment: .leading) {
+//                                Text("Pre-Trip Service Requests")
+//                                    .font(.headline)
+//                                    .padding(.horizontal)
+//                                
+//                                ForEach(preTripRequests) { request in
+//                                    ServiceRequestCard(request: request)
+//                                }
+//                            }
+//                            
+//                            // Post-Trip Requests Section
+//                            VStack(alignment: .leading) {
+//                                Text("Post-Trip Service Requests")
+//                                    .font(.headline)
+//                                    .padding(.horizontal)
+//                                
+//                                ForEach(postTripRequests) { request in
+//                                    ServiceRequestCard(request: request)
+//                                }
+//                            }
+//                        }
+//                        .padding(.vertical)
                     }
                     .tag(0)
                     

@@ -47,19 +47,19 @@ struct DriverTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-//            mainContentView
-//                .tabItem {
-//                    Label("Home", systemImage: "house.fill")
-//                }
-//                .tag(0)
-//            
-            NavigationView {
-                TripsView()
-            }
-            .tabItem {
-                Label("Trips", systemImage: "car.fill")
-            }
-            .tag(1)
+            mainContentView
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+                .tag(0)
+            
+//            NavigationView {
+//                TripsView()
+//            }
+//            .tabItem {
+//                Label("Trips", systemImage: "car.fill")
+//            }
+//            .tag(1)
         }
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
     }
@@ -76,33 +76,33 @@ struct DriverTabView: View {
             
             NavigationView {
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        // Current Delivery Card
-                        if currentTrip.status == .current && availabilityManager.isAvailable {
-                            currentDeliveryCard
-                        }
-                        
-                        // Only show upcoming trips and trip queue if available
-                        if availabilityManager.isAvailable {
-                            // Trip Queue Section
-                            if !tripQueue.isEmpty {
-                                tripQueueSection
-                            }
-
-                            // Upcoming Trips
-                            upcomingTripsSection
-                        } else {
-                            // Display message when driver is unavailable
-                            unavailableDriverSection
-                        }
-
-                        // Recent Deliveries
-                        recentDeliveriesSection
-                        
-                        // Bottom padding for better scrolling experience
-                        Spacer().frame(height: 20)
-                    }
-                    .padding(.top, 8)
+//                    VStack(spacing: 24) {
+//                        // Current Delivery Card
+//                        if currentTrip.status == .current && availabilityManager.isAvailable {
+//                            currentDeliveryCard
+//                        }
+//                        
+//                        // Only show upcoming trips and trip queue if available
+//                        if availabilityManager.isAvailable {
+//                            // Trip Queue Section
+//                            if !tripQueue.isEmpty {
+//                                tripQueueSection
+//                            }
+//
+//                            // Upcoming Trips
+//                            upcomingTripsSection
+//                        } else {
+//                            // Display message when driver is unavailable
+//                            unavailableDriverSection
+//                        }
+//
+//                        // Recent Deliveries
+//                        recentDeliveriesSection
+//                        
+//                        // Bottom padding for better scrolling experience
+//                        Spacer().frame(height: 20)
+//                    }
+//                    .padding(.top, 8)
                 }
                 .navigationTitle("Home")
                 .navigationBarTitleDisplayMode(.large)

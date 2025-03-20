@@ -41,72 +41,72 @@ struct FleetManagerDashboardTabView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Stats Grid
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 16) {
-                        // Vehicles Stat
-                        StatCard(
-                            icon: "car.fill",
-                            iconColor: .blue,
-                            title: "Available Vehicles",
-                            value: "\(availableVehiclesCount)"
-                        )
-
-                        // Drivers Stat
-                        StatCard(
-                            icon: "person.fill",
-                            iconColor: .green,
-                            title: "Available Drivers",
-                            value: "\(availableDriversCount)"
-                        )
-
-                        // Maintenance Personnel Stat
-                        StatCard(
-                            icon: "wrench.fill",
-                            iconColor: .orange,
-                            title: "Under Maintenance",
-                            value: "\(vehiclesUnderMaintenanceCount)"
-                        )
-
-                        // Active Trips Stat
-                        StatCard(
-                            icon: "arrow.triangle.turn.up.right.diamond.fill",
-                            iconColor: .purple,
-                            title: "Active Trips",
-                            value: "0"
-                        )
-                    }
-                    .padding(.horizontal)
-
-                    // Financial Summary
-                    VStack(spacing: 16) {
-                        // Total Expenses
-                        FinancialCard(
-                            title: "Total Expenses",
-                            amount: "$\(String(format: "%.2f", totalExpenses))",
-                            trend: .negative
-                        )
-
-                        // Monthly Salary Expenses
-                        FinancialCard(
-                            title: "Monthly Salary Expenses",
-                            amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
-                            trend: .negative
-                        )
-
-                        // Total Revenue
-                        FinancialCard(
-                            title: "Total Revenue",
-                            amount: "$\(String(format: "%.2f", totalRevenue))",
-                            trend: .positive
-                        )
-                    }
-                    .padding(.horizontal)
-                }
-                .padding(.vertical)
+//                VStack(spacing: 24) {
+//                    // Stats Grid
+//                    LazyVGrid(columns: [
+//                        GridItem(.flexible()),
+//                        GridItem(.flexible())
+//                    ], spacing: 16) {
+//                        // Vehicles Stat
+//                        StatCard(
+//                            icon: "car.fill",
+//                            iconColor: .blue,
+//                            title: "Available Vehicles",
+//                            value: "\(availableVehiclesCount)"
+//                        )
+//
+//                        // Drivers Stat
+//                        StatCard(
+//                            icon: "person.fill",
+//                            iconColor: .green,
+//                            title: "Available Drivers",
+//                            value: "\(availableDriversCount)"
+//                        )
+//
+//                        // Maintenance Personnel Stat
+//                        StatCard(
+//                            icon: "wrench.fill",
+//                            iconColor: .orange,
+//                            title: "Under Maintenance",
+//                            value: "\(vehiclesUnderMaintenanceCount)"
+//                        )
+//
+//                        // Active Trips Stat
+//                        StatCard(
+//                            icon: "arrow.triangle.turn.up.right.diamond.fill",
+//                            iconColor: .purple,
+//                            title: "Active Trips",
+//                            value: "0"
+//                        )
+//                    }
+//                    .padding(.horizontal)
+//
+//                    // Financial Summary
+//                    VStack(spacing: 16) {
+//                        // Total Expenses
+//                        FinancialCard(
+//                            title: "Total Expenses",
+//                            amount: "$\(String(format: "%.2f", totalExpenses))",
+//                            trend: .negative
+//                        )
+//
+//                        // Monthly Salary Expenses
+//                        FinancialCard(
+//                            title: "Monthly Salary Expenses",
+//                            amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
+//                            trend: .negative
+//                        )
+//
+//                        // Total Revenue
+//                        FinancialCard(
+//                            title: "Total Revenue",
+//                            amount: "$\(String(format: "%.2f", totalRevenue))",
+//                            trend: .positive
+//                        )
+//                    }
+//                    .padding(.horizontal)
+//                }
+//                .padding(.vertical)
             }
             .navigationTitle("Fleet Manager")
             .toolbar {
