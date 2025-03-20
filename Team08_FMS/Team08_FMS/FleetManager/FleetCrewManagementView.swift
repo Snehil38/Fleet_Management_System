@@ -39,27 +39,23 @@ import SwiftUI
 //    }
 //}
 
-enum CrewType {
-    case drivers
-    case maintenance
-}
-
 struct FleetCrewManagementView: View {
-    @EnvironmentObject private var dataManager: CrewDataManager
+    @EnvironmentObject private var dataManager: CrewDataController
     @State private var crewType: CrewType = .drivers
     @State private var showingAddDriverSheet = false
     @State private var showingAddMaintenanceSheet = false
     @State private var showingProfile = false
     @State private var showingMessages = false
     @State private var searchText = ""
-    @State private var selectedStatus: CrewMember.Status?
+    @State private var selectedStatus: Status?  // Updated to use our new Status enum
 
-    var filteredCrew: [CrewMember] {
-        let crewList = crewType == .drivers ? dataManager.drivers : dataManager.maintenancePersonnel
-        return crewList.filter { crewMember in
+    // We now filter on any crew member conforming to CrewMemberProtocol.
+    var filteredCrew: [any CrewMemberProtocol] {
+        let crewList: [any CrewMemberProtocol] = crewType == .drivers ? dataManager.drivers : dataManager.maintenancePersonnel
+        return crewList.filter { crew in
             let matchesSearch = searchText.isEmpty ||
-                crewMember.name.lowercased().contains(searchText.lowercased())
-            let matchesStatus = selectedStatus == nil || crewMember.status == selectedStatus
+                crew.name.lowercased().contains(searchText.lowercased())
+            let matchesStatus = selectedStatus == nil || crew.status == selectedStatus
             return matchesSearch && matchesStatus
         }
     }
@@ -82,7 +78,7 @@ struct FleetCrewManagementView: View {
                     // Crew Type Selector
                     Picker("Crew Type", selection: $crewType) {
                         Text("Drivers").tag(CrewType.drivers)
-                        Text("Maintenance Personnel").tag(CrewType.maintenance)
+                        Text("Maintenance Personnel").tag(CrewType.maintenancePersonnel)
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
@@ -95,8 +91,8 @@ struct FleetCrewManagementView: View {
                                 isSelected: selectedStatus == nil,
                                 action: { selectedStatus = nil }
                             )
-
-                            ForEach([CrewMember.Status.available, .busy, .offline], id: \.self) { status in
+                            
+                            ForEach([Status.available, .busy, .offDuty], id: \.self) { status in
                                 FilterChip(
                                     title: status.rawValue,
                                     isSelected: selectedStatus == status,
@@ -113,8 +109,8 @@ struct FleetCrewManagementView: View {
                         if filteredCrew.isEmpty {
                             EmptyStateView(type: crewType)
                         } else {
-                            ForEach(filteredCrew) { crewMember in
-                                CrewCardView(crewMember: crewMember)
+                            ForEach(Array(filteredCrew.enumerated()), id: \.element.id) { (_, crew) in
+                                CrewCardView(crewMember: crew)
                                     .padding(.horizontal)
                             }
                         }
@@ -126,28 +122,28 @@ struct FleetCrewManagementView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
-                        Button(action: {
+                        Button {
                             if crewType == .drivers {
                                 showingAddDriverSheet = true
                             } else {
                                 showingAddMaintenanceSheet = true
                             }
-                        }) {
+                        } label: {
                             Image(systemName: "plus")
                         }
-//                        Button {
-//                            showingMessages = true
-//                        } label: {
-//                            Image(systemName: "message.fill")
-//                                .foregroundColor(.blue)
-//                        }
-//
-//                        Button {
-//                            showingProfile = true
-//                        } label: {
-//                            Image(systemName: "person.circle.fill")
-//                                .foregroundColor(.blue)
-//                        }
+                        Button {
+                            showingMessages = true
+                        } label: {
+                            Image(systemName: "message.fill")
+                                .foregroundColor(.blue)
+                        }
+
+                        Button {
+                            showingProfile = true
+                        } label: {
+                            Image(systemName: "person.circle.fill")
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
             }
@@ -213,6 +209,157 @@ private struct EmptyStateView: View {
     }
 }
 
+struct CrewCardView: View {
+    let crewMember: any CrewMemberProtocol
+    @EnvironmentObject var dataManager: CrewDataController
+    @State private var showingDeleteAlert = false
+    @State private var showingMessageSheet = false
+
+    // This computed property returns the most recent crew member from the data manager.
+    var currentCrew: any CrewMemberProtocol {
+        if crewMember is Driver {
+            return dataManager.drivers.first { $0.id == crewMember.id } ?? crewMember
+        } else {
+            return dataManager.maintenancePersonnel.first { $0.id == crewMember.id } ?? crewMember
+        }
+    }
+    
+    var body: some View {
+        NavigationLink(destination: CrewProfileView(crewMember: currentCrew)) {
+            VStack(spacing: 0) {
+                // Header with name and status
+                HStack {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color.blue.opacity(0.2))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Text(currentCrew.avatar)
+                                    .font(.headline)
+                                    .foregroundColor(.blue)
+                            )
+                        
+                        VStack(alignment: .leading) {
+                            Text(currentCrew.name)
+                                .font(.headline)
+                            Text(role)
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Text(currentCrew.status.rawValue)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(statusColor)
+                        .clipShape(Capsule())
+                }
+                .padding()
+                
+                Divider()
+                
+                // Summary Details Section
+                VStack(spacing: 12) {
+                    if let driver = currentCrew as? Driver {
+                        HStack {
+                            Label("Experience: \(driver.yearsOfExperience) yrs", systemImage: "clock.fill")
+                            Spacer()
+                            Label("License: \(driver.driverLicenseNumber)", systemImage: "car.fill")
+                        }
+                    } else if let maintenance = currentCrew as? MaintenancePersonnel {
+                        HStack {
+                            Label("Experience: \(maintenance.yearsOfExperience) yrs", systemImage: "clock.fill")
+                            Spacer()
+                            Label("Specialty: \(maintenance.specialty.rawValue)", systemImage: "wrench.fill")
+                        }
+                    }
+                }
+                .padding()
+            }
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .contextMenu {
+            Button(role: .destructive) {
+                showingDeleteAlert = true
+            } label: {
+                Label("Delete Crew Member", systemImage: "trash")
+            }
+            
+            if currentCrew.status != .busy {
+                Button {
+                    updateCrewStatus(.busy)
+                } label: {
+                    Label("Mark as Busy", systemImage: "person.fill.checkmark")
+                }
+            }
+            
+            if currentCrew.status != .available {
+                Button {
+                    updateCrewStatus(.available)
+                } label: {
+                    Label("Mark as Available", systemImage: "checkmark.circle.fill")
+                }
+            }
+            
+            Button {
+                showingMessageSheet = true
+            } label: {
+                Label("Send Message", systemImage: "message.fill")
+            }
+        }
+        .alert("Delete Crew Member", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteCrew()
+            }
+        } message: {
+            Text("Are you sure you want to delete this crew member? This action cannot be undone.")
+        }
+        .sheet(isPresented: $showingMessageSheet) {
+            NavigationView {
+                ContactView()
+            }
+        }
+    }
+    
+    // Determine the role based on the type.
+    var role: String {
+        if currentCrew is Driver { return "Driver" }
+        else { return "Maintenance" }
+    }
+    
+    var statusColor: Color {
+        switch currentCrew.status {
+        case .available: return .green
+        case .busy: return .orange
+        case .offDuty: return .gray
+        }
+    }
+    
+    private func updateCrewStatus(_ newStatus: Status) {
+        if currentCrew is Driver {
+            dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
+        } else {
+            dataManager.updateMaintenancePersonnelStatus(currentCrew.id, status: newStatus)
+        }
+    }
+    
+    private func deleteCrew() {
+        if currentCrew is Driver {
+            dataManager.deleteDriver(currentCrew.id)
+        } else {
+            dataManager.deleteMaintenancePersonnel(currentCrew.id)
+        }
+    }
+}
+
 struct StatusCard: View {
     let title: String
     let count: Int
@@ -251,178 +398,5 @@ struct StatusCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isSelected ? color : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
         )
-    }
-}
-
-struct CrewCardView: View {
-    let crewMember: CrewMember
-    @EnvironmentObject var dataManager: CrewDataManager
-    @State private var showingDeleteAlert = false
-    @State private var showingMessageSheet = false
-
-    private var statusColor: Color {
-        switch crewMember.status {
-        case .available: return .green
-        case .busy: return .yellow
-        case .offline: return .red
-        }
-    }
-
-    var body: some View {
-        NavigationLink(destination: CrewProfileView(crewMember: crewMember)) {
-            VStack(spacing: 0) {
-                // Header with name and status
-                HStack {
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(Color.blue.opacity(0.2))
-                            .frame(width: 40, height: 40)
-                            .overlay(
-                                Text(crewMember.avatar)
-                                    .font(.headline)
-                                    .foregroundColor(.blue)
-                            )
-                        
-                        VStack(alignment: .leading) {
-                            Text(crewMember.name)
-                                .font(.headline)
-                            Text(crewMember.role)
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Text(crewMember.status.rawValue)
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(statusColor)
-                        .clipShape(Capsule())
-                }
-                .padding()
-                
-                Divider()
-                
-                // Details section
-                VStack(spacing: 12) {
-                    ForEach(crewMember.details) { detail in
-                        HStack(spacing: 16) {
-                            Label {
-                                Text(detail.label)
-                                    .foregroundColor(.secondary)
-                            } icon: {
-                                Image(systemName: iconForDetail(detail.label))
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            Spacer()
-                            
-                            Text(detail.value)
-                                .foregroundColor(.primary)
-                        }
-                        .font(.subheadline)
-                    }
-                }
-                .padding()
-            }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .contextMenu {
-            Button(role: .destructive) {
-                showingDeleteAlert = true
-            } label: {
-                Label("Delete Crew Member", systemImage: "trash")
-            }
-
-            if crewMember.status != .busy {
-                Button {
-                    updateCrewStatus(.busy)
-                } label: {
-                    Label("Mark as Busy", systemImage: "person.fill.checkmark")
-                }
-            }
-
-            if crewMember.status != .available {
-                Button {
-                    updateCrewStatus(.available)
-                } label: {
-                    Label("Mark as Available", systemImage: "checkmark.circle.fill")
-                }
-            }
-
-            Button {
-                showingMessageSheet = true
-            } label: {
-                Label("Send Message", systemImage: "message.fill")
-            }
-        }
-        .alert("Delete Crew Member", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                deleteCrew()
-            }
-        } message: {
-            Text("Are you sure you want to delete this crew member? This action cannot be undone.")
-        }
-        .sheet(isPresented: $showingMessageSheet) {
-            NavigationView {
-                ContactView()
-            }
-        }
-    }
-    
-    private func updateCrewStatus(_ newStatus: CrewMember.Status) {
-        if crewMember.role == "Driver" {
-            dataManager.updateDriverStatus(crewMember.id, status: newStatus)
-        } else {
-            dataManager.updateMaintenancePersonnelStatus(crewMember.id, status: newStatus)
-        }
-    }
-    
-    private func deleteCrew() {
-        if crewMember.role == "Driver" {
-            dataManager.deleteDriver(crewMember.id)
-        } else {
-            dataManager.deleteMaintenancePersonnel(crewMember.id)
-        }
-    }
-    
-    private func iconForDetail(_ label: String) -> String {
-        switch label {
-        case "Experience":
-            return "clock.fill"
-        case "License":
-            return "car.fill"
-        case "Phone":
-            return "phone.fill"
-        case "Email":
-            return "envelope.fill"
-        case "Specialty":
-            return "wrench.fill"
-        case "Certification":
-            return "checkmark.seal.fill"
-        case "Last Active":
-            return "calendar"
-        case "Vehicle":
-            return "car.fill"
-        case "ETA":
-            return "timer"
-        case "Next Shift":
-            return "clock.fill"
-        case "Hours This Week":
-            return "hourglass"
-        case "Location":
-            return "location.fill"
-        case "Last Job":
-            return "briefcase.fill"
-        default:
-            return "info.circle.fill"
-        }
     }
 }

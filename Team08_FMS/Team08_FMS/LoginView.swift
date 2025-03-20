@@ -191,6 +191,9 @@ struct VerifyOTPView: View {
             }
         }
         .padding()
+        .alert(isPresented: $dataController.showAlert) {  // 🔹 Uses showAlert state from controller
+            Alert(title: Text("Alert"), message: Text(dataController.alertMessage), dismissButton: .default(Text("OK")))
+        }
     }
 }
 

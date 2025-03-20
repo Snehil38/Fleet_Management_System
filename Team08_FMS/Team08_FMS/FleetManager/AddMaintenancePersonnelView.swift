@@ -1,5 +1,4 @@
-//
-//  AddMaintenacePersonnelView.swift
+//  AddMaintenancePersonnelView.swift
 //  Team08_FMS
 //
 //  Created by Snehil on 19/03/25.
@@ -9,26 +8,26 @@ import SwiftUI
 
 struct AddMaintenancePersonnelView: View {
     @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var dataManager: CrewDataManager
+    @StateObject private var supabase = SupabaseDataController.shared
+    @StateObject private var crewDataController = CrewDataController.shared
 
     // Maintenance personnel information
-    @State private var personnelID = ""
     @State private var name = ""
     @State private var avatar = ""
     @State private var experience = ""
-    @State private var specialty = "Engine Repair"
+    @State private var specialty: Specialization = .engineRepair
     @State private var phoneNumber = ""
     @State private var email = ""
-    @State private var certification = ""
-
-    // Available specialties
-    let specialties = ["Engine Repair", "Electrical Systems", "Brake Systems", "Transmission", "HVAC", "General Maintenance"]
+    @State private var certification: Certification = .aseCertified
+    @State private var salary = ""
+    @State private var address = ""
 
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !experience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !salary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -36,13 +35,6 @@ struct AddMaintenancePersonnelView: View {
             Form {
                 // Basic Information
                 Section("Basic Information") {
-                    TextField("Personnel ID", text: $personnelID)
-                        .textInputAutocapitalization(.never)
-                        .onChange(of: personnelID) { oldValue, newValue in
-                            if !newValue.isEmpty {
-                                personnelID = newValue.uppercased()
-                            }
-                        }
                     TextField("Full Name", text: $name)
                     TextField("Avatar Initials", text: $avatar)
                         .onChange(of: name) {
@@ -51,7 +43,6 @@ struct AddMaintenancePersonnelView: View {
                                 avatar = words.compactMap { $0.first }.map(String.init).joined()
                             }
                         }
-
                 }
                 
                 // Contact Information
@@ -60,6 +51,7 @@ struct AddMaintenancePersonnelView: View {
                         .keyboardType(.phonePad)
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
                 }
                 
                 // Professional Details
@@ -68,12 +60,20 @@ struct AddMaintenancePersonnelView: View {
                         .keyboardType(.numberPad)
                     
                     Picker("Specialty", selection: $specialty) {
-                        ForEach(specialties, id: \.self) {
-                            Text($0)
+                        ForEach(Specialization.allCases, id: \.self) { specialty in
+                            Text(specialty.rawValue)
                         }
                     }
                     
-                    TextField("Certification", text: $certification)
+                    Picker("Certification", selection: $certification) {
+                        ForEach(Certification.allCases, id: \.self) { certification in
+                            Text(certification.rawValue)
+                        }
+                    }
+                    
+                    TextField("Salary", text: $salary)
+                        .keyboardType(.decimalPad)
+                    TextField("Address", text: $address)
                 }
             }
             .navigationTitle("Add Maintenance Personnel")
@@ -96,28 +96,38 @@ struct AddMaintenancePersonnelView: View {
     }
 
     private func saveMaintenancePersonnel() {
-        let newPersonnel = CrewMember(
-            id: personnelID.isEmpty ? "MT-\(Int.random(in: 1000...9999))" : personnelID,
+        var newPersonnel = MaintenancePersonnel(
+            userID: UUID(),
             name: name,
-            avatar: avatar.isEmpty ? String(name.prefix(2).uppercased()) : avatar,
-            role: "Maintenance",
-            status: .available,
-            salary: 5000.0,
-            details: [
-                DetailItem(label: "Specialty", value: specialty),
-                DetailItem(label: "Experience", value: "\(experience) years"),
-                DetailItem(label: "Certification", value: certification),
-                DetailItem(label: "Phone", value: phoneNumber),
-                DetailItem(label: "Email", value: email),
-                DetailItem(label: "Salary", value: "$\(String(format: "%.2f", 5000.0))")
-            ]
+            profileImage: avatar.isEmpty ? String(name.prefix(2).uppercased()) : avatar,
+            email: email,
+            phoneNumber: Int(phoneNumber) ?? 0,
+            certifications: certification,
+            yearsOfExperience: Int(experience) ?? 0,
+            specialty: specialty,
+            salary: Double(salary) ?? 5000.0,
+            address: address.isEmpty ? nil : address,
+            createdAt: Date(),
+            status: .available
         )
-        dataManager.addMaintenancePersonnel(newPersonnel)
-        presentationMode.wrappedValue.dismiss()
+        
+        Task {
+            do {
+                guard let signUpID = await supabase.signUp(name: newPersonnel.name, email: newPersonnel.email, phoneNo: newPersonnel.phoneNumber, role: "maintenance_personnel") else { return }
+                newPersonnel.userID = signUpID
+                try await supabase.insertMaintenancePersonnel(personnel: newPersonnel, password: AppDataController.shared.randomPasswordGenerator(length: 6))
+                await MainActor.run {
+                    crewDataController.update()
+                    presentationMode.wrappedValue.dismiss()
+                }
+            } catch {
+                print("Error inserting maintenance personnel: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
 #Preview {
     AddMaintenancePersonnelView()
-        .environmentObject(CrewDataManager())
+        .environmentObject(SupabaseDataController.shared)
 }

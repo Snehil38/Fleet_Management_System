@@ -87,14 +87,14 @@ private struct VehicleCard: View {
 
                 // Document status indicators
                 HStack(spacing: 12) {
-                    Label("RC", systemImage: vehicle.documents.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents.rc != nil ? .green : .red)
+                    Label("RC", systemImage: vehicle.documents?.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(vehicle.documents?.rc != nil ? .green : .red)
 
-                    Label("Insurance", systemImage: vehicle.documents.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents.insurance != nil ? .green : .red)
+                    Label("Insurance", systemImage: vehicle.documents?.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(vehicle.documents?.insurance != nil ? .green : .red)
 
-                    Label("Pollution", systemImage: vehicle.documents.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents.pollutionCertificate != nil ? .green : .red)
+                    Label("Pollution", systemImage: vehicle.documents?.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(vehicle.documents?.pollutionCertificate != nil ? .green : .red)
                 }
                 .font(.caption)
             }
@@ -279,7 +279,7 @@ private struct DeleteVehiclesView: View {
 }
 
 struct VehiclesView: View {
-    @EnvironmentObject private var dataManager: CrewDataManager
+    @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
     @State private var showingAddVehicle = false
     @State private var showingDeleteMode = false

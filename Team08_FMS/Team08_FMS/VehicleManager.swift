@@ -5,7 +5,15 @@ class VehicleManager: ObservableObject {
     private let vehiclesKey = "savedVehicles"
 
     init() {
-        loadVehicles()
+        Task {
+            do {
+                let vehichle = try await SupabaseDataController.shared.fetchVehicles()
+                
+                await MainActor.run {
+                    vehicles = vehichle
+                }
+            }
+        }
     }
 
     private func loadVehicles() {

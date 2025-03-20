@@ -23,10 +23,40 @@ class SupabaseDataController: ObservableObject {
         supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrZnJ2enh3amxpbWhodmR3d3FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTA5MjUsImV4cCI6MjA1Nzc4NjkyNX0.7vNQWGbjOYFeynNt8N8V-DzoJbS3qq28o3LAa1XvLnw"
     )
     
-    private init() {}
+    private init() {
+//        Task {
+//            await checkSession()
+//        }
+    }
+    
+    func checkSession() async {
+        do {
+            let session = try await supabase.auth.session
+            
+            await MainActor.run {
+                self.isAuthenticated = true
+                self.userID = session.user.id
+            }
+            
+            // Fetch additional user-related data
+            await fetchUserRole(userID: session.user.id)
+            await CheckGenPass(userID: session.user.id)
+            
+        } catch {
+            // If an error occurs, reset the session-related properties
+            print("Error checking session: \(error.localizedDescription)")
+            await MainActor.run {
+                self.isAuthenticated = false
+                self.userRole = nil
+                self.userID = nil
+                self.isGenPass = false
+                self.otpVerified = false
+            }
+        }
+    }
     
     // MARK: - Authentication
-    func signUp(name: String, email: String, phoneNo: Int, role: String) async {
+    func signUp(name: String, email: String, phoneNo: Int, role: String) async -> UUID? {
         struct UserRole: Codable {
             let user_id: UUID
             let role_id: Int
@@ -44,7 +74,7 @@ class SupabaseDataController: ObservableObject {
         
         guard let roleID = roleMapping[role] else {
             print("Invalid role: \(role)")
-            return
+            return nil
         }
         
         do {
@@ -52,23 +82,25 @@ class SupabaseDataController: ObservableObject {
             print(password)
             let signUpResponse = try await supabase.auth.signUp(email: email, password: password)
             
-            let userID = signUpResponse.user.id
+//            let userID = signUpResponse.user.id
             
-            let userRole = UserRole(user_id: userID, role_id: roleID)
+            let userRole = UserRole(user_id: signUpResponse.user.id, role_id: roleID)
             try await supabase
                 .from("user_roles")
                 .insert(userRole)
                 .execute()
             
-            let genPass = GenPass(user_id: userID)
+            let genPass = GenPass(user_id: signUpResponse.user.id)
             try await supabase
                 .from("gen_pass")
                 .insert(genPass)
                 .execute()
             
             print("User signed up successfully with role: \(role)")
+            return signUpResponse.user.id
         } catch {
             print("Error during sign-up: \(error.localizedDescription)")
+            return nil
         }
     }
 
@@ -137,7 +169,7 @@ class SupabaseDataController: ObservableObject {
         Task {
             if !isGenPass {
                 do {
-                    try await supabase.auth.signInWithOTP(email: email)
+                    try await supabase.auth.signInWithOTP(email: email, shouldCreateUser: false)
                     completion(true, nil)
                 } catch {
                     signOut()
@@ -162,8 +194,12 @@ class SupabaseDataController: ObservableObject {
                 }
                 completion(true, nil)
             } catch {
-                signOut()
                 completion(false, error.localizedDescription)
+                await MainActor.run {
+                    authError = "Login failed: \(error.localizedDescription)"
+                    alertMessage = authError!
+                    showAlert = true
+                }
             }
         }
     }
@@ -274,4 +310,418 @@ class SupabaseDataController: ObservableObject {
             print("Error fetching user role: \(error.localizedDescription)")
         }
     }
+    
+    // MARK: - Manage Crew Record
+    func fetchFleetManagerByUserID(userID: UUID) async throws -> FleetManager? {
+        do {
+            let response = try await supabase
+                .from("fleet_manager")
+                .select()
+                .eq("userID", value: userID)
+                .execute()
+            
+            let data = response.data
+
+            // Print raw JSON response for debugging
+            if let rawJSON = String(data: data, encoding: .utf8) {
+                print("Raw JSON Response for Fleet Manager: \(rawJSON)")
+            }
+
+            // Decode JSON as an array of dictionaries and extract the first record
+            guard let jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]],
+                  !jsonArray.isEmpty else {
+                print("No fleet manager found for userID: \(userID)")
+                return nil
+            }
+
+            // Convert the first record back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray[0], options: [])
+
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+            // Decode into FleetManager model
+            let fleetManager = try decoder.decode(FleetManager.self, from: transformedData)
+            print("Decoded Fleet Manager: \(fleetManager)")
+            return fleetManager
+        } catch {
+            print("Error fetching fleet manager: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    func fetchFleetManagers() async throws -> [FleetManager] {
+        do {
+            let response = try await supabase
+                .from("fleet_manager")
+                .select()
+                .eq("isDeleted", value: false)
+                .execute()
+            
+            let data = response.data
+
+            // Decode JSON as an array of dictionaries first
+            guard let jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
+                print("Invalid JSON structure")
+                return []
+            }
+
+            // Convert transformed array back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
+
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+            // Decode into FleetManager model
+            let fleetManagers = try decoder.decode([FleetManager].self, from: transformedData)
+            print("Decoded Fleet Managers: \(fleetManagers)")
+            return fleetManagers
+        } catch {
+            print("Error fetching fleet managers: \(error)")
+            return []
+        }
+    }
+    
+    func fetchDriverByUserID(userID: UUID) async throws -> Driver? {
+        do {
+            let response = try await supabase
+                .from("driver")
+                .select()
+                .eq("userID", value: userID)
+                .execute()
+            
+            let data = response.data
+            
+            // Print raw JSON response for debugging
+            if let rawJSON = String(data: data, encoding: .utf8) {
+                print("Raw JSON Response for Driver: \(rawJSON)")
+            }
+            
+            // Decode JSON as an array of dictionaries and extract the first record
+            guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]],
+                  !jsonArray.isEmpty else {
+                print("No driver found for userID: \(userID)")
+                return nil
+            }
+            
+            // Fix date format for driverLicenseExpiry if present
+            for i in 0..<jsonArray.count {
+                if let expiryDateString = jsonArray[i]["driverLicenseExpiry"] as? String {
+                    // Set up a formatter for the input format "yyyy-MM-dd HH:mm:ss"
+                    let inputFormatter = DateFormatter()
+                    inputFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+                    
+                    if let date = inputFormatter.date(from: expiryDateString) {
+                        // Configure ISO8601DateFormatter to include fractional seconds
+                        let isoFormatter = ISO8601DateFormatter()
+                        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        let formattedDate = isoFormatter.string(from: date)
+                        
+                        // Update the JSON with the properly formatted date string
+                        jsonArray[i]["driverLicenseExpiry"] = formattedDate
+                    }
+                }
+            }
+            
+            // Convert the first record back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray[0], options: [])
+            
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            
+            // Decode into Driver model
+            let driver = try decoder.decode(Driver.self, from: transformedData)
+            print("Decoded Driver: \(driver)")
+            return driver
+        } catch {
+            print("Error fetching driver: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    func fetchDrivers() async throws -> [Driver] {
+        do {
+            let response = try await supabase
+                .from("driver")
+                .select()
+                .eq("isDeleted", value: false)
+                .execute()
+            
+            let data = response.data
+
+            // Decode JSON as an array of dictionaries first
+            guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
+                print("Invalid JSON structure")
+                return []
+            }
+
+            // Fix date format for driverLicenseExpiry
+            for i in 0..<jsonArray.count {
+                if let expiryDateString = jsonArray[i]["driverLicenseExpiry"] as? String {
+                    // Set up a formatter for the input format "yyyy-MM-dd HH:mm:ss"
+                    let inputFormatter = DateFormatter()
+                    inputFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+                    
+                    if let date = inputFormatter.date(from: expiryDateString) {
+                        // Configure ISO8601DateFormatter to include fractional seconds
+                        let isoFormatter = ISO8601DateFormatter()
+                        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        let formattedDate = isoFormatter.string(from: date)
+                        
+                        // Update the JSON with the properly formatted date string
+                        jsonArray[i]["driverLicenseExpiry"] = formattedDate
+                    }
+                }
+            }
+
+            // Convert transformed array back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
+
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Allows fractional seconds
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+            // Decode into Driver model
+            let drivers = try decoder.decode([Driver].self, from: transformedData)
+            print("Decoded Drivers: \(drivers)")
+            return drivers
+        } catch {
+            print("Error fetching drivers: \(error)")
+            return []
+        }
+    }
+
+    func fetchMaintenancePersonnelByUserID(userID: UUID) async throws -> MaintenancePersonnel? {
+        do {
+            let response = try await supabase
+                .from("maintenance_personnel")
+                .select()
+                .eq("userID", value: userID)
+                .execute()
+            
+            let data = response.data
+            
+            // Print raw JSON response for debugging
+            if let rawJSON = String(data: data, encoding: .utf8) {
+                print("Raw JSON Response for Maintenance Personnel: \(rawJSON)")
+            }
+            
+            // Custom Date Formatter (Supports Fractional Seconds)
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            
+            // Decode JSON as an array of dictionaries and extract the first record
+            guard let jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]],
+                  !jsonArray.isEmpty else {
+                print("No maintenance personnel found for userID: \(userID)")
+                return nil
+            }
+            
+            // Convert the first record back to Data
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray[0], options: [])
+            
+            // Decode into MaintenancePersonnel model
+            let personnel = try decoder.decode(MaintenancePersonnel.self, from: transformedData)
+            print("Decoded Maintenance Personnel: \(personnel)")
+            return personnel
+        } catch {
+            print("Error fetching maintenance personnel: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    func fetchMaintenancePersonnel() async throws -> [MaintenancePersonnel] {
+        do {
+            let response = try await supabase
+                .from("maintenance_personnel")
+                .select()
+                .eq("isDeleted", value: false)
+                .execute()
+            
+            let data = response.data
+
+            // Custom Date Formatter
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Fractional seconds support
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+            // Decode data
+            let personnels = try decoder.decode([MaintenancePersonnel].self, from: data)
+            return personnels
+        } catch {
+            print("Error fetching maintenance personnel: \(error)")
+            return []
+        }
+    }
+
+    func insertDriver(driver: Driver, password: String) async throws {
+        do {
+            // Set up a custom JSONEncoder with ISO8601 format including milliseconds.
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the driver to JSON for debugging/logging.
+            let driverJSONData = try encoder.encode(driver)
+            if let driverJSONString = String(data: driverJSONData, encoding: .utf8) {
+                print("Driver JSON to insert: \(driverJSONString)")
+            }
+            
+            // Insert the driver into the "driver" table.
+            let response = try await supabase
+                .from("driver")
+                .insert(driver)
+                .execute()
+            
+            // Print raw JSON response for debugging.
+            if let rawJSON = String(data: response.data, encoding: .utf8) {
+                print("Raw JSON Insert Response for Driver: \(rawJSON)")
+            }
+            
+            print("Insert response: \(response)")
+            
+        } catch {
+            print("Error inserting driver: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    func insertMaintenancePersonnel(personnel: MaintenancePersonnel, password: String) async throws {
+        do {
+            // Set up a custom JSONEncoder with ISO8601 format including milliseconds.
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the personnel to JSON for debugging/logging.
+            let personnelJSONData = try encoder.encode(personnel)
+            if let personnelJSONString = String(data: personnelJSONData, encoding: .utf8) {
+                print("Maintenance Personnel JSON to insert: \(personnelJSONString)")
+            }
+            
+            // Insert the personnel record into the "maintenance_personnel" table.
+            let response = try await supabase
+                .from("maintenance_personnel")
+                .insert(personnel)
+                .execute()
+            
+            // Print raw JSON response for debugging.
+            if let rawJSON = String(data: response.data, encoding: .utf8) {
+                print("Raw JSON Insert Response for Maintenance Personnel: \(rawJSON)")
+            }
+            
+            print("Insert response: \(response)")
+            
+        } catch {
+            print("Error inserting maintenance personnel: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    func fetchVehicles() async throws -> [Vehicle] {
+        do {
+            let response = try await supabase
+                .from("vehicles")
+                .select()
+                .execute()
+            
+            let data = response.data
+            
+            // Decode JSON as an array of dictionaries first.
+            guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
+                print("Invalid JSON structure")
+                return []
+            }
+            
+            // Set up input formatter for "yyyy-MM-dd"
+            let inputFormatter = DateFormatter()
+            inputFormatter.dateFormat = "yyyy-MM-dd"
+            inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+            
+            // Set up output formatter for "yyyy-MM-dd" (you can change this if needed)
+            let outputFormatter = DateFormatter()
+            outputFormatter.dateFormat = "yyyy-MM-dd"
+            outputFormatter.locale = Locale(identifier: "en_US_POSIX")
+            outputFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            // Fix date format for pollution_expiry and insurance_expiry fields.
+            for i in 0..<jsonArray.count {
+                // Convert pollution_expiry from string to Date and back to formatted string.
+                if let pollutionExpiryString = jsonArray[i]["pollution_expiry"] as? String,
+                   let pollutionDate = inputFormatter.date(from: pollutionExpiryString) {
+                    let formattedPollutionExpiry = outputFormatter.string(from: pollutionDate)
+                    jsonArray[i]["pollution_expiry"] = formattedPollutionExpiry
+                }
+                
+                // Convert insurance_expiry from string to Date and back to formatted string.
+                if let insuranceExpiryString = jsonArray[i]["insurance_expiry"] as? String,
+                   let insuranceDate = inputFormatter.date(from: insuranceExpiryString) {
+                    let formattedInsuranceExpiry = outputFormatter.string(from: insuranceDate)
+                    jsonArray[i]["insurance_expiry"] = formattedInsuranceExpiry
+                }
+            }
+            
+            // Convert the transformed JSON array back to Data.
+            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
+            
+            // Create a date formatter for decoding dates from JSON.
+            let decoderDateFormatter = DateFormatter()
+            decoderDateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            decoderDateFormatter.dateFormat = "yyyy-MM-dd"
+            decoderDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(decoderDateFormatter)
+            
+            // Decode into Vehicle model
+            let vehicles = try decoder.decode([Vehicle].self, from: transformedData)
+            print("Decoded Vehicles: \(vehicles)")
+            return vehicles
+        } catch {
+            print("Error fetching vehicles: \(error)")
+            return []
+        }
+    }
+
+
 }

@@ -240,9 +240,9 @@ struct VehicleDetailView: View {
             _pollutionExpiry = State(initialValue: vehicle.pollutionExpiry)
             _insuranceExpiry = State(initialValue: vehicle.insuranceExpiry)
 
-            _pollutionCertificate = State(initialValue: vehicle.documents.pollutionCertificate)
-            _rc = State(initialValue: vehicle.documents.rc)
-            _insurance = State(initialValue: vehicle.documents.insurance)
+            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
+            _rc = State(initialValue: vehicle.documents?.rc)
+            _insurance = State(initialValue: vehicle.documents?.insurance)
         }
     }
 
