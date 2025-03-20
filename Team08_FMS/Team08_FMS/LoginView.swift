@@ -29,6 +29,9 @@ struct RoleSelectionView: View {
                             selectedRole = role
                             UserDefaults.standard.set(role, forKey: "selectedRole")
                             navigateToLogin = true
+                            Task {
+                                try await SupabaseDataController.shared.fetchVehicles()
+                            }
                         }) {
                             Text(role)
                                 .font(.headline)
