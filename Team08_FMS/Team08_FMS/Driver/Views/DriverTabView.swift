@@ -53,13 +53,13 @@ struct DriverTabView: View {
                 }
                 .tag(0)
             
-            NavigationView {
-                TripsView()
-            }
-            .tabItem {
-                Label("Trips", systemImage: "car.fill")
-            }
-            .tag(1)
+//            NavigationView {
+//                TripsView()
+//            }
+//            .tabItem {
+//                Label("Trips", systemImage: "car.fill")
+//            }
+//            .tag(1)
         }
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
     }
@@ -77,11 +77,11 @@ struct DriverTabView: View {
             NavigationView {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 24) {
-                        // Current Delivery Card
-                        if currentTrip.status == .current && availabilityManager.isAvailable {
-                            currentDeliveryCard
-                        }
-                        
+//                        // Current Delivery Card
+//                        if currentTrip.status == .current && availabilityManager.isAvailable {
+//                            currentDeliveryCard
+//                        }
+//                        
                         // Only show upcoming trips and trip queue if available
                         if availabilityManager.isAvailable {
                             // Trip Queue Section
@@ -90,14 +90,14 @@ struct DriverTabView: View {
                             }
 
                             // Upcoming Trips
-                            upcomingTripsSection
+//                            upcomingTripsSection
                         } else {
                             // Display message when driver is unavailable
                             unavailableDriverSection
                         }
 
                         // Recent Deliveries
-                        recentDeliveriesSection
+//                        recentDeliveriesSection
                         
                         // Bottom padding for better scrolling experience
                         Spacer().frame(height: 20)
@@ -109,13 +109,13 @@ struct DriverTabView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 16) {
-                            Button(action: {
-                                showingChatBot = true
-                            }) {
-                                Image(systemName: "message.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.blue)
-                            }
+//                            Button(action: {
+//                                showingChatBot = true
+//                            }) {
+//                                Image(systemName: "message.fill")
+//                                    .font(.system(size: 22))
+//                                    .foregroundColor(.blue)
+//                            }
                             
                             Button(action: {
                                 showingProfileView = true

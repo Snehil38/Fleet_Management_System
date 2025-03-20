@@ -39,11 +39,11 @@ struct DriverProfileView: View {
                             .foregroundColor(.gray)
                         
                         HStack {
-                            Text("Availability Status")
-                                .font(.headline)
-                            
-                            Spacer()
-                            
+//                            Text("Availability Status")
+//                                .font(.headline)
+//                            
+//                            Spacer()
+//                            
                             if !availabilityManager.isAvailable {
                                 Text("Unavailable")
                                     .foregroundColor(.red)
@@ -176,18 +176,18 @@ struct DriverProfileView: View {
                                 Text(experience)
                                     .foregroundColor(.gray)
                             }
-                            .padding()
+//                            .padding()
                             
-                            Divider()
-                                .padding(.leading)
+//                            Divider()
+//                                .padding(.leading)
                             
-                            HStack {
-                                Text("Vehicle Type")
-                                    .font(.headline)
-                                Spacer()
-                                Text(vehicleType)
-                                    .foregroundColor(.gray)
-                            }
+//                            HStack {
+//                                Text("Vehicle Type")
+//                                    .font(.headline)
+//                                Spacer()
+//                                Text(vehicleType)
+//                                    .foregroundColor(.gray)
+//                            }
                             .padding()
                             
                             Divider()
