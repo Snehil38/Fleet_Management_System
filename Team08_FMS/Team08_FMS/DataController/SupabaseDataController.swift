@@ -274,4 +274,23 @@ class SupabaseDataController: ObservableObject {
             print("Error fetching user role: \(error.localizedDescription)")
         }
     }
+    
+    // MARK: - Insert Crew Record
+    func insertDriver(driver: Driver) async throws {
+        let response = try await supabase
+            .from("drivers")
+            .insert(driver)
+            .execute()
+        // Optionally, you can process the response here
+        print("Insert response: \(response)")
+    }
+    
+    func insertMaintenancePersonnel(personnel: MaintenancePersonnel) async throws {
+        let response = try await supabase
+            .from("maintenance_personnel")
+            .insert(personnel)
+            .execute()
+        // Optionally, you can process the response here
+        print("Insert response: \(response)")
+    }
 }

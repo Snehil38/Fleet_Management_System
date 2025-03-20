@@ -18,60 +18,28 @@ import Foundation
 //    let salary: Double
 //    let details: [DetailItem]
 //
+//    // MARK: - Status Enum
 //    enum Status: String {
 //        case available = "Available"
 //        case busy = "Busy"
-//        case offline = "Offline"
+//        case onLeave = "On Leave"
 //
 //        var color: Color {
 //            switch self {
-//            case .available: return Color.green
-//            case .busy: return Color.yellow
-//            case .offline: return Color.red
+//            case .available: return .green
+//            case .busy: return .yellow
+//            case .onLeave: return .red
 //            }
 //        }
 //
 //        var backgroundColor: Color {
 //            switch self {
-//            case .available: return Color.green.opacity(0.2)
-//            case .busy: return Color.yellow.opacity(0.2)
-//            case .offline: return Color.red.opacity(0.2)
+//            case .available: return .green.opacity(0.2)
+//            case .busy: return .yellow.opacity(0.2)
+//            case .onLeave: return .red.opacity(0.2)
 //            }
 //        }
 //    }
-//}
-
-struct CrewMember: Identifiable {
-    let id: String
-    let name: String
-    let avatar: String
-    let role: String
-    let status: Status
-    let salary: Double
-    let details: [DetailItem]
-
-    // MARK: - Status Enum
-    enum Status: String {
-        case available = "Available"
-        case busy = "Busy"
-        case offline = "Offline"
-
-        var color: Color {
-            switch self {
-            case .available: return .green
-            case .busy: return .yellow
-            case .offline: return .red
-            }
-        }
-
-        var backgroundColor: Color {
-            switch self {
-            case .available: return .green.opacity(0.2)
-            case .busy: return .yellow.opacity(0.2)
-            case .offline: return .red.opacity(0.2)
-            }
-        }
-    }
 
     // MARK: - Computed Properties
 //    var details: [DetailItem] {
@@ -99,7 +67,7 @@ struct CrewMember: Identifiable {
 //        items.append(DetailItem(label: "Salary", value: "$\(String(format: "%.2f", salary))"))
 //        return items
 //    }
-}
+//}
 
 // MARK: - Initialization
 //extension CrewMember {
