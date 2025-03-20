@@ -24,6 +24,7 @@ class CrewDataController: ObservableObject {
             do {
                 let driver = try await SupabaseDataController.shared.fetchDrivers()
                 let personnel = try await SupabaseDataController.shared.fetchMaintenancePersonnel()
+                print(maintenancePersonnel)
                 await MainActor.run {
                     drivers = driver
                     maintenancePersonnel = personnel
@@ -35,6 +36,20 @@ class CrewDataController: ObservableObject {
     }
     
     // MARK: - Loading Sample Data
+    func update() {
+        Task {
+            do {
+                let driver = try await SupabaseDataController.shared.fetchDrivers()
+                let personnel = try await SupabaseDataController.shared.fetchMaintenancePersonnel()
+                await MainActor.run {
+                    drivers = driver
+                    maintenancePersonnel = personnel
+                }
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
     
     private func loadFleetManagers() {
         fleetManagers = [

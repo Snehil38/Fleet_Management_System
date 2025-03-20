@@ -56,7 +56,7 @@ class SupabaseDataController: ObservableObject {
     }
     
     // MARK: - Authentication
-    func signUp(name: String, email: String, phoneNo: Int, role: String) async {
+    func signUp(name: String, email: String, phoneNo: Int, role: String) async -> UUID? {
         struct UserRole: Codable {
             let user_id: UUID
             let role_id: Int
@@ -74,7 +74,7 @@ class SupabaseDataController: ObservableObject {
         
         guard let roleID = roleMapping[role] else {
             print("Invalid role: \(role)")
-            return
+            return nil
         }
         
         do {
@@ -82,23 +82,25 @@ class SupabaseDataController: ObservableObject {
             print(password)
             let signUpResponse = try await supabase.auth.signUp(email: email, password: password)
             
-            let userID = signUpResponse.user.id
+//            let userID = signUpResponse.user.id
             
-            let userRole = UserRole(user_id: userID, role_id: roleID)
+            let userRole = UserRole(user_id: signUpResponse.user.id, role_id: roleID)
             try await supabase
                 .from("user_roles")
                 .insert(userRole)
                 .execute()
             
-            let genPass = GenPass(user_id: userID)
+            let genPass = GenPass(user_id: signUpResponse.user.id)
             try await supabase
                 .from("gen_pass")
                 .insert(genPass)
                 .execute()
             
             print("User signed up successfully with role: \(role)")
+            return signUpResponse.user.id
         } catch {
             print("Error during sign-up: \(error.localizedDescription)")
+            return nil
         }
     }
 
@@ -338,7 +340,7 @@ class SupabaseDataController: ObservableObject {
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
 
             let decoder = JSONDecoder()
@@ -376,7 +378,7 @@ class SupabaseDataController: ObservableObject {
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
 
             let decoder = JSONDecoder()
@@ -415,8 +417,23 @@ class SupabaseDataController: ObservableObject {
             }
             
             // Fix date format for driverLicenseExpiry if present
-            if let expiryDate = jsonArray[0]["driverLicenseExpiry"] as? String {
-                jsonArray[0]["driverLicenseExpiry"] = expiryDate + "T00:00:00.000Z" // Ensure full ISO8601 with milliseconds
+            for i in 0..<jsonArray.count {
+                if let expiryDateString = jsonArray[i]["driverLicenseExpiry"] as? String {
+                    // Set up a formatter for the input format "yyyy-MM-dd HH:mm:ss"
+                    let inputFormatter = DateFormatter()
+                    inputFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+                    
+                    if let date = inputFormatter.date(from: expiryDateString) {
+                        // Configure ISO8601DateFormatter to include fractional seconds
+                        let isoFormatter = ISO8601DateFormatter()
+                        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        let formattedDate = isoFormatter.string(from: date)
+                        
+                        // Update the JSON with the properly formatted date string
+                        jsonArray[i]["driverLicenseExpiry"] = formattedDate
+                    }
+                }
             }
             
             // Convert the first record back to Data
@@ -459,8 +476,21 @@ class SupabaseDataController: ObservableObject {
 
             // Fix date format for driverLicenseExpiry
             for i in 0..<jsonArray.count {
-                if let expiryDate = jsonArray[i]["driverLicenseExpiry"] as? String {
-                    jsonArray[i]["driverLicenseExpiry"] = expiryDate + "T00:00:00.000Z" // Ensure full ISO8601 with milliseconds
+                if let expiryDateString = jsonArray[i]["driverLicenseExpiry"] as? String {
+                    // Set up a formatter for the input format "yyyy-MM-dd HH:mm:ss"
+                    let inputFormatter = DateFormatter()
+                    inputFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+                    
+                    if let date = inputFormatter.date(from: expiryDateString) {
+                        // Configure ISO8601DateFormatter to include fractional seconds
+                        let isoFormatter = ISO8601DateFormatter()
+                        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        let formattedDate = isoFormatter.string(from: date)
+                        
+                        // Update the JSON with the properly formatted date string
+                        jsonArray[i]["driverLicenseExpiry"] = formattedDate
+                    }
                 }
             }
 
@@ -470,7 +500,7 @@ class SupabaseDataController: ObservableObject {
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX" // Allows fractional seconds
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Allows fractional seconds
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
 
             let decoder = JSONDecoder()
@@ -504,7 +534,7 @@ class SupabaseDataController: ObservableObject {
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             
             let decoder = JSONDecoder()
@@ -543,13 +573,11 @@ class SupabaseDataController: ObservableObject {
             // Custom Date Formatter
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX" // Fractional seconds support
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Fractional seconds support
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
 
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .formatted(dateFormatter)
-            
-            
 
             // Decode data
             let personnels = try decoder.decode([MaintenancePersonnel].self, from: data)
@@ -560,13 +588,13 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
-    func insertDriver(driver: Driver) async throws {
+    func insertDriver(driver: Driver, password: String) async throws {
         do {
             // Set up a custom JSONEncoder with ISO8601 format including milliseconds.
             let encoder = JSONEncoder()
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             encoder.dateEncodingStrategy = .formatted(dateFormatter)
             
@@ -588,19 +616,20 @@ class SupabaseDataController: ObservableObject {
             }
             
             print("Insert response: \(response)")
+            
         } catch {
             print("Error inserting driver: \(error.localizedDescription)")
             throw error
         }
     }
     
-    func insertMaintenancePersonnel(personnel: MaintenancePersonnel) async throws {
+    func insertMaintenancePersonnel(personnel: MaintenancePersonnel, password: String) async throws {
         do {
             // Set up a custom JSONEncoder with ISO8601 format including milliseconds.
             let encoder = JSONEncoder()
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             encoder.dateEncodingStrategy = .formatted(dateFormatter)
             
@@ -622,6 +651,7 @@ class SupabaseDataController: ObservableObject {
             }
             
             print("Insert response: \(response)")
+            
         } catch {
             print("Error inserting maintenance personnel: \(error.localizedDescription)")
             throw error
@@ -643,27 +673,45 @@ class SupabaseDataController: ObservableObject {
                 return []
             }
             
+            // Set up input formatter for "yyyy-MM-dd"
+            let inputFormatter = DateFormatter()
+            inputFormatter.dateFormat = "yyyy-MM-dd"
+            inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+            
+            // Set up output formatter for "yyyy-MM-dd" (you can change this if needed)
+            let outputFormatter = DateFormatter()
+            outputFormatter.dateFormat = "yyyy-MM-dd"
+            outputFormatter.locale = Locale(identifier: "en_US_POSIX")
+            outputFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
             // Fix date format for pollution_expiry and insurance_expiry fields.
             for i in 0..<jsonArray.count {
-                if let pollutionExpiry = jsonArray[i]["pollution_expiry"] as? String {
-                    jsonArray[i]["pollution_expiry"] = pollutionExpiry + "T00:00:00.000Z"
+                // Convert pollution_expiry from string to Date and back to formatted string.
+                if let pollutionExpiryString = jsonArray[i]["pollution_expiry"] as? String,
+                   let pollutionDate = inputFormatter.date(from: pollutionExpiryString) {
+                    let formattedPollutionExpiry = outputFormatter.string(from: pollutionDate)
+                    jsonArray[i]["pollution_expiry"] = formattedPollutionExpiry
                 }
-                if let insuranceExpiry = jsonArray[i]["insurance_expiry"] as? String {
-                    jsonArray[i]["insurance_expiry"] = insuranceExpiry + "T00:00:00.000Z"
+                
+                // Convert insurance_expiry from string to Date and back to formatted string.
+                if let insuranceExpiryString = jsonArray[i]["insurance_expiry"] as? String,
+                   let insuranceDate = inputFormatter.date(from: insuranceExpiryString) {
+                    let formattedInsuranceExpiry = outputFormatter.string(from: insuranceDate)
+                    jsonArray[i]["insurance_expiry"] = formattedInsuranceExpiry
                 }
             }
             
             // Convert the transformed JSON array back to Data.
             let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
             
-            // Custom Date Formatter (supports fractional seconds)
-            let dateFormatter = DateFormatter()
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
-            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            // Create a date formatter for decoding dates from JSON.
+            let decoderDateFormatter = DateFormatter()
+            decoderDateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            decoderDateFormatter.dateFormat = "yyyy-MM-dd"
+            decoderDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             
             let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            decoder.dateDecodingStrategy = .formatted(decoderDateFormatter)
             
             // Decode into Vehicle model
             let vehicles = try decoder.decode([Vehicle].self, from: transformedData)
@@ -674,5 +722,6 @@ class SupabaseDataController: ObservableObject {
             return []
         }
     }
+
 
 }
