@@ -260,20 +260,94 @@ struct CrewCardView: View {
                 Label("Delete Crew Member", systemImage: "trash")
             }
             
-            if currentCrew.status != .busy {
+            if currentCrew.status == .available {
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Busy", systemImage: "checkmark.circle.fill")
+//                }
+                
                 Button {
-                    updateCrewStatus(.busy)
+                    Task {
+                        if currentCrew is Driver {
+                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, for: currentCrew.id)
+                        }
+                        else {
+                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, for: currentCrew.id)
+                        }
+                        CrewDataController.shared.update()
+                    }
                 } label: {
-                    Label("Mark as Busy", systemImage: "person.fill.checkmark")
+                    Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
                 }
             }
             
-            if currentCrew.status != .available {
+//            else if currentCrew.status == .busy {
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Available", systemImage: "checkmark.circle.fill")
+//                }
+//                
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
+//                }
+//            }
+            
+            else if currentCrew.status == .offDuty {
                 Button {
-                    updateCrewStatus(.available)
+                    Task {
+                        if currentCrew is Driver {
+                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, for: currentCrew.id)
+                        }
+                        else {
+                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, for: currentCrew.id)
+                        }
+                        CrewDataController.shared.update()
+                    }
                 } label: {
                     Label("Mark as Available", systemImage: "checkmark.circle.fill")
                 }
+                
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Busy", systemImage: "checkmark.circle.fill")
+//                }
             }
             
             Button {
