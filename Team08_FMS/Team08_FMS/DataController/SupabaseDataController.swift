@@ -766,9 +766,26 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    func softDeleteDriver(for userID: UUID) async {do {
+    func softDeleteDriver(for userID: UUID) async {
+        do {
+        let response = try await supabase
+            .from("driver")
+            .update(["isDeleted": true])
+            .eq("id", value: userID)
+            .execute()
+        
+        let data = response.data
+        let jsonString = String(data: data, encoding: .utf8)
+        print("Update response data: \(jsonString ?? "")")
+        } catch {
+            print("Exception updating driver status: \(error.localizedDescription)")
+        }
+    }
+    
+    func softDeleteMaintenancePersonnel(for userID: UUID) async {
+        do {
             let response = try await supabase
-                .from("driver")
+                .from("maintenance_personnel")
                 .update(["isDeleted": true])
                 .eq("id", value: userID)
                 .execute()
@@ -781,12 +798,28 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    func softDeleteMaintenancePersonnel(for userID: UUID) async {
+    func updateDriver(driver: Driver) async {
+        do {
+        let response = try await supabase
+            .from("driver")
+            .update(driver)
+            .eq("id", value: driver.id)
+            .execute()
+        
+        let data = response.data
+        let jsonString = String(data: data, encoding: .utf8)
+        print("Update response data: \(jsonString ?? "")")
+        } catch {
+            print("Exception updating driver status: \(error.localizedDescription)")
+        }
+    }
+    
+    func updateMaintenancePersonnel(peronnel: MaintenancePersonnel) async {
         do {
             let response = try await supabase
                 .from("maintenance_personnel")
-                .update(["isDeleted": true])
-                .eq("id", value: userID)
+                .update(peronnel)
+                .eq("id", value: peronnel.id)
                 .execute()
             
             let data = response.data

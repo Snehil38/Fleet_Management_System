@@ -21,7 +21,7 @@ struct CrewProfileView: View {
     @State private var editedExperience: String = ""
     @State private var editedSalary: String = ""
     @State private var editedLicense: String = ""     // For Driver
-    @State private var editedSpecialty: String = ""    // For Maintenance
+    @State private var editedSpecialty: Specialization?
     
     @State private var showingDeleteAlert = false
     
@@ -40,8 +40,8 @@ struct CrewProfileView: View {
                             .foregroundColor(crewMember.status.color)
                     }
                 } else {
-                    LabeledContent("ID", value: crewMember.id.uuidString)
                     LabeledContent("Name", value: crewMember.name)
+                    LabeledContent("ID", value: crewMember.id.uuidString)
                     LabeledContent("Role", value: role)
                     HStack {
                         Text("Status")
@@ -54,15 +54,8 @@ struct CrewProfileView: View {
             
             // Contact Information Section
             Section("Contact Information") {
-                if isEditing {
-                    TextField("Phone", text: $editedPhone)
-                        .keyboardType(.phonePad)
-                    TextField("Email", text: $editedEmail)
-                        .keyboardType(.emailAddress)
-                } else {
-                    LabeledContent("Phone", value: "\(crewMember.phoneNumber)")
-                    LabeledContent("Email", value: crewMember.email)
-                }
+                LabeledContent("Phone", value: "\(crewMember.phoneNumber)")
+                LabeledContent("Email", value: crewMember.email)
             }
             
             // Professional Details Section
@@ -73,7 +66,12 @@ struct CrewProfileView: View {
                     if isDriver {
                         TextField("License Number", text: $editedLicense)
                     } else {
-                        TextField("Specialty", text: $editedSpecialty)
+                        Picker("Specialty", selection: $editedSpecialty) {
+                            ForEach(Specialization.allCases) { specialty in
+                                Text(specialty.rawValue.capitalized)
+                                    .tag(specialty)
+                            }
+                        }
                     }
                     TextField("Monthly Salary", text: $editedSalary)
                         .keyboardType(.decimalPad)
@@ -148,7 +146,7 @@ struct CrewProfileView: View {
             editedSalary = String(format: "%.2f", driver.salary)
         } else if let maintenance = crewMember as? MaintenancePersonnel {
             editedExperience = "\(maintenance.yearsOfExperience)"
-            editedSpecialty = maintenance.specialty.rawValue
+            editedSpecialty = maintenance.specialty
             editedSalary = String(format: "%.2f", maintenance.salary)
         }
     }
@@ -165,6 +163,9 @@ struct CrewProfileView: View {
             dataManager.drivers[index].driverLicenseNumber = editedLicense
             dataManager.drivers[index].salary = Double(editedSalary) ?? dataManager.drivers[index].salary
             dataManager.drivers[index].updatedAt = Date()
+            Task {
+                await SupabaseDataController.shared.updateDriver(driver: dataManager.drivers[index])
+            }
         } else if let maintenance = crewMember as? MaintenancePersonnel,
                   let index = dataManager.maintenancePersonnel.firstIndex(where: { $0.id == maintenance.id }) {
             dataManager.maintenancePersonnel[index].name = editedName
@@ -172,19 +173,25 @@ struct CrewProfileView: View {
             dataManager.maintenancePersonnel[index].phoneNumber = Int(editedPhone) ?? dataManager.maintenancePersonnel[index].phoneNumber
             dataManager.maintenancePersonnel[index].email = editedEmail
             dataManager.maintenancePersonnel[index].yearsOfExperience = Int(editedExperience) ?? dataManager.maintenancePersonnel[index].yearsOfExperience
-            dataManager.maintenancePersonnel[index].specialty = Specialization(rawValue: editedSpecialty) ?? dataManager.maintenancePersonnel[index].specialty
+            dataManager.maintenancePersonnel[index].specialty = editedSpecialty ?? dataManager.maintenancePersonnel[index].specialty
             dataManager.maintenancePersonnel[index].salary = Double(editedSalary) ?? dataManager.maintenancePersonnel[index].salary
             dataManager.maintenancePersonnel[index].updatedAt = Date()
+            Task {
+                await SupabaseDataController.shared.updateMaintenancePersonnel(peronnel: dataManager.maintenancePersonnel[index])
+            }
         }
-        isEditing = false
     }
     
     // Delete the crew member using the appropriate data controller method.
     private func deleteCrew() {
         if isDriver, let driver = crewMember as? Driver {
-            dataManager.deleteDriver(driver.id)
+            Task {
+                await SupabaseDataController.shared.softDeleteDriver(for: driver.id)
+            }
         } else if let maintenance = crewMember as? MaintenancePersonnel {
-            dataManager.deleteMaintenancePersonnel(maintenance.id)
+            Task {
+                await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: maintenance.id)
+            }
         }
         presentationMode.wrappedValue.dismiss()
     }
