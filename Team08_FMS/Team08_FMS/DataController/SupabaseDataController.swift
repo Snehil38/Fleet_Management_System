@@ -18,6 +18,7 @@ class SupabaseDataController: ObservableObject {
     @Published var isGenPass: Bool = false
     @Published var showAlert = false
     @Published var alertMessage = ""
+    @Published var session: Session?
     
     private let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
@@ -45,6 +46,89 @@ class SupabaseDataController: ObservableObject {
             }
         }
     }
+    
+    func setUserSession() async {
+        do {
+            guard let session = session else {
+                print("Cannot set session")
+                return
+            }
+            let accessToken = session.accessToken
+            let refreshToken = session.refreshToken
+            try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+            print(session)
+        } catch {
+            print("Cannot set session")
+        }
+    }
+    
+    func setSessionManually(userSession: Session) async {
+        do {
+            let accessToken = userSession.accessToken
+            let refreshToken = userSession.refreshToken
+            
+            // Save tokens
+            UserDefaults.standard.set(accessToken, forKey: "accessToken")
+            UserDefaults.standard.set(refreshToken, forKey: "refreshToken")
+            UserDefaults.standard.synchronize()  // Ensure they are saved
+
+            // Verify the values were saved
+            print("Saved accessToken: \(UserDefaults.standard.string(forKey: "accessToken") ?? "nil")")
+            print("Saved refreshToken: \(UserDefaults.standard.string(forKey: "refreshToken") ?? "nil")")
+
+            try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+            print("Session set manually: \(userSession)")
+        } catch {
+            print("Cannot set session: \(error)")
+        }
+    }
+    
+    func saveUserDefaults() {
+        guard let session = session else {
+            print("cannot store user defaults")
+            return
+        }
+        let accessToken = session.accessToken
+        let refreshToken = session.refreshToken
+        // Save tokens
+        UserDefaults.standard.set(accessToken, forKey: "accessToken")
+        UserDefaults.standard.set(refreshToken, forKey: "refreshToken")
+        UserDefaults.standard.synchronize()  // Ensure they are saved
+
+        // Verify the values were saved
+        print("Saved accessToken: \(UserDefaults.standard.string(forKey: "accessToken") ?? "nil")")
+        print("Saved refreshToken: \(UserDefaults.standard.string(forKey: "refreshToken") ?? "nil")")
+    }
+    
+    func autoLogin() async {
+        guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+              let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
+            print("No saved session found in UserDefaults")
+            return
+        }
+
+        print("Retrieved accessToken: \(accessToken)")
+        print("Retrieved refreshToken: \(refreshToken)")
+
+        do {
+            try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+
+            // Ensure session is valid
+            await MainActor.run {
+                session = supabase.auth.currentSession
+                userID = session?.user.id
+            }
+            // Fetch user role using the retrieved user ID
+            await fetchUserRole(userID: session!.user.id)
+            await MainActor.run {
+                self.isAuthenticated = true
+            }
+            print("Auto-login successful")
+        } catch {
+            print("Auto-login failed: \(error)")
+        }
+    }
+
     
     func checkSession() async {
         do {
@@ -95,6 +179,7 @@ class SupabaseDataController: ObservableObject {
         }
         
         do {
+            session = supabase.auth.currentSession
             let password = AppDataController.shared.randomPasswordGenerator(length: 6)
             print(password)
             let signUpResponse = try await supabase.auth.signUp(email: email, password: password)
@@ -116,6 +201,7 @@ class SupabaseDataController: ObservableObject {
             sendEmail(toName: name, toEmail: email, subject: "Welcome to Fleet Management System", text: text)
             
             print("User signed up successfully with role: \(role)")
+            
             return signUpResponse.user.id
         } catch {
             print("Error during sign-up: \(error.localizedDescription)")
@@ -148,6 +234,7 @@ class SupabaseDataController: ObservableObject {
                     await MainActor.run {
                         userID = session.user.id
                         self.roleMatched = true
+                        self.session = session
                     }
                     await CheckGenPass(userID: userID!)
                     if isGenPass {
@@ -169,6 +256,7 @@ class SupabaseDataController: ObservableObject {
                     await MainActor.run {
                         isAuthenticated = true
                     }
+                    saveUserDefaults()
                 }
                 completion(true, nil)
             } catch {
@@ -211,6 +299,7 @@ class SupabaseDataController: ObservableObject {
                     self.isAuthenticated = true
                     self.otpVerified = true
                 }
+                saveUserDefaults()
                 completion(true, nil)
             } catch {
                 completion(false, error.localizedDescription)
@@ -227,6 +316,11 @@ class SupabaseDataController: ObservableObject {
         Task {
             do {
                 try await supabase.auth.signOut()
+                
+                UserDefaults.standard.removeObject(forKey: "accessToken")
+                UserDefaults.standard.removeObject(forKey: "refreshToken")
+                UserDefaults.standard.synchronize() // Ensure changes are saved
+                
                 await MainActor.run {
                     self.userRole = nil
                     self.isAuthenticated = false
@@ -234,6 +328,7 @@ class SupabaseDataController: ObservableObject {
                     self.isGenPass = false
                     self.otpVerified = false
                     self.roleMatched = false
+                    self.session = nil
                 }
             } catch {
             }

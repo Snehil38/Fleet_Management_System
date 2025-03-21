@@ -32,6 +32,9 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut, value: auth.isAuthenticated) // Smooth transition
+        .task {
+            await auth.autoLogin() // Auto-login when ContentView appears
+        }
     }
 }
 

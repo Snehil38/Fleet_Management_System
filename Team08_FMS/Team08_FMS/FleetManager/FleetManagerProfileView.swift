@@ -162,7 +162,7 @@ struct FleetManagerProfileView: View {
     // MARK: - Data Loading
     
     private func loadFleetManagerData() async {
-        if let userID = supabaseDataController.userID {
+        if let userID = await supabaseDataController.getUserID() {
             do {
                 if let fetchedManager = try await supabaseDataController.fetchFleetManagerByUserID(userID: userID) {
                     self.fleetManager = fetchedManager

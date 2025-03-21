@@ -82,7 +82,7 @@ struct DriverProfileView: View {
                 )
             }
             .task {
-                if let userID = supabaseDataController.userID {
+                if let userID = await supabaseDataController.getUserID() {
                     do {
                         if let fetchedDriver = try await supabaseDataController.fetchDriverByUserID(userID: userID) {
                             self.driver = fetchedDriver
