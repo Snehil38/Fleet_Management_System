@@ -12,8 +12,6 @@ struct FleetCrewManagementView: View {
     @State private var crewType: CrewType = .drivers
     @State private var showingAddDriverSheet = false
     @State private var showingAddMaintenanceSheet = false
-    @State private var showingProfile = false
-    @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: Status?  // Updated to use our new Status enum
 
@@ -62,7 +60,7 @@ struct FleetCrewManagementView: View {
                             
                             ForEach([Status.available, .busy, .offDuty], id: \.self) { status in
                                 FilterChip(
-                                    title: status.rawValue,
+                                    title: AppDataController.shared.getStatusString(status: status),
                                     isSelected: selectedStatus == status,
                                     action: { selectedStatus = status }
                                 )
@@ -99,32 +97,7 @@ struct FleetCrewManagementView: View {
                         } label: {
                             Image(systemName: "plus")
                         }
-                        Button {
-                            showingMessages = true
-                        } label: {
-                            Image(systemName: "message.fill")
-                                .foregroundColor(.blue)
-                        }
-
-                        Button {
-                            showingProfile = true
-                        } label: {
-                            Image(systemName: "person.circle.fill")
-                                .foregroundColor(.blue)
-                        }
                     }
-                }
-            }
-            .sheet(isPresented: $showingProfile) {
-                NavigationView {
-                    FleetManagerProfileView()
-                        .environmentObject(dataManager)
-                }
-            }
-            .sheet(isPresented: $showingMessages) {
-                NavigationView {
-                    ContactView()
-                        .environmentObject(dataManager)
                 }
             }
             .sheet(isPresented: $showingAddDriverSheet) {
@@ -218,12 +191,12 @@ struct CrewCardView: View {
                     
                     Spacer()
                     
-                    Text(currentCrew.status.rawValue)
+                    Text(AppDataController.shared.getStatusString(status: currentCrew.status))
                         .font(.subheadline)
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(statusColor)
+                        .background(currentCrew.status.color)
                         .clipShape(Capsule())
                 }
                 .padding()
@@ -235,14 +208,18 @@ struct CrewCardView: View {
                     if let driver = currentCrew as? Driver {
                         HStack {
                             Label("Experience: \(driver.yearsOfExperience) yrs", systemImage: "clock.fill")
+                                .font(.caption)
                             Spacer()
                             Label("License: \(driver.driverLicenseNumber)", systemImage: "car.fill")
+                                .font(.caption)
                         }
                     } else if let maintenance = currentCrew as? MaintenancePersonnel {
                         HStack {
                             Label("Experience: \(maintenance.yearsOfExperience) yrs", systemImage: "clock.fill")
+                                .font(.caption)
                             Spacer()
-                            Label("Specialty: \(maintenance.specialty.rawValue)", systemImage: "wrench.fill")
+                            Label("Specialty: \(AppDataController.shared.getSpecialityString(speciality: maintenance.speciality))", systemImage: "wrench.fill")
+                                .font(.caption)
                         }
                     }
                 }
@@ -375,14 +352,6 @@ struct CrewCardView: View {
     var role: String {
         if currentCrew is Driver { return "Driver" }
         else { return "Maintenance" }
-    }
-    
-    var statusColor: Color {
-        switch currentCrew.status {
-        case .available: return .green
-        case .busy: return .orange
-        case .offDuty: return .gray
-        }
     }
     
     private func updateCrewStatus(_ newStatus: Status) {

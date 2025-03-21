@@ -19,4 +19,45 @@ class AppDataController {
         
         return String((0..<length).map { _ in character.randomElement()! })
     }
+    
+    func getStatusString(status: Status) -> String {
+        switch status {
+        case .available:
+            return "Available"
+        case .busy:
+            return "Busy"
+        case .offDuty:
+            return "Off Duty"
+        }
+    }
+    
+    func getSpecialityString(speciality: Specialization) -> String {
+        switch speciality {
+        case .engineRepair:
+            return "Engine Repair"
+        case .tireMaintenance:
+            return "Tire Maintenance"
+        case .electricalSystems:
+            return "Electrical Systems"
+        case .diagnostics:
+            return "Diagnostics"
+        case .generalMaintenance:
+            return "General Maintenance"
+        }
+    }
+    
+    func getCertificationString(certification: Certification) -> String {
+        switch certification {
+        case .aseCertified:
+            return "ASE Certified"
+        case .dieselMechanic:
+            return "Diesel Mechanic"
+        case .hvacSpecialist:
+            return "HVAC Specialist"
+        case .electricalSystemsCertified:
+            return "Electrical Systems Certified"
+        case .heavyEquipmentTechnician:
+            return "Heavy Equiment Technician"
+        }
+    }
 }

@@ -129,7 +129,7 @@ struct DriverProfileView: View {
                 Text("Status")
                     .font(.headline)
                 Spacer()
-                Text(statusText(for: driver))
+                Text(AppDataController.shared.getStatusString(status: driver.status))
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(driver.status.color)
@@ -265,17 +265,6 @@ struct DriverProfileView: View {
                 .font(.subheadline)
         }
         .padding()
-    }
-    
-    private func statusText(for driver: Driver) -> String {
-        switch driver.status {
-        case .available:
-            return "Available"
-        case .offDuty:
-            return "Off Duty"
-        case .busy:
-            return "Busy"
-        }
     }
     
     private func statusToggleBinding(for driver: Driver) -> Binding<Bool> {

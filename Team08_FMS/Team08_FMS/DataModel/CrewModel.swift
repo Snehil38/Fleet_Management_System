@@ -10,7 +10,7 @@ enum Status: String, Codable, Identifiable {
         switch self {
         case .available: return .green
         case .busy: return .orange
-        case .offDuty: return .gray
+        case .offDuty: return .red
         }
     }
 
@@ -102,7 +102,7 @@ struct MaintenancePersonnel: Identifiable, Codable {
     var phoneNumber: Int
     var certifications: Certification
     var yearsOfExperience: Int
-    var specialty: Specialization
+    var speciality: Specialization
     var salary: Double
     var address: String?
     var createdAt: Date?

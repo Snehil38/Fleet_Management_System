@@ -104,7 +104,7 @@ struct AddMaintenancePersonnelView: View {
             phoneNumber: Int(phoneNumber) ?? 0,
             certifications: certification,
             yearsOfExperience: Int(experience) ?? 0,
-            specialty: specialty,
+            speciality: specialty,
             salary: Double(salary) ?? 5000.0,
             address: address.isEmpty ? nil : address,
             createdAt: Date(),
