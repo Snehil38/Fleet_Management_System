@@ -723,5 +723,300 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
+    // MARK: - Trip Operations
+    func fetchTrips() async throws -> [Trip] {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .select()
+                .execute()
+            
+            let data = response.data
+            
+            // Print raw date string for debugging
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Raw JSON from database: \(jsonString)")
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateString = try container.decode(String.self)
+                
+                print("Trying to decode date string: \(dateString)")
+                
+                // Create date formatter
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                
+                // Try multiple date formats
+                let formats = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",    // PostgreSQL timestamp without timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS",       // Milliseconds
+                    "yyyy-MM-dd'T'HH:mm:ss",           // Basic format
+                    "yyyy-MM-dd HH:mm:ss",             // PostgreSQL default
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",   // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",      // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ssZ"           // With timezone
+                ]
+                
+                var lastError: Error?
+                
+                for format in formats {
+                    formatter.dateFormat = format
+                    if let date = formatter.date(from: dateString) {
+                        return date
+                    }
+                }
+                
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Cannot decode date string \(dateString). Tried formats: \(formats.joined(separator: ", "))"
+                )
+            }
+            
+            // Decode into Trip model
+            let trips = try decoder.decode([Trip].self, from: data)
+            print("Successfully decoded \(trips.count) trips")
+            return trips
+        } catch {
+            print("Error fetching trips: \(error)")
+            throw error
+        }
+    }
+    
+    func fetchTripsByDriver(driverId: UUID) async throws -> [Trip] {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .select()
+                .eq("driver_id", value: driverId)
+                .execute()
+            
+            let data = response.data
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateString = try container.decode(String.self)
+                
+                // Create date formatter
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                
+                // Try multiple date formats
+                let formats = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",    // PostgreSQL timestamp without timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS",       // Milliseconds
+                    "yyyy-MM-dd'T'HH:mm:ss",           // Basic format
+                    "yyyy-MM-dd HH:mm:ss",             // PostgreSQL default
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",   // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",      // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ssZ"           // With timezone
+                ]
+                
+                for format in formats {
+                    formatter.dateFormat = format
+                    if let date = formatter.date(from: dateString) {
+                        return date
+                    }
+                }
+                
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Cannot decode date string \(dateString)"
+                )
+            }
+            
+            // Decode into Trip model
+            let trips = try decoder.decode([Trip].self, from: data)
+            print("Successfully decoded \(trips.count) trips for driver \(driverId)")
+            return trips
+        } catch {
+            print("Error fetching trips for driver: \(error)")
+            throw error
+        }
+    }
+    
+    func fetchTripsByVehicle(vehicleId: UUID) async throws -> [Trip] {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .select()
+                .eq("vehicle_id", value: vehicleId)
+                .execute()
+            
+            let data = response.data
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateString = try container.decode(String.self)
+                
+                // Create date formatter
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                
+                // Try multiple date formats
+                let formats = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",    // PostgreSQL timestamp without timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS",       // Milliseconds
+                    "yyyy-MM-dd'T'HH:mm:ss",           // Basic format
+                    "yyyy-MM-dd HH:mm:ss",             // PostgreSQL default
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",   // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",      // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ssZ"           // With timezone
+                ]
+                
+                for format in formats {
+                    formatter.dateFormat = format
+                    if let date = formatter.date(from: dateString) {
+                        return date
+                    }
+                }
+                
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Cannot decode date string \(dateString)"
+                )
+            }
+            
+            // Decode into Trip model
+            let trips = try decoder.decode([Trip].self, from: data)
+            print("Successfully decoded \(trips.count) trips for vehicle \(vehicleId)")
+            return trips
+        } catch {
+            print("Error fetching trips for vehicle: \(error)")
+            throw error
+        }
+    }
+    
+    func fetchTripsByStatus(status: TripStatus) async throws -> [Trip] {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .select()
+                .eq("status", value: status.rawValue)
+                .execute()
+            
+            let data = response.data
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateString = try container.decode(String.self)
+                
+                // Create date formatter
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                
+                // Try multiple date formats
+                let formats = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",    // PostgreSQL timestamp without timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS",       // Milliseconds
+                    "yyyy-MM-dd'T'HH:mm:ss",           // Basic format
+                    "yyyy-MM-dd HH:mm:ss",             // PostgreSQL default
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",   // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",      // With timezone
+                    "yyyy-MM-dd'T'HH:mm:ssZ"           // With timezone
+                ]
+                
+                for format in formats {
+                    formatter.dateFormat = format
+                    if let date = formatter.date(from: dateString) {
+                        return date
+                    }
+                }
+                
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Cannot decode date string \(dateString)"
+                )
+            }
+            
+            // Decode into Trip model
+            let trips = try decoder.decode([Trip].self, from: data)
+            print("Successfully decoded \(trips.count) trips with status \(status)")
+            return trips
+        } catch {
+            print("Error fetching trips by status: \(error)")
+            throw error
+        }
+    }
+
+    func updateTrip(_ trip: Trip) async throws {
+        do {
+            // Set up a custom JSONEncoder with ISO8601 format
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the trip to JSON for debugging/logging
+            let tripJSONData = try encoder.encode(trip)
+            if let tripJSONString = String(data: tripJSONData, encoding: .utf8) {
+                print("Trip JSON to update: \(tripJSONString)")
+            }
+            
+            // Update the trip in Supabase
+            let response = try await supabase
+                .from("trips")
+                .update(trip)
+                .eq("id", value: trip.id)
+                .execute()
+            
+            // Print raw JSON response for debugging
+            if let rawJSON = String(data: response.data, encoding: .utf8) {
+                print("Raw JSON Update Response for Trip: \(rawJSON)")
+            }
+            
+            print("Update response: \(response)")
+            
+        } catch {
+            print("Error updating trip: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    func insertTrip(_ trip: Trip) async throws {
+        do {
+            // Set up a custom JSONEncoder with ISO8601 format
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the trip to JSON for debugging/logging
+            let tripJSONData = try encoder.encode(trip)
+            if let tripJSONString = String(data: tripJSONData, encoding: .utf8) {
+                print("Trip JSON to insert: \(tripJSONString)")
+            }
+            
+            // Insert the trip into Supabase
+            let response = try await supabase
+                .from("trips")
+                .insert(trip)
+                .execute()
+            
+            // Print raw JSON response for debugging
+            if let rawJSON = String(data: response.data, encoding: .utf8) {
+                print("Raw JSON Insert Response for Trip: \(rawJSON)")
+            }
+            
+            print("Insert response: \(response)")
+            
+        } catch {
+            print("Error inserting trip: \(error.localizedDescription)")
+            throw error
+        }
+    }
 
 }

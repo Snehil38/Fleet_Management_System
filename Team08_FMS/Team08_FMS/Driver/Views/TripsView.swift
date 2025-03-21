@@ -39,8 +39,9 @@ struct TripsView: View {
         switch selectedFilter {
         case .all:
             var allTrips: [Trip] = []
-            if tripController.currentTrip.status == .current && availabilityManager.isAvailable {
-                allTrips.append(tripController.currentTrip)
+            if let currentTrip = tripController.currentTrip,
+               currentTrip.status == .current && availabilityManager.isAvailable {
+                allTrips.append(currentTrip)
             }
             
             // Only include upcoming trips if driver is available
@@ -50,40 +51,29 @@ struct TripsView: View {
             
             return allTrips
         case .current:
-            return tripController.currentTrip.status == .current && availabilityManager.isAvailable ? 
-                [tripController.currentTrip] : []
+            if let currentTrip = tripController.currentTrip,
+               currentTrip.status == .current && availabilityManager.isAvailable {
+                return [currentTrip]
+            }
+            return []
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
             // Filter recent deliveries to show only delivered trips
             return tripController.recentDeliveries.map { delivery in
                 Trip(
+                    id: UUID(),
                     name: delivery.vehicle,
                     destination: delivery.location,
                     address: delivery.location,
-                    eta: "",
-                    distance: "",
                     status: .delivered,
-                    vehicleDetails: Vehicle(
-                        name: "Tesla",
-                        year: 2023,
-                        make: "Tesla",
-                        model: "Model Y",
-                        vin: "5YJYGDEE3MF123456",
-                        licensePlate: "TESLA88",
-                        vehicleType: .car,
-                        color: "White",
-                        bodyType: .suv,
-                        bodySubtype: "Electric",
-                        msrp: 55000.0,
-                        pollutionExpiry: Date(),
-                        insuranceExpiry: Date(),
-                        status: .available,
-                        documents: VehicleDocuments()
-                    ),
-                    sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                    destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                    startingPoint: delivery.location
+                    hasCompletedPreTrip: true,
+                    hasCompletedPostTrip: true,
+                    vehicleId: UUID(),
+                    driverId: nil,
+                    startTime: nil,
+                    endTime: nil,
+                    notes: delivery.notes
                 )
             }
         }
@@ -107,8 +97,8 @@ struct TripCard: View {
                 
                 Spacer()
                 
-                if !trip.eta.isEmpty {
-                    Text(trip.eta)
+                if let startTime = trip.startTime {
+                    Text(startTime, style: .time)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -121,11 +111,9 @@ struct TripCard: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            if !trip.distance.isEmpty {
-                Text(trip.distance)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
+            Text(trip.address)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
             
             Button(action: { showingDetails = true }) {
                 Text("View Details")
@@ -176,18 +164,24 @@ struct TripDetailsView: View {
                     TripDetailRow(icon: "number", title: "Trip ID", value: trip.name)
                     TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
                     TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
-                    if !trip.eta.isEmpty {
-                        TripDetailRow(icon: "clock.fill", title: "ETA", value: trip.eta)
+                    if let startTime = trip.startTime {
+                        TripDetailRow(icon: "clock.fill", title: "Start Time", value: startTime.formatted(date: .numeric, time: .shortened))
                     }
-                    if !trip.distance.isEmpty {
-                        TripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
+                    if let endTime = trip.endTime {
+                        TripDetailRow(icon: "clock.fill", title: "End Time", value: endTime.formatted(date: .numeric, time: .shortened))
                     }
                 }
                 
                 Section(header: Text("Vehicle Information")) {
                     TripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.bodyType.rawValue)
-                    if !trip.vehicleDetails.licensePlate.isEmpty {
-                        TripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
+                    TripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
+                }
+                
+                if let notes = trip.notes {
+                    Section(header: Text("Notes")) {
+                        Text(notes)
+                            .font(.body)
+                            .foregroundColor(.secondary)
                     }
                 }
             }
