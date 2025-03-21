@@ -3,6 +3,7 @@ import SwiftUI
 struct FleetManagerProfileView: View {
     @StateObject private var supabaseDataController = SupabaseDataController.shared
     @State private var fleetManager: FleetManager?
+    @State private var showAlert = false
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
@@ -24,6 +25,18 @@ struct FleetManagerProfileView: View {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                 }
+            }
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text("Alert"),
+                    message: Text("Are you sure you want to log out?"),
+                    primaryButton: .destructive(Text("Yes")) {
+                        Task {
+                            SupabaseDataController.shared.signOut()
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
             }
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
@@ -121,7 +134,7 @@ struct FleetManagerProfileView: View {
     
     private var logoutButton: some View {
         Button {
-            Task { supabaseDataController.signOut() }
+            Task { showAlert = true }
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
