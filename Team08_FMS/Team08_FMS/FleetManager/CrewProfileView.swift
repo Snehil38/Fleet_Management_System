@@ -36,7 +36,7 @@ struct CrewProfileView: View {
                     LabeledContent("Role", value: role)
                     Picker("Status", selection: $editedStatus) {
                         ForEach([Status.available, .offDuty], id: \.self) { status in
-                            Text(status.rawValue.capitalized)
+                            Text(AppDataController.shared.getStatusString(status: status))
                                 .tag(status)
                         }
                     }
@@ -47,7 +47,7 @@ struct CrewProfileView: View {
                     HStack {
                         Text("Status")
                         Spacer()
-                        Text(crewMember.status.rawValue)
+                        Text(AppDataController.shared.getStatusString(status: crewMember.status))
                             .foregroundColor(crewMember.status.color)
                     }
                 }
@@ -69,7 +69,7 @@ struct CrewProfileView: View {
                     } else {
                         Picker("Specialty", selection: $editedSpecialty) {
                             ForEach(Specialization.allCases) { specialty in
-                                Text(specialty.rawValue.capitalized)
+                                Text(AppDataController.shared.getSpecialityString(speciality: specialty))
                                     .tag(specialty)
                             }
                         }
@@ -82,7 +82,7 @@ struct CrewProfileView: View {
                         LabeledContent("License", value: driver.driverLicenseNumber)
                     } else if let maintenance = crewMember as? MaintenancePersonnel {
                         LabeledContent("Experience", value: "\(maintenance.yearsOfExperience) years")
-                        LabeledContent("Specialty", value: maintenance.specialty.rawValue)
+                        LabeledContent("Specialty", value: maintenance.speciality.rawValue)
                     }
                     LabeledContent("Salary", value: "$\(String(format: "%.2f", crewMember.salary))")
                 }
@@ -148,7 +148,7 @@ struct CrewProfileView: View {
             editedSalary = String(format: "%.2f", driver.salary)
         } else if let maintenance = crewMember as? MaintenancePersonnel {
             editedExperience = "\(maintenance.yearsOfExperience)"
-            editedSpecialty = maintenance.specialty
+            editedSpecialty = maintenance.speciality
             editedSalary = String(format: "%.2f", maintenance.salary)
         }
     }
@@ -177,7 +177,7 @@ struct CrewProfileView: View {
             dataManager.maintenancePersonnel[index].phoneNumber = Int(editedPhone) ?? dataManager.maintenancePersonnel[index].phoneNumber
             dataManager.maintenancePersonnel[index].email = editedEmail
             dataManager.maintenancePersonnel[index].yearsOfExperience = Int(editedExperience) ?? dataManager.maintenancePersonnel[index].yearsOfExperience
-            dataManager.maintenancePersonnel[index].specialty = editedSpecialty ?? dataManager.maintenancePersonnel[index].specialty
+            dataManager.maintenancePersonnel[index].speciality = editedSpecialty ?? dataManager.maintenancePersonnel[index].speciality
             dataManager.maintenancePersonnel[index].status = editedStatus ?? dataManager.maintenancePersonnel[index].status
             dataManager.maintenancePersonnel[index].salary = Double(editedSalary) ?? dataManager.maintenancePersonnel[index].salary
             dataManager.maintenancePersonnel[index].updatedAt = Date()

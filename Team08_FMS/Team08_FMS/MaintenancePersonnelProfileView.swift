@@ -112,7 +112,7 @@ struct MaintenancePersonnelProfileView: View {
                 Text("Status")
                     .font(.headline)
                 Spacer()
-                Text(statusText(for: personnel))
+                Text(AppDataController.shared.getStatusString(status: personnel.status))
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(personnel.status.color)
@@ -221,17 +221,6 @@ struct MaintenancePersonnelProfileView: View {
                 .font(.subheadline)
         }
         .padding()
-    }
-    
-    private func statusText(for personnel: MaintenancePersonnel) -> String {
-        switch personnel.status {
-        case .available:
-            return "Available"
-        case .offDuty:
-            return "Off Duty"
-        case .busy:
-            return "Busy"
-        }
     }
     
     private func statusToggleBinding(for personnel: MaintenancePersonnel) -> Binding<Bool> {
