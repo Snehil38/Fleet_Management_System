@@ -1,23 +1,30 @@
 import Foundation
 import CoreLocation
 
+enum tripStatus: String, Codable {
+    case upcoming
+    case current
+    case delivered
+}
+
 struct Trip: Identifiable, Codable {
     let id: UUID
     let name: String
     let destination: String
     let address: String
     var tripStatus: TripStatus
-    var hasCompletedPreTrip: Bool  // Changed to var
-    var hasCompletedPostTrip: Bool  // Changed to var
+    var hasCompletedPreTrip: Bool
+    var hasCompletedPostTrip: Bool
     let vehicleId: UUID
     let driverId: UUID?
     let startTime: Date?
     let endTime: Date?
     let notes: String?
+    let createdAt: Date?
+    let updatedAt: Date?
+    let isDeleted: Bool
     
     var vehicleDetails: Vehicle {
-        // This is a computed property that returns a default vehicle
-        // In a real app, you would fetch this from your vehicle database
         Vehicle(
             id: vehicleId,
             name: "Default Truck",
@@ -40,18 +47,13 @@ struct Trip: Identifiable, Codable {
     }
     
     var sourceCoordinate: CLLocationCoordinate2D {
-        // This is a computed property that returns a default coordinate
-        // In a real app, you would fetch this from your location database
         CLLocationCoordinate2D(latitude: 19.0760, longitude: 72.8777)
     }
     
     var destinationCoordinate: CLLocationCoordinate2D {
-        // This is a computed property that returns a default coordinate
-        // In a real app, you would fetch this from your location database
         CLLocationCoordinate2D(latitude: 19.0760, longitude: 72.8777)
     }
     
-    // Computed properties for compatibility with existing views
     var eta: String {
         guard let startTime = startTime else { return "N/A" }
         let formatter = DateComponentsFormatter()
@@ -62,7 +64,6 @@ struct Trip: Identifiable, Codable {
     }
     
     var distance: String {
-        // Calculate distance between source and destination coordinates
         let source = CLLocation(latitude: sourceCoordinate.latitude, longitude: sourceCoordinate.longitude)
         let destination = CLLocation(latitude: destinationCoordinate.latitude, longitude: destinationCoordinate.longitude)
         let distanceInMeters = source.distance(from: destination)
@@ -75,7 +76,6 @@ struct Trip: Identifiable, Codable {
     }
     
     var startingPoint: String {
-        // Extract starting point from trip name (assuming format "Source to Destination")
         name.split(separator: " to ").first?.trimmingCharacters(in: .whitespaces) ?? "Starting Point"
     }
     
@@ -84,14 +84,17 @@ struct Trip: Identifiable, Codable {
         case name
         case destination
         case address
-        case tripStatus
+        case tripStatus = "trip_status"
         case hasCompletedPreTrip = "has_completed_pre_trip"
         case hasCompletedPostTrip = "has_completed_post_trip"
         case vehicleId = "vehicle_id"
         case driverId = "driver_id"
-        case startTime = "created_at"
-        case endTime = "updated_at"
+        case startTime = "start_time"
+        case endTime = "end_time"
         case notes
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case isDeleted = "is_deleted"
     }
     
     static func mockCurrentTrip() -> Trip {
@@ -107,7 +110,10 @@ struct Trip: Identifiable, Codable {
             driverId: UUID(),
             startTime: Date(),
             endTime: nil,
-            notes: "Priority delivery to MIDC warehouse"
+            notes: "Priority delivery to MIDC warehouse",
+            createdAt: Date(),
+            updatedAt: nil,
+            isDeleted: false
         )
     }
     
@@ -125,7 +131,10 @@ struct Trip: Identifiable, Codable {
                 driverId: UUID(),
                 startTime: Date().addingTimeInterval(3600),
                 endTime: nil,
-                notes: "Standard delivery to logistics park"
+                notes: "Standard delivery to logistics park",
+                createdAt: Date(),
+                updatedAt: nil,
+                isDeleted: false
             ),
             Trip(
                 id: UUID(),
@@ -139,8 +148,11 @@ struct Trip: Identifiable, Codable {
                 driverId: UUID(),
                 startTime: Date().addingTimeInterval(7200),
                 endTime: nil,
-                notes: "Long distance delivery to Gurgaon"
+                notes: "Long distance delivery to Gurgaon",
+                createdAt: Date(),
+                updatedAt: nil,
+                isDeleted: false
             )
         ]
     }
-} 
+}
