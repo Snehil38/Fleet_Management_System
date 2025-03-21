@@ -9,32 +9,32 @@ class TripDataController: ObservableObject {
     @Published var currentTrip: Trip?
     @Published var upcomingTrips: [Trip] = []
     @Published var recentDeliveries: [DeliveryDetails] = []
+    @Published var queuedTrips: [Trip] = []
     
     private init() {
-        // Load real data immediately
-        loadTrips()
+        // Initialize with empty state
+        // Data will be loaded when view appears
     }
     
-    func loadTrips() {
-        Task {
-            do {
-                let fetchedTrips = try await SupabaseDataController.shared.fetchTrips()
-                await MainActor.run {
-                    trips = fetchedTrips
-                    
-                    // Update current and upcoming trips
-                    currentTrip = fetchedTrips.first(where: { $0.status == .current })
-                    upcomingTrips = fetchedTrips.filter { $0.status == .upcoming }
-                }
-            } catch {
-                print("Error loading trips: \(error.localizedDescription)")
-                // Clear all data in case of error
-                await MainActor.run {
-                    trips = []
-                    currentTrip = nil
-                    upcomingTrips = []
-                }
+    func loadTrips() async throws {
+        do {
+            let fetchedTrips = try await SupabaseDataController.shared.fetchTrips()
+            await MainActor.run {
+                trips = fetchedTrips
+                
+                // Update current and upcoming trips
+                currentTrip = fetchedTrips.first(where: { $0.tripStatus == .current })
+                upcomingTrips = fetchedTrips.filter { $0.tripStatus == .upcoming }
             }
+        } catch {
+            print("Error loading trips: \(error.localizedDescription)")
+            // Clear all data in case of error
+            await MainActor.run {
+                trips = []
+                currentTrip = nil
+                upcomingTrips = []
+            }
+            throw error // Rethrow the error so it can be handled by the view
         }
     }
     
@@ -51,7 +51,13 @@ class TripDataController: ObservableObject {
     }
     
     func update() {
-        loadTrips()
+        Task {
+            do {
+                try await loadTrips()
+            } catch {
+                print("Error updating trips: \(error.localizedDescription)")
+            }
+        }
     }
     
     // Helper function to get trips for the current page
@@ -111,7 +117,7 @@ class TripDataController: ObservableObject {
         
         // Create a new trip with updated status
         var updatedTrip = trip
-        updatedTrip.status = .delivered
+        updatedTrip.tripStatus = .delivered
         updatedTrip.hasCompletedPostTrip = true
         
         // If this is the current trip, update it
@@ -162,6 +168,46 @@ class TripDataController: ObservableObject {
                 update()
             } catch {
                 print("Error updating post-trip status: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func addTripToQueue(_ trip: Trip) {
+        if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
+            var updatedTrip = upcomingTrips.remove(at: index)
+            updatedTrip.tripStatus = .current
+            currentTrip = updatedTrip
+            objectWillChange.send()
+            
+            // Update the trip status in the database
+            Task {
+                do {
+                    try await SupabaseDataController.shared.updateTrip(updatedTrip)
+                } catch {
+                    print("Error updating trip status: \(error.localizedDescription)")
+                    // Revert changes if update fails
+                    upcomingTrips.insert(trip, at: index)
+                    currentTrip = nil
+                    objectWillChange.send()
+                }
+            }
+        }
+    }
+    
+    func declineTrip(_ trip: Trip) {
+        if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
+            upcomingTrips.remove(at: index)
+            objectWillChange.send()
+            
+            // Update the trip status in the database
+            var updatedTrip = trip
+            updatedTrip.tripStatus = .delivered // Using delivered as declined for now
+            Task {
+                do {
+                    try await SupabaseDataController.shared.updateTrip(updatedTrip)
+                } catch {
+                    print("Error declining trip: \(error.localizedDescription)")
+                }
             }
         }
     }

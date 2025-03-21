@@ -5,6 +5,8 @@ struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @State private var selectedFilter: TripFilter = .all
+    @State private var isLoading = true
+    @State private var error: Error?
     
     enum TripFilter {
         case all, current, upcoming, delivered
@@ -22,17 +24,81 @@ struct TripsView: View {
             .pickerStyle(.segmented)
             .padding()
             
-            // Trips List
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(filteredTrips) { trip in
-                        TripCard(trip: trip)
+            // Content
+            if isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .scaleEffect(1.5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = error {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.red)
+                    Text("Error loading trips")
+                        .font(.headline)
+                    Text(error.localizedDescription)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") {
+                        loadTrips()
                     }
+                    .buttonStyle(.bordered)
                 }
                 .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filteredTrips.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "car.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.gray)
+                    Text("No trips found")
+                        .font(.headline)
+                    Text("Check back later for new trips")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Trips List
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(filteredTrips) { trip in
+                            TripCard(trip: trip)
+                        }
+                    }
+                    .padding()
+                }
             }
         }
         .navigationTitle("Trips")
+        .task {
+            loadTrips()
+        }
+        .refreshable {
+            loadTrips()
+        }
+    }
+    
+    private func loadTrips() {
+        isLoading = true
+        error = nil
+        
+        Task {
+            do {
+                try await tripController.loadTrips()
+                await MainActor.run {
+                    isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.error = error
+                    isLoading = false
+                }
+            }
+        }
     }
     
     private var filteredTrips: [Trip] {
@@ -40,7 +106,7 @@ struct TripsView: View {
         case .all:
             var allTrips: [Trip] = []
             if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .current && availabilityManager.isAvailable {
+               currentTrip.tripStatus == .current && availabilityManager.isAvailable {
                 allTrips.append(currentTrip)
             }
             
@@ -49,33 +115,21 @@ struct TripsView: View {
                 allTrips.append(contentsOf: tripController.upcomingTrips)
             }
             
+            // Include delivered trips
+            allTrips.append(contentsOf: tripController.trips.filter { $0.tripStatus == .delivered })
+            
             return allTrips
         case .current:
             if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .current && availabilityManager.isAvailable {
+               currentTrip.tripStatus == .current && availabilityManager.isAvailable {
                 return [currentTrip]
             }
             return []
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
-            // Filter recent deliveries to show only delivered trips
-            return tripController.recentDeliveries.map { delivery in
-                Trip(
-                    id: UUID(),
-                    name: delivery.vehicle,
-                    destination: delivery.location,
-                    address: delivery.location,
-                    status: .delivered,
-                    hasCompletedPreTrip: true,
-                    hasCompletedPostTrip: true,
-                    vehicleId: UUID(),
-                    driverId: nil,
-                    startTime: nil,
-                    endTime: nil,
-                    notes: delivery.notes
-                )
-            }
+            // Show actual delivered trips from the database
+            return tripController.trips.filter { $0.tripStatus == .delivered }
         }
     }
 }
@@ -83,42 +137,151 @@ struct TripsView: View {
 struct TripCard: View {
     let trip: Trip
     @State private var showingDetails = false
+    @StateObject private var tripController = TripDataController.shared
+    @StateObject private var availabilityManager = DriverAvailabilityManager.shared
+    @State private var showingPreTripInspection = false
+    @State private var showingPostTripInspection = false
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Trip ID and Time Info
             HStack {
-                Text(statusText)
-                    .font(.subheadline)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(statusColor.opacity(0.2))
-                    .foregroundColor(statusColor)
-                    .cornerRadius(8)
-                
+                Text(trip.name)
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
                 Spacer()
-                
-                if let startTime = trip.startTime {
-                    Text(startTime, style: .time)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                if trip.tripStatus == .upcoming {
+                    Text(trip.eta)
+                        .font(.system(size: 17))
+                        .foregroundColor(.blue)
+                        .bold()
                 }
             }
             
-            Text(trip.name)
-                .font(.headline)
-            
+            // Destination
             Text(trip.destination)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(.system(size: 24))
+                .fontWeight(.bold)
             
+            // Address
             Text(trip.address)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(.system(size: 17))
+                .foregroundColor(.gray)
             
-            Button(action: { showingDetails = true }) {
-                Text("View Details")
-                    .font(.subheadline)
-                    .foregroundColor(.blue)
+            if trip.tripStatus == .upcoming {
+                // Distance
+                HStack {
+                    Spacer()
+                    Text("\(trip.distance)")
+                        .font(.system(size: 17))
+                        .foregroundColor(.gray)
+                }
+                
+                // Action Buttons for upcoming trips
+                HStack(spacing: 12) {
+                    Button(action: {
+                        if availabilityManager.isAvailable {
+                            tripController.addTripToQueue(trip)
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "checkmark")
+                            Text("Add to Queue")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.green.opacity(0.15))
+                        .foregroundColor(.green)
+                        .cornerRadius(8)
+                    }
+                    
+                    Button(action: {
+                        tripController.declineTrip(trip)
+                    }) {
+                        HStack {
+                            Image(systemName: "xmark")
+                            Text("Decline")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.red.opacity(0.15))
+                        .foregroundColor(.red)
+                        .cornerRadius(8)
+                    }
+                }
+            } else if trip.tripStatus == .current {
+                // Action Buttons for current trip
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            if !trip.hasCompletedPreTrip {
+                                showingPreTripInspection = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "circle")
+                                Text("Pre-Trip\nInspection")
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundColor(.orange)
+                            .cornerRadius(8)
+                        }
+                        .disabled(trip.hasCompletedPreTrip)
+                        
+                        Button(action: {
+                            if trip.hasCompletedPreTrip {
+                                showingPostTripInspection = true
+                            } else {
+                                alertMessage = "Complete pre-trip inspection first"
+                                showingAlert = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: trip.hasCompletedPostTrip ? "checkmark.circle.fill" : "circle")
+                                Text("Post-Trip\nInspection")
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundColor(.orange)
+                            .cornerRadius(8)
+                        }
+                        .disabled(!trip.hasCompletedPreTrip || trip.hasCompletedPostTrip)
+                    }
+                    
+                    Button(action: {
+                        if !trip.hasCompletedPreTrip {
+                            alertMessage = "Complete pre-trip inspection first"
+                            showingAlert = true
+                        } else if trip.hasCompletedPostTrip {
+                            tripController.markTripAsDelivered(trip: trip)
+                        } else {
+                            showingPostTripInspection = true
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Mark Delivered")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.green.opacity(0.15))
+                        .foregroundColor(.green)
+                        .cornerRadius(8)
+                    }
+                }
+            } else {
+                Button(action: { showingDetails = true }) {
+                    Text("View Details")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
             }
         }
         .padding()
@@ -128,27 +291,27 @@ struct TripCard: View {
         .sheet(isPresented: $showingDetails) {
             TripDetailsView(trip: trip)
         }
-    }
-    
-    private var statusText: String {
-        switch trip.status {
-        case .current:
-            return "Current"
-        case .upcoming:
-            return "Upcoming"
-        case .delivered:
-            return "Delivered"
+        .sheet(isPresented: $showingPreTripInspection) {
+            VehicleInspectionView(isPreTrip: true) { success in
+                if success {
+                    tripController.updateTripPreTripStatus(trip, completed: true)
+                }
+            }
         }
-    }
-    
-    private var statusColor: Color {
-        switch trip.status {
-        case .current:
-            return .blue
-        case .upcoming:
-            return .green
-        case .delivered:
-            return .gray
+        .sheet(isPresented: $showingPostTripInspection) {
+            VehicleInspectionView(isPreTrip: false) { success in
+                if success {
+                    tripController.updateTripPostTripStatus(trip, completed: true)
+                    if trip.hasCompletedPreTrip {
+                        tripController.markTripAsDelivered(trip: trip)
+                    }
+                }
+            }
+        }
+        .alert("Action Required", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
         }
     }
 }

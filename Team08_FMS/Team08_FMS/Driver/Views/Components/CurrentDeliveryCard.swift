@@ -104,7 +104,7 @@ struct CurrentDeliveryCard: View {
                     VStack {
                         Text("Status")
                             .font(.caption)
-                        Text(currentTrip.status.rawValue.capitalized)
+                        Text(currentTrip.tripStatus.rawValue.capitalized)
                             .font(.body)
                     }
                     .padding()

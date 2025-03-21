@@ -26,6 +26,8 @@ struct DriverTabView: View {
     @State private var alertMessage = ""
     @State private var selectedTab = 0
     @State private var showingProfileView = false
+    @State private var isLoading = false
+    @State private var loadingError: Error?
     
     @State private var showingNavigation = false
     @State private var showingDeliveryDetails = false
@@ -83,7 +85,10 @@ struct DriverTabView: View {
                 .tag(1)
         }
         .task {
-            await tripController.loadTrips()
+            await loadTripsData()
+        }
+        .refreshable {
+            await loadTripsData()
         }
         .sheet(isPresented: $showingChatBot) {
             ChatBotView()
@@ -126,14 +131,31 @@ struct DriverTabView: View {
                 DeliveryDetailsView(delivery: delivery)
             }
         }
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Action Required"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+        .alert("Error", isPresented: .constant(loadingError != nil)) {
+            Button("Retry") {
+                Task {
+                    await loadTripsData()
+                }
+            }
+            Button("OK") {
+                loadingError = nil
+            }
+        } message: {
+            Text(loadingError?.localizedDescription ?? "")
         }
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
+    }
+
+    private func loadTripsData() async {
+        isLoading = true
+        loadingError = nil
+        do {
+            try await tripController.loadTrips()
+        } catch {
+            loadingError = error
+            print("Error loading trips: \(error.localizedDescription)")
+        }
+        isLoading = false
     }
 
     private var mainContentView: some View {
@@ -170,7 +192,7 @@ struct DriverTabView: View {
                                         selectedDelivery = DeliveryDetails(
                                             location: trip.destination,
                                             date: (trip.startTime ?? Date()).formatted(date: .numeric, time: .shortened),
-                                            status: trip.status.rawValue,
+                                            status: trip.tripStatus.rawValue,
                                             driver: "Current Driver",
                                             vehicle: trip.vehicleDetails.licensePlate,
                                             notes: trip.notes ?? ""
@@ -207,7 +229,7 @@ struct DriverTabView: View {
             .padding()
         }
         .refreshable {
-            await tripController.loadTrips()
+            await loadTripsData()
         }
         .sheet(isPresented: $showingDeliveryDetails) {
             if let delivery = selectedDelivery {
@@ -759,7 +781,7 @@ struct DriverTabView: View {
             // Clear current trip if no more trips
             if tripQueue.isEmpty && tripController.upcomingTrips.isEmpty {
                 var updatedTrip = currentTrip
-                updatedTrip.status = .delivered
+                updatedTrip.tripStatus = .delivered
                 tripController.currentTrip = nil
             }
         }

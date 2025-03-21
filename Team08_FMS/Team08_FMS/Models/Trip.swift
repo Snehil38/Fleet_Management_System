@@ -6,7 +6,7 @@ struct Trip: Identifiable, Codable {
     let name: String
     let destination: String
     let address: String
-    var status: TripStatus
+    var tripStatus: TripStatus
     var hasCompletedPreTrip: Bool  // Changed to var
     var hasCompletedPostTrip: Bool  // Changed to var
     let vehicleId: UUID
@@ -84,7 +84,7 @@ struct Trip: Identifiable, Codable {
         case name
         case destination
         case address
-        case status
+        case tripStatus
         case hasCompletedPreTrip = "has_completed_pre_trip"
         case hasCompletedPostTrip = "has_completed_post_trip"
         case vehicleId = "vehicle_id"
@@ -100,7 +100,7 @@ struct Trip: Identifiable, Codable {
             name: "Mumbai to Pune",
             destination: "Pune MIDC Warehouse",
             address: "MIDC Industrial Area, Pune",
-            status: .current,
+            tripStatus: .current,
             hasCompletedPreTrip: false,
             hasCompletedPostTrip: false,
             vehicleId: UUID(),
@@ -118,7 +118,7 @@ struct Trip: Identifiable, Codable {
                 name: "Pune to Bhiwandi",
                 destination: "Bhiwandi Logistics Park",
                 address: "Bhiwandi, Maharashtra",
-                status: .upcoming,
+                tripStatus: .upcoming,
                 hasCompletedPreTrip: false,
                 hasCompletedPostTrip: false,
                 vehicleId: UUID(),
@@ -132,7 +132,7 @@ struct Trip: Identifiable, Codable {
                 name: "Bhiwandi to Gurgaon",
                 destination: "Gurgaon Logistics Hub",
                 address: "Gurgaon, Haryana",
-                status: .upcoming,
+                tripStatus: .upcoming,
                 hasCompletedPreTrip: false,
                 hasCompletedPostTrip: false,
                 vehicleId: UUID(),
