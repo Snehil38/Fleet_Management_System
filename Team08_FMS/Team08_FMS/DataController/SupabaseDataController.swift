@@ -316,7 +316,7 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    // MARK: - Manage Crew Record
+    // MARK: - Manage Crew and Vehicle Record
     func fetchFleetManagerByUserID(userID: UUID) async throws -> FleetManager? {
         do {
             let response = try await supabase
@@ -736,7 +736,7 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("driver")
                 .update(payload)
-                .eq("userID", value: userID)
+                .eq("id", value: userID)
                 .execute()
             
             let data = response.data
@@ -749,13 +749,14 @@ class SupabaseDataController: ObservableObject {
     
     func updateMaintenancePersonnelStatus(newStatus: Status, for userID: UUID) async {
         // Use [String: String] since newStatus.rawValue is a String.
+        print(newStatus)
         let payload: [String: String] = ["status": newStatus.rawValue]
         
         do {
             let response = try await supabase
-                .from("driver")
+                .from("maintenance_personnel")
                 .update(payload)
-                .eq("userID", value: userID)
+                .eq("id", value: userID)
                 .execute()
             
             let data = response.data
@@ -814,12 +815,12 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    func updateMaintenancePersonnel(peronnel: MaintenancePersonnel) async {
+    func updateMaintenancePersonnel(personnel: MaintenancePersonnel) async {
         do {
             let response = try await supabase
                 .from("maintenance_personnel")
-                .update(peronnel)
-                .eq("id", value: peronnel.id)
+                .update(personnel)
+                .eq("id", value: personnel.id)
                 .execute()
             
             let data = response.data

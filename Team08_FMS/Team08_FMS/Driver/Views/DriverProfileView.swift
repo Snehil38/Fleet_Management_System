@@ -60,8 +60,8 @@ struct DriverProfileView: View {
                         primaryButton: .cancel(Text("Cancel")),
                         secondaryButton: .default(Text("Confirm"), action: {
                             Task {
-                                if let userID = await supabaseDataController.getUserID() {
-                                    await supabaseDataController.updateDriverStatus(newStatus: .offDuty, for: userID)
+                                if let driver = driver {
+                                    await supabaseDataController.updateDriverStatus(newStatus: .offDuty, for: driver.id)
                                     self.driver?.status = .offDuty
                                 }
                             }
@@ -142,6 +142,13 @@ struct DriverProfileView: View {
             
             if driver.status == .offDuty {
                 Text("Your status will automatically change back to Available tomorrow.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .italic()
+            }
+            
+            else if driver.status == .busy {
+                Text("You cannot change status while you have a In-Progress Trip.")
                     .font(.caption)
                     .foregroundColor(.gray)
                     .italic()

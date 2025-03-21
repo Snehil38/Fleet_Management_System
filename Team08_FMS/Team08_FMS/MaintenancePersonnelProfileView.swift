@@ -39,8 +39,8 @@ struct MaintenancePersonnelProfileView: View {
                         message: Text("Your status will be updated to Available."),
                         dismissButton: .default(Text("OK"), action: {
                             Task {
-                                if let userID = await supabaseDataController.getUserID() {
-                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, for: userID)
+                                if let personnel = personnel {
+                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, for: personnel.id)
                                     self.personnel?.status = .available
                                 }
                             }
@@ -125,6 +125,12 @@ struct MaintenancePersonnelProfileView: View {
             
             if personnel.status == .offDuty {
                 Text("Your status will automatically change back to Available tomorrow.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .italic()
+            }
+            else if personnel.status == .busy {
+                Text("You cannot change status while you have a In-Progress Maintenance.")
                     .font(.caption)
                     .foregroundColor(.gray)
                     .italic()

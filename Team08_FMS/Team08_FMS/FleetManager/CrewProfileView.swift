@@ -16,6 +16,7 @@ struct CrewProfileView: View {
     // Editing state variables – note that for numeric fields we work with Strings for TextField binding.
     @State private var isEditing = false
     @State private var editedName: String = ""
+    @State private var editedStatus: Status?
     @State private var editedPhone: String = ""
     @State private var editedEmail: String = ""
     @State private var editedExperience: String = ""
@@ -33,11 +34,11 @@ struct CrewProfileView: View {
                     TextField("Name", text: $editedName)
                     LabeledContent("ID", value: crewMember.id.uuidString)
                     LabeledContent("Role", value: role)
-                    HStack {
-                        Text("Status")
-                        Spacer()
-                        Text(crewMember.status.rawValue)
-                            .foregroundColor(crewMember.status.color)
+                    Picker("Status", selection: $editedStatus) {
+                        ForEach([Status.available, .offDuty], id: \.self) { status in
+                            Text(status.rawValue.capitalized)
+                                .tag(status)
+                        }
                     }
                 } else {
                     LabeledContent("Name", value: crewMember.name)
@@ -139,6 +140,7 @@ struct CrewProfileView: View {
     private func initializeEditingFields() {
         editedName = crewMember.name
         editedPhone = "\(crewMember.phoneNumber)"
+        editedStatus = crewMember.status
         editedEmail = crewMember.email
         if isDriver, let driver = crewMember as? Driver {
             editedExperience = "\(driver.yearsOfExperience)"
@@ -161,12 +163,14 @@ struct CrewProfileView: View {
             dataManager.drivers[index].email = editedEmail
             dataManager.drivers[index].yearsOfExperience = Int(editedExperience) ?? dataManager.drivers[index].yearsOfExperience
             dataManager.drivers[index].driverLicenseNumber = editedLicense
+            dataManager.drivers[index].status = editedStatus ?? dataManager.drivers[index].status
             dataManager.drivers[index].salary = Double(editedSalary) ?? dataManager.drivers[index].salary
             dataManager.drivers[index].updatedAt = Date()
             Task {
                 await SupabaseDataController.shared.updateDriver(driver: dataManager.drivers[index])
             }
-        } else if let maintenance = crewMember as? MaintenancePersonnel,
+        }
+        else if let maintenance = crewMember as? MaintenancePersonnel,
                   let index = dataManager.maintenancePersonnel.firstIndex(where: { $0.id == maintenance.id }) {
             dataManager.maintenancePersonnel[index].name = editedName
             dataManager.maintenancePersonnel[index].profileImage = String(editedName.prefix(2).uppercased())
@@ -174,10 +178,11 @@ struct CrewProfileView: View {
             dataManager.maintenancePersonnel[index].email = editedEmail
             dataManager.maintenancePersonnel[index].yearsOfExperience = Int(editedExperience) ?? dataManager.maintenancePersonnel[index].yearsOfExperience
             dataManager.maintenancePersonnel[index].specialty = editedSpecialty ?? dataManager.maintenancePersonnel[index].specialty
+            dataManager.maintenancePersonnel[index].status = editedStatus ?? dataManager.maintenancePersonnel[index].status
             dataManager.maintenancePersonnel[index].salary = Double(editedSalary) ?? dataManager.maintenancePersonnel[index].salary
             dataManager.maintenancePersonnel[index].updatedAt = Date()
             Task {
-                await SupabaseDataController.shared.updateMaintenancePersonnel(peronnel: dataManager.maintenancePersonnel[index])
+                await SupabaseDataController.shared.updateMaintenancePersonnel(personnel: dataManager.maintenancePersonnel[index])
             }
         }
     }
@@ -194,6 +199,7 @@ struct CrewProfileView: View {
             }
         }
         presentationMode.wrappedValue.dismiss()
+        CrewDataController.shared.update()
     }
 }
 
