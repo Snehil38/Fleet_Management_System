@@ -119,7 +119,6 @@ struct AddDriverView: View {
                 salary: salaryDouble,
                 yearsOfExperience: experienceInt,
                 createdAt: Date(),
-                updatedAt: Date(),
                 isDeleted: false,
                 status: .available
             )

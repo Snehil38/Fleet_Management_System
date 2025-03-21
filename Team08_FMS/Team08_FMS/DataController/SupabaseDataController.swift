@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import Combine
+import SwiftSMTP
 
 class SupabaseDataController: ObservableObject {
     static let shared = SupabaseDataController()
@@ -27,6 +28,22 @@ class SupabaseDataController: ObservableObject {
 //        Task {
 //            await checkSession()
 //        }
+    }
+    
+    func sendEmail(toName: String, toEmail: String, subject: String, text: String) {
+        let smtp = SMTP(
+            hostname: "smtp.gmail.com",     // SMTP server address
+            email: "c0sm042532@gmail.com",        // username to login
+            password: "xjsk jrno odyh exoe"            // password to login
+        )
+        let fromUser = Mail.User(name: "Dr. Light", email: "c0sm042532@gmail.com")
+        let toUser = Mail.User(name: toName, email: toEmail)
+        let mail = Mail(from: fromUser, to: [toUser], subject: subject, text: text)
+        smtp.send(mail) { (error) in
+            if let error = error {
+                print(error)
+            }
+        }
     }
     
     func checkSession() async {
@@ -95,6 +112,8 @@ class SupabaseDataController: ObservableObject {
                 .from("gen_pass")
                 .insert(genPass)
                 .execute()
+            let text = "Your Login Crediets as \(role) are as follows:\nPassword: \(password)"
+            sendEmail(toName: name, toEmail: email, subject: "Welcome to Fleet Management System", text: text)
             
             print("User signed up successfully with role: \(role)")
             return signUpResponse.user.id

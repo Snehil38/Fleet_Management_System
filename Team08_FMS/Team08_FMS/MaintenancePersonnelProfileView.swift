@@ -250,7 +250,7 @@ struct MaintenancePersonnelProfileView: View {
                 message: Text("Your status will be updated to Available."),
                 dismissButton: .default(Text("OK"), action: {
                     Task {
-                        if let userID = await supabaseDataController.getUserID() {
+                        if let userID = supabaseDataController.userID {
                             await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, for: userID)
                             self.personnel?.status = .available
                         }
