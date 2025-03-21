@@ -18,10 +18,10 @@ struct Trip: Identifiable, Codable {
     let vehicleId: UUID
     let driverId: UUID?
     let startTime: Date?
-    let endTime: Date?
+    var endTime: Date?
     let notes: String?
     let createdAt: Date?
-    let updatedAt: Date?
+    var updatedAt: Date?
     let isDeleted: Bool
     
     var vehicleDetails: Vehicle {

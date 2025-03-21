@@ -119,6 +119,8 @@ class TripDataController: ObservableObject {
         var updatedTrip = trip
         updatedTrip.tripStatus = .delivered
         updatedTrip.hasCompletedPostTrip = true
+        updatedTrip.endTime = Date()
+        updatedTrip.updatedAt = Date()
         
         // If this is the current trip, update it
         if currentTrip?.id == trip.id {
@@ -129,7 +131,8 @@ class TripDataController: ObservableObject {
         Task {
             do {
                 try await SupabaseDataController.shared.updateTrip(updatedTrip)
-                update() // Refresh the trips list
+                print("Successfully marked trip as delivered in Supabase")
+                try await loadTrips() // Refresh the trips list
             } catch {
                 print("Error updating trip status: \(error.localizedDescription)")
             }
