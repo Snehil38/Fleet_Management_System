@@ -353,9 +353,13 @@ struct CrewCardView: View {
     
     private func deleteCrew() {
         if currentCrew is Driver {
-            dataManager.deleteDriver(currentCrew.id)
+            Task {
+                await SupabaseDataController.shared.softDeleteDriver(for: currentCrew.id)
+            }
         } else {
-            dataManager.deleteMaintenancePersonnel(currentCrew.id)
+            Task {
+                await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: currentCrew.id)
+            }
         }
     }
 }
