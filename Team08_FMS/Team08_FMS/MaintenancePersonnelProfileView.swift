@@ -5,6 +5,7 @@ struct MaintenancePersonnelProfileView: View {
     @State private var personnel: MaintenancePersonnel?
     @State private var showingStatusChangeAlert = false
     @State private var pendingStatus: Status?
+    @State private var showAlert = false
     @Environment(\.presentationMode) private var presentationMode
 
     var body: some View {
@@ -31,6 +32,18 @@ struct MaintenancePersonnelProfileView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { backButton }
             .alert(isPresented: $showingStatusChangeAlert, content: { statusChangeAlert })
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text("Alert"),
+                    message: Text("Are you sure you want to log out?"),
+                    primaryButton: .destructive(Text("Yes")) {
+                        Task {
+                            SupabaseDataController.shared.signOut()
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
             .task { await loadPersonnelData() }
         }
     }
@@ -132,7 +145,9 @@ struct MaintenancePersonnelProfileView: View {
     
     private var logoutButton: some View {
         Button {
-            Task { supabaseDataController.signOut() }
+            Task {
+                showAlert = true
+            }
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")

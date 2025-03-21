@@ -5,6 +5,7 @@ struct DriverProfileView: View {
     @State private var driver: Driver?
     @State private var showingStatusChangeAlert = false
     @State private var pendingStatus: Status?
+    @State private var showAlert = false
     @Environment(\.presentationMode) private var presentationMode
 
     var body: some View {
@@ -66,6 +67,18 @@ struct DriverProfileView: View {
                         })
                     )
                 }
+            }
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text("Alert"),
+                    message: Text("Are you sure you want to log out?"),
+                    primaryButton: .destructive(Text("Yes")) {
+                        Task {
+                            SupabaseDataController.shared.signOut()
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
             }
             .task {
                 if let userID = await supabaseDataController.getUserID() {
@@ -214,7 +227,7 @@ struct DriverProfileView: View {
     
     private var logoutButton: some View {
         Button {
-            Task { supabaseDataController.signOut() }
+            Task { showAlert = true }
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
