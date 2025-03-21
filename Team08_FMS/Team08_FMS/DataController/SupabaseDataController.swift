@@ -765,5 +765,36 @@ class SupabaseDataController: ObservableObject {
             print("Exception updating driver status: \(error.localizedDescription)")
         }
     }
+    
+    func softDeleteDriver(for userID: UUID) async {do {
+            let response = try await supabase
+                .from("driver")
+                .update(["isDeleted": true])
+                .eq("id", value: userID)
+                .execute()
+            
+            let data = response.data
+            let jsonString = String(data: data, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")")
+        } catch {
+            print("Exception updating driver status: \(error.localizedDescription)")
+        }
+    }
+    
+    func softDeleteMaintenancePersonnel(for userID: UUID) async {
+        do {
+            let response = try await supabase
+                .from("maintenance_personnel")
+                .update(["isDeleted": true])
+                .eq("id", value: userID)
+                .execute()
+            
+            let data = response.data
+            let jsonString = String(data: data, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")")
+        } catch {
+            print("Exception updating driver status: \(error.localizedDescription)")
+        }
+    }
 
 }

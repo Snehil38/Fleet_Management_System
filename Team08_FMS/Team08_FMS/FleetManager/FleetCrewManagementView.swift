@@ -7,38 +7,6 @@
 
 import SwiftUI
 
-//struct CrewMember: Identifiable {
-//    let id: String
-//    let name: String
-//    let avatar: String
-//    let role: String
-//    let status: Status
-//    let salary: Double
-//    let details: [DetailItem]
-//
-//    enum Status: String {
-//        case available = "Available"
-//        case busy = "Busy"
-//        case offline = "Offline"
-//
-//        var color: Color {
-//            switch self {
-//            case .available: return Color.green
-//            case .busy: return Color.yellow
-//            case .offline: return Color.red
-//            }
-//        }
-//
-//        var backgroundColor: Color {
-//            switch self {
-//            case .available: return Color.green.opacity(0.2)
-//            case .busy: return Color.yellow.opacity(0.2)
-//            case .offline: return Color.red.opacity(0.2)
-//            }
-//        }
-//    }
-//}
-
 struct FleetCrewManagementView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @State private var crewType: CrewType = .drivers
@@ -109,7 +77,7 @@ struct FleetCrewManagementView: View {
                         if filteredCrew.isEmpty {
                             EmptyStateView(type: crewType)
                         } else {
-                            ForEach(Array(filteredCrew.enumerated()), id: \.element.id) { (_, crew) in
+                            ForEach(filteredCrew, id: \.id) { crew in
                                 CrewCardView(crewMember: crew)
                                     .padding(.horizontal)
                             }
@@ -353,10 +321,16 @@ struct CrewCardView: View {
     
     private func deleteCrew() {
         if currentCrew is Driver {
-            dataManager.deleteDriver(currentCrew.id)
-        } else {
-            dataManager.deleteMaintenancePersonnel(currentCrew.id)
+            Task {
+                await SupabaseDataController.shared.softDeleteDriver(for: currentCrew.id)
+            }
         }
+        else {
+            Task {
+                await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: currentCrew.id)
+            }
+        }
+        CrewDataController.shared.update()
     }
 }
 
