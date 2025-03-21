@@ -29,6 +29,7 @@ struct DriverProfileView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                 }
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -4,56 +4,51 @@ struct FleetManagerProfileView: View {
     @StateObject private var supabaseDataController = SupabaseDataController.shared
     @State private var fleetManager: FleetManager?
     @State private var showAlert = false
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.presentationMode) private var presentationMode
 
     var body: some View {
-        NavigationView {
-            Group {
-                if let fm = fleetManager {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            profileHeader(for: fm)
-                            personalInfo(for: fm)
-                            contactInfo(for: fm)
-                            workInfo() // Work info is static in this example.
-                            logoutButton
-                        }
-                        .padding()
-                        .background(Color(.systemGroupedBackground))
+        Group {
+            if let fm = fleetManager {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        profileHeader(for: fm)
+                        personalInfo(for: fm)
+                        contactInfo(for: fm)
+                        workInfo()
+                        logoutButton
                     }
-                } else {
-                    ProgressView("Loading...")
-                        .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                    .padding()
+                    .background(Color(.systemGroupedBackground))
                 }
+            } else {
+                ProgressView("Loading...")
+                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
             }
-            .alert(isPresented: $showAlert) {
-                Alert(
-                    title: Text("Alert"),
-                    message: Text("Are you sure you want to log out?"),
-                    primaryButton: .destructive(Text("Yes")) {
-                        Task {
-                            SupabaseDataController.shared.signOut()
-                        }
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Back") { presentationMode.wrappedValue.dismiss() }
-                }
-            }
-            .task { await loadFleetManagerData() }
         }
+        .background(Color(.systemGroupedBackground))
+        .alert(isPresented: $showAlert) {
+            Alert(
+                title: Text("Alert"),
+                message: Text("Are you sure you want to log out?"),
+                primaryButton: .destructive(Text("Yes")) {
+                    Task {
+                        SupabaseDataController.shared.signOut()
+                    }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .navigationTitle("Profile")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { backButton }
+        .task { await loadFleetManagerData() }
     }
     
     // MARK: - View Components
     
     private func profileHeader(for fm: FleetManager) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: (fm.profileImage) ?? "person.circle.fill")
+            Image(systemName: "person.circle.fill")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 110, height: 110)
@@ -174,6 +169,14 @@ struct FleetManagerProfileView: View {
                 }
             } catch {
                 print("Error fetching fleet manager: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private var backButton: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button("Back") {
+                presentationMode.wrappedValue.dismiss()
             }
         }
     }
