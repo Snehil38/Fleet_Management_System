@@ -103,7 +103,7 @@ struct MaintenancePersonnelTabView: View {
                 MaintenancePersonnelProfileView()
             }
             .sheet(isPresented: $showingContact) {
-                ContactView()
+                MaintenanceContactView()
             }
         }
     }
@@ -166,7 +166,7 @@ struct ServiceRequestCard: View {
     }
 }
 
-struct ContactView: View {
+struct MaintenanceContactView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedContact: ContactType = .fleetManager
     @State private var message = ""

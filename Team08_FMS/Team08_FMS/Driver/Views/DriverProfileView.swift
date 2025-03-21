@@ -39,8 +39,6 @@ struct DriverProfileView: View {
                             .foregroundColor(.gray)
                         
                         HStack {
-                            Text("Availability Status")
-                                .font(.headline)
                             
                             Spacer()
                             
