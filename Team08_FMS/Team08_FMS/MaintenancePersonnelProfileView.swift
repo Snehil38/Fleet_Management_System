@@ -28,10 +28,40 @@ struct MaintenancePersonnelProfileView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                 }
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { backButton }
-            .alert(isPresented: $showingStatusChangeAlert, content: { statusChangeAlert })
+            .alert(isPresented: $showingStatusChangeAlert) {
+                if pendingStatus == .available {
+                    return Alert(
+                        title: Text("Confirm Status Change"),
+                        message: Text("Your status will be updated to Available."),
+                        dismissButton: .default(Text("OK"), action: {
+                            Task {
+                                if let userID = await supabaseDataController.getUserID() {
+                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, for: userID)
+                                    self.personnel?.status = .available
+                                }
+                            }
+                        })
+                    )
+                } else {
+                    return Alert(
+                        title: Text("Confirm Status Change"),
+                        message: Text("Are you sure you want to set your status to Off Duty?"),
+                        primaryButton: .cancel(Text("Cancel")),
+                        secondaryButton: .default(Text("Confirm"), action: {
+                            Task {
+                                if let userID = await supabaseDataController.getUserID() {
+                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, for: userID)
+                                    self.personnel?.status = .offDuty
+                                }
+                            }
+                        })
+                    )
+                }
+            }
             .alert(isPresented: $showAlert) {
                 Alert(
                     title: Text("Alert"),
@@ -52,7 +82,7 @@ struct MaintenancePersonnelProfileView: View {
     
     private func profileHeader(for personnel: MaintenancePersonnel) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: personnel.profileImage ?? "person.circle.fill")
+            Image(systemName: "person.circle.fill")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 110, height: 110)
