@@ -17,7 +17,7 @@ struct FleetManagerTabView: View {
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
                 .tabItem {
-                    Label("Dashboard", systemImage: "car.fill")
+                    Label("Home", systemImage: "house.fill")
                 }
             
             VehiclesView()
