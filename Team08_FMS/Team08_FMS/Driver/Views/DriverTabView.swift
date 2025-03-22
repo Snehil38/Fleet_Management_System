@@ -109,13 +109,13 @@ struct DriverTabView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack(spacing: 16) {
-                            Button(action: {
-                                showingChatBot = true
-                            }) {
-                                Image(systemName: "message.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.blue)
-                            }
+//                            Button(action: {
+//                                showingChatBot = true
+//                            }) {
+//                                Image(systemName: "message.fill")
+//                                    .font(.system(size: 22))
+//                                    .foregroundColor(.blue)
+//                            }
                             
                             Button(action: {
                                 showingProfileView = true
