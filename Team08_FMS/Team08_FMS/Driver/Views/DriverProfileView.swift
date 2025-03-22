@@ -47,7 +47,7 @@ struct DriverProfileView: View {
                         dismissButton: .default(Text("OK"), action: {
                             Task {
                                 if let userID = await supabaseDataController.getUserID() {
-                                    await supabaseDataController.updateDriverStatus(newStatus: .available, for: userID)
+                                    await supabaseDataController.updateDriverStatus(newStatus: .available, userID: userID, id: nil)
                                     self.driver?.status = .available
                                 }
                             }
@@ -61,7 +61,7 @@ struct DriverProfileView: View {
                         secondaryButton: .default(Text("Confirm"), action: {
                             Task {
                                 if let driver = driver {
-                                    await supabaseDataController.updateDriverStatus(newStatus: .offDuty, for: driver.id)
+                                    await supabaseDataController.updateDriverStatus(newStatus: .offDuty, userID: nil, id: driver.id)
                                     self.driver?.status = .offDuty
                                 }
                             }

@@ -843,40 +843,63 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
-    func updateDriverStatus(newStatus: Status, for userID: UUID) async {
+    func updateDriverStatus(newStatus: Status, userID: UUID?, id: UUID?) async {
         // Use [String: String] since newStatus.rawValue is a String.
         let payload: [String: String] = ["status": newStatus.rawValue]
         
         do {
-            let response = try await supabase
-                .from("driver")
-                .update(payload)
-                .eq("userID", value: userID)
-                .execute()
-            
-            let data = response.data
-            let jsonString = String(data: data, encoding: .utf8)
-            print("Update response data: \(jsonString ?? "")")
+            if let userID {
+                let response = try await supabase
+                    .from("driver")
+                    .update(payload)
+                    .eq("userID", value: userID)
+                    .execute()
+                let data = response.data
+                let jsonString = String(data: data, encoding: .utf8)
+                print("Update response data: \(jsonString ?? "")")
+            } else if id != nil {
+                let response = try await supabase
+                    .from("driver")
+                    .update(payload)
+                    .eq("id", value: id)
+                    .execute()
+                let data = response.data
+                let jsonString = String(data: data, encoding: .utf8)
+                print("Update response data: \(jsonString ?? "")")
+            }
         } catch {
             print("Exception updating driver status: \(error.localizedDescription)")
         }
     }
     
-    func updateMaintenancePersonnelStatus(newStatus: Status, for userID: UUID) async {
+    func updateMaintenancePersonnelStatus(newStatus: Status, userID: UUID?, id: UUID?) async {
         // Use [String: String] since newStatus.rawValue is a String.
         print(newStatus)
         let payload: [String: String] = ["status": newStatus.rawValue]
         
         do {
-            let response = try await supabase
-                .from("maintenance_personnel")
-                .update(payload)
-                .eq("userID", value: userID)
-                .execute()
-            
-            let data = response.data
-            let jsonString = String(data: data, encoding: .utf8)
-            print("Update response data: \(jsonString ?? "")")
+            if let userID {
+                let response = try await supabase
+                    .from("maintenance_personnel")
+                    .update(payload)
+                    .eq("userID", value: userID)
+                    .execute()
+                
+                let data = response.data
+                let jsonString = String(data: data, encoding: .utf8)
+                print("Update response data: \(jsonString ?? "")")
+            }
+            else if id != nil {
+                let response = try await supabase
+                    .from("maintenance_personnel")
+                    .update(payload)
+                    .eq("id", value: id)
+                    .execute()
+                
+                let data = response.data
+                let jsonString = String(data: data, encoding: .utf8)
+                print("Update response data: \(jsonString ?? "")")
+            }
         } catch {
             print("Exception updating driver status: \(error.localizedDescription)")
         }
