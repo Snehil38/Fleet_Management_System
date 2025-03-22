@@ -1,7 +1,7 @@
 import Foundation
 
 class VehicleManager: ObservableObject {
-    @Published private(set) var vehicles: [Vehicle] = []
+    @Published var vehicles: [Vehicle] = []
     private let vehiclesKey = "savedVehicles"
 
     init() {
@@ -16,10 +16,15 @@ class VehicleManager: ObservableObject {
         }
     }
 
-    private func loadVehicles() {
-        if let data = UserDefaults.standard.data(forKey: vehiclesKey),
-           let decodedVehicles = try? JSONDecoder().decode([Vehicle].self, from: data) {
-            vehicles = decodedVehicles
+    func loadVehicles() {
+        Task {
+            do {
+                let vehichle = try await SupabaseDataController.shared.fetchVehicles()
+                
+                await MainActor.run {
+                    vehicles = vehichle
+                }
+            }
         }
     }
 

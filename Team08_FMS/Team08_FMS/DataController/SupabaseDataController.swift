@@ -627,7 +627,7 @@ class SupabaseDataController: ObservableObject {
 
             // Decode into Driver model
             let drivers = try decoder.decode([Driver].self, from: transformedData)
-            print("Decoded Drivers: \(drivers)")
+//            print("Decoded Drivers: \(drivers)")
             return drivers
         } catch {
             print("Error fetching drivers: \(error)")
@@ -782,6 +782,7 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("vehicles")
                 .select()
+                .notEquals("status", value: "Decommissioned")
                 .execute()
             
             let data = response.data
@@ -834,7 +835,7 @@ class SupabaseDataController: ObservableObject {
             
             // Decode into Vehicle model
             let vehicles = try decoder.decode([Vehicle].self, from: transformedData)
-            print("Decoded Vehicles: \(vehicles)")
+//            print("Decoded Vehicles: \(vehicles)")
             return vehicles
         } catch {
             print("Error fetching vehicles: \(error)")
@@ -850,7 +851,7 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("driver")
                 .update(payload)
-                .eq("id", value: userID)
+                .eq("userID", value: userID)
                 .execute()
             
             let data = response.data
@@ -870,7 +871,7 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("maintenance_personnel")
                 .update(payload)
-                .eq("id", value: userID)
+                .eq("userID", value: userID)
                 .execute()
             
             let data = response.data
@@ -944,5 +945,139 @@ class SupabaseDataController: ObservableObject {
             print("Exception updating driver status: \(error.localizedDescription)")
         }
     }
+    
+    func insertVehicle(vehicle: Vehicle) async throws {
+        // 1. Create a date formatter for encoding date fields as "yyyy-MM-dd"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
 
+        // 2. Convert your `Vehicle`'s dates to strings
+        let pollutionExpiryString = dateFormatter.string(from: vehicle.pollutionExpiry)
+        let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
+
+        // 3. Convert document `Data` fields to Base64 strings (if they exist)
+        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+
+        // 5. Create an instance of the payload
+        let payload = VehiclePayload(
+            id: vehicle.id,
+            name: vehicle.name,
+            year: vehicle.year,
+            make: vehicle.make,
+            model: vehicle.model,
+            vin: vehicle.vin,
+            license_plate: vehicle.licensePlate,
+            vehicle_type: vehicle.vehicleType,
+            color: vehicle.color,
+            body_type: vehicle.bodyType,
+            body_subtype: vehicle.bodySubtype,
+            msrp: vehicle.msrp,
+            pollution_expiry: pollutionExpiryString,
+            insurance_expiry: insuranceExpiryString,
+            status: vehicle.status,
+            driver_id: vehicle.driverId,
+            pollution_certificate: pollutionCertBase64,
+            rc: rcBase64,
+            insurance: insuranceBase64
+        )
+
+        do {
+            // 6. Insert the payload into Supabase
+            let response = try await supabase
+                .from("vehicles")
+                .insert([payload])
+                .execute()
+            
+            print("Insert success: \(response)")
+        } catch {
+            print("Error inserting vehicle: \(error.localizedDescription)")
+        }
+    }
+
+    func updateVehicle(vehicle: Vehicle) async throws {
+        // 1. Create a date formatter for encoding date fields as "yyyy-MM-dd"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+        // 2. Convert your `Vehicle`'s dates to strings
+        let pollutionExpiryString = dateFormatter.string(from: vehicle.pollutionExpiry)
+        let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
+
+        // 3. Convert document `Data` fields to Base64 strings (if they exist)
+        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+
+        // 5. Create an instance of the update payload with current vehicle details.
+        let payload = VehiclePayload(
+            id: vehicle.id,
+            name: vehicle.name,
+            year: vehicle.year,
+            make: vehicle.make,
+            model: vehicle.model,
+            vin: vehicle.vin,
+            license_plate: vehicle.licensePlate,
+            vehicle_type: vehicle.vehicleType,
+            color: vehicle.color,
+            body_type: vehicle.bodyType,
+            body_subtype: vehicle.bodySubtype,
+            msrp: vehicle.msrp,
+            pollution_expiry: pollutionExpiryString,
+            insurance_expiry: insuranceExpiryString,
+            status: vehicle.status,
+            driver_id: vehicle.driverId,
+            pollution_certificate: pollutionCertBase64,
+            rc: rcBase64,
+            insurance: insuranceBase64
+        )
+
+        do {
+            // 6. Update the payload in Supabase by filtering with the vehicle's `id`
+            let response = try await supabase
+                .from("vehicles")
+                .update([payload])
+                .eq("id", value: vehicle.id)
+                .execute()
+            
+            print("Update success: \(response)")
+        } catch {
+            print("Error updating vehicle: \(error.localizedDescription)")
+        }
+    }
+
+    func softDeleteVehichle(vehicleID: UUID) async {
+        do {
+            // 6. Update the payload in Supabase by filtering with the vehicle's `id`
+            let response = try await supabase
+                .from("vehicles")
+                .update(["status": "Decommissioned"])
+                .eq("id", value: vehicleID)
+                .execute()
+            
+            print("Update success: \(response)")
+        } catch {
+            print("Error updating vehicle: \(error)")
+        }
+    }
+    
+    func updateVehichleStatus(newStatus: VehicleStatus, vehicleID: UUID) async {
+        do {
+            // 6. Update the payload in Supabase by filtering with the vehicle's `id`
+            let response = try await supabase
+                .from("vehicles")
+                .update(["status": newStatus.rawValue])
+                .eq("id", value: vehicleID)
+                .execute()
+            
+            print("Update success: \(response)")
+        } catch {
+            print("Error updating vehicle: \(error)")
+        }
+    }
 }

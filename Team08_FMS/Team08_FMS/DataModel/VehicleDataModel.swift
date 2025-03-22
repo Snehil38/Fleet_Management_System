@@ -64,6 +64,30 @@ struct VehicleDocuments: Codable {
     }
 }
 
+struct VehiclePayload: Codable {
+    let id: UUID
+    let name: String
+    let year: Int
+    let make: String
+    let model: String
+    let vin: String
+    let license_plate: String
+    let vehicle_type: VehicleType
+    let color: String
+    let body_type: BodyType
+    let body_subtype: String
+    let msrp: Double
+    let pollution_expiry: String
+    let insurance_expiry: String
+    let status: VehicleStatus
+    let driver_id: UUID?
+    
+    // Document fields as Base64-encoded strings
+    let pollution_certificate: String?
+    let rc: String?
+    let insurance: String?
+}
+
 struct Vehicle: Identifiable, Codable {
     var id: UUID = UUID()
     var name: String

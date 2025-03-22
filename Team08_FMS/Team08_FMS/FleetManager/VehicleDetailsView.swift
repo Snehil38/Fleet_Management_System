@@ -380,41 +380,33 @@ struct VehicleDetailView: View {
         )
 
         if let vehicle = vehicle {
-            vehicleManager.updateVehicle(
-                vehicle,
-                name: name,
-                year: Int(year) ?? 0,
-                make: make,
-                model: model,
-                vin: vin,
-                licensePlate: licensePlate,
-                vehicleType: vehicleType,
-                color: color,
-                bodyType: bodyType,
-                bodySubtype: bodySubtype,
-                msrp: Double(msrp) ?? 0,
-                pollutionExpiry: pollutionExpiry,
-                insuranceExpiry: insuranceExpiry,
-                documents: documents
-            )
-        } else {
-            vehicleManager.addVehicle(
-                name: name,
-                year: Int(year) ?? 0,
-                make: make,
-                model: model,
-                vin: vin,
-                licensePlate: licensePlate,
-                vehicleType: vehicleType,
-                color: color,
-                bodyType: bodyType,
-                bodySubtype: bodySubtype,
-                msrp: Double(msrp) ?? 0,
-                pollutionExpiry: pollutionExpiry,
-                insuranceExpiry: insuranceExpiry,
-                documents: documents
-            )
+            Task {
+                try await SupabaseDataController.shared.updateVehicle(vehicle: vehicle)
+            }
         }
+        else {
+            let vehicle = Vehicle(
+                name: name,
+                year: Int(year) ?? 0,
+                make: make,
+                model: model,
+                vin: vin,
+                licensePlate: licensePlate,
+                vehicleType: vehicleType,
+                color: color,
+                bodyType: bodyType,
+                bodySubtype: bodySubtype,
+                msrp: Double(msrp) ?? 0,
+                pollutionExpiry: pollutionExpiry,
+                insuranceExpiry: insuranceExpiry,
+                status: .available,
+                documents: documents
+            )
+            Task {
+                try await SupabaseDataController.shared.insertVehicle(vehicle: vehicle)
+            }
+        }
+        vehicleManager.loadVehicles()
         
         if isEditing {
             isEditing = false

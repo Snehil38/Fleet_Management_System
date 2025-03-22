@@ -62,18 +62,18 @@ struct MaintenancePersonnelProfileView: View {
                     )
                 }
             }
-            .alert(isPresented: $showAlert) {
-                Alert(
-                    title: Text("Alert"),
-                    message: Text("Are you sure you want to log out?"),
-                    primaryButton: .destructive(Text("Yes")) {
-                        Task {
-                            SupabaseDataController.shared.signOut()
-                        }
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
+//            .alert(isPresented: $showAlert) {
+//                Alert(
+//                    title: Text("Alert"),
+//                    message: Text("Are you sure you want to log out?"),
+//                    primaryButton: .destructive(Text("Yes")) {
+//                        Task {
+//                            SupabaseDataController.shared.signOut()
+//                        }
+//                    },
+//                    secondaryButton: .cancel()
+//                )
+//            }
             .task { await loadPersonnelData() }
         }
     }
@@ -182,7 +182,7 @@ struct MaintenancePersonnelProfileView: View {
     private var logoutButton: some View {
         Button {
             Task {
-                showAlert = true
+                supabaseDataController.signOut()
             }
         } label: {
             HStack {
