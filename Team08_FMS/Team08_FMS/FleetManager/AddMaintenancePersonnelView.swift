@@ -116,6 +116,7 @@ struct AddMaintenancePersonnelView: View {
                 guard let signUpID = await supabase.signUp(name: newPersonnel.name, email: newPersonnel.email, phoneNo: newPersonnel.phoneNumber, role: "maintenance_personnel") else { return }
                 newPersonnel.userID = signUpID
                 try await supabase.insertMaintenancePersonnel(personnel: newPersonnel, password: AppDataController.shared.randomPasswordGenerator(length: 6))
+                await supabase.setUserSession()
                 await MainActor.run {
                     crewDataController.update()
                     presentationMode.wrappedValue.dismiss()

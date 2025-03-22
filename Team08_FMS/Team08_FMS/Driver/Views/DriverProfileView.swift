@@ -69,18 +69,18 @@ struct DriverProfileView: View {
                     )
                 }
             }
-            .alert(isPresented: $showAlert) {
-                Alert(
-                    title: Text("Alert"),
-                    message: Text("Are you sure you want to log out?"),
-                    primaryButton: .destructive(Text("Yes")) {
-                        Task {
-                            SupabaseDataController.shared.signOut()
-                        }
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
+//            .alert(isPresented: $showAlert) {
+//                Alert(
+//                    title: Text("Alert"),
+//                    message: Text("Are you sure you want to log out?"),
+//                    primaryButton: .destructive(Text("Yes")) {
+//                        Task {
+//                            SupabaseDataController.shared.signOut()
+//                        }
+//                    },
+//                    secondaryButton: .cancel()
+//                )
+//            }
             .task {
                 if let userID = await supabaseDataController.getUserID() {
                     do {
@@ -235,7 +235,7 @@ struct DriverProfileView: View {
     
     private var logoutButton: some View {
         Button {
-            Task { showAlert = true }
+            Task { supabaseDataController.signOut() }
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")

@@ -92,7 +92,6 @@ struct LoginView: View {
                         print("success")
                         if !dataController.isGenPass, dataController.is2faEnabled {
                             email = email
-                            UserDefaults.standard.set(email, forKey: "email")
                             if dataController.roleMatched {
                                 dataController.sendOTP(email: email) { success, error in
                                     if success {

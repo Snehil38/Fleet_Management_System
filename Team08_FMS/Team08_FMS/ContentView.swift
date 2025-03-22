@@ -26,12 +26,15 @@ struct ContentView: View {
                     case "maintenance_personnel":
                         MaintenancePersonnelTabView()
                     default:
-                        RoleSelectionView() // Handles unknown role case
+                        RoleSelectionView()
                     }
                 }
             }
         }
-        .animation(.easeInOut, value: auth.isAuthenticated) // Smooth transition
+        .animation(.easeInOut, value: auth.isAuthenticated)
+        .task {
+            await auth.autoLogin()
+        }
     }
 }
 

@@ -119,7 +119,6 @@ struct AddDriverView: View {
                 salary: salaryDouble,
                 yearsOfExperience: experienceInt,
                 createdAt: Date(),
-                updatedAt: Date(),
                 isDeleted: false,
                 status: .available
             )
@@ -130,6 +129,7 @@ struct AddDriverView: View {
                     newDriver.userID = signUpID
                     // Call the SupabaseDataController function to insert the driver
                     try await supabase.insertDriver(driver: newDriver, password: AppDataController.shared.randomPasswordGenerator(length: 6))
+                    await supabase.setUserSession()
                     await MainActor.run {
                         crewDataController.update()
                         presentationMode.wrappedValue.dismiss()
