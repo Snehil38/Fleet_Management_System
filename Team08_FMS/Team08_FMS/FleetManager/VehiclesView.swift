@@ -390,7 +390,7 @@ struct VehiclesView: View {
                 }
             }
             .sheet(isPresented: $showingAddVehicle) {
-                VehicleDetailView(vehicleManager: vehicleManager)
+                VehicleSaveView(vehicleManager: vehicleManager)
             }
 //            .sheet(isPresented: $showingDeleteMode) {
 //                DeleteVehiclesView(vehicleManager: vehicleManager)

@@ -1041,11 +1041,13 @@ class SupabaseDataController: ObservableObject {
             // 6. Update the payload in Supabase by filtering with the vehicle's `id`
             let response = try await supabase
                 .from("vehicles")
-                .update([payload])
+                .update(payload)
                 .eq("id", value: vehicle.id)
                 .execute()
             
             print("Update success: \(response)")
+            print("Payload: \(payload)")
+
         } catch {
             print("Error updating vehicle: \(error.localizedDescription)")
         }
