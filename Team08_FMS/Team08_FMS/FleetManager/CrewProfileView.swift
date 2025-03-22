@@ -192,14 +192,16 @@ struct CrewProfileView: View {
         if isDriver, let driver = crewMember as? Driver {
             Task {
                 await SupabaseDataController.shared.softDeleteDriver(for: driver.id)
+                CrewDataController.shared.update()
             }
         } else if let maintenance = crewMember as? MaintenancePersonnel {
             Task {
                 await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: maintenance.id)
+                CrewDataController.shared.update()
             }
         }
-        presentationMode.wrappedValue.dismiss()
         CrewDataController.shared.update()
+        presentationMode.wrappedValue.dismiss()
     }
 }
 

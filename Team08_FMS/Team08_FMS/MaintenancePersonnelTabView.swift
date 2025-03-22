@@ -28,7 +28,7 @@ struct MaintenancePersonnelTabView: View {
             VStack {
                 // Header
                 HStack {
-                    Text("Dashboard")
+                    Text("Home")
                         .font(.title)
                         .fontWeight(.bold)
                     Spacer()

@@ -179,7 +179,9 @@ class SupabaseDataController: ObservableObject {
         }
         
         do {
-            session = supabase.auth.currentSession
+            await MainActor.run {
+                session = supabase.auth.currentSession
+            }
             let password = AppDataController.shared.randomPasswordGenerator(length: 6)
             print(password)
             let signUpResponse = try await supabase.auth.signUp(email: email, password: password)
