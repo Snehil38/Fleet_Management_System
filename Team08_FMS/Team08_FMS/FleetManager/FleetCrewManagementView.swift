@@ -255,10 +255,10 @@ struct CrewCardView: View {
                 Button {
                     Task {
                         if currentCrew is Driver {
-                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, for: currentCrew.id)
+                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
                         }
                         else {
-                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, for: currentCrew.id)
+                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
                         }
                         CrewDataController.shared.update()
                     }
@@ -301,10 +301,10 @@ struct CrewCardView: View {
                 Button {
                     Task {
                         if currentCrew is Driver {
-                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, for: currentCrew.id)
+                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
                         }
                         else {
-                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, for: currentCrew.id)
+                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
                         }
                         CrewDataController.shared.update()
                     }

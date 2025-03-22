@@ -39,8 +39,8 @@ struct MaintenancePersonnelProfileView: View {
                         message: Text("Your status will be updated to Available."),
                         dismissButton: .default(Text("OK"), action: {
                             Task {
-                                if let personnel = personnel {
-                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, for: personnel.id)
+                                if let userID = await supabaseDataController.getUserID() {
+                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
                                     self.personnel?.status = .available
                                 }
                             }
@@ -54,7 +54,7 @@ struct MaintenancePersonnelProfileView: View {
                         secondaryButton: .default(Text("Confirm"), action: {
                             Task {
                                 if let userID = await supabaseDataController.getUserID() {
-                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, for: userID)
+                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, userID: userID, id: nil)
                                     self.personnel?.status = .offDuty
                                 }
                             }
@@ -251,7 +251,7 @@ struct MaintenancePersonnelProfileView: View {
                 dismissButton: .default(Text("OK"), action: {
                     Task {
                         if let userID = supabaseDataController.userID {
-                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, for: userID)
+                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
                             self.personnel?.status = .available
                         }
                     }
@@ -265,7 +265,7 @@ struct MaintenancePersonnelProfileView: View {
                 secondaryButton: .default(Text("Confirm"), action: {
                     Task {
                         if let userID = await supabaseDataController.getUserID() {
-                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, for: userID)
+                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, userID: userID, id: nil)
                             self.personnel?.status = .offDuty
                         }
                     }
