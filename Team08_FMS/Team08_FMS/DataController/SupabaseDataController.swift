@@ -268,7 +268,7 @@ class SupabaseDataController: ObservableObject {
                     }
                     signOut()
                 }
-                if !is2faEnabled {
+                if !is2faEnabled || isAuthenticated {
                     await MainActor.run {
                         isAuthenticated = true
                     }
