@@ -14,7 +14,7 @@ struct FleetManagerProfileView: View {
                         profileHeader(for: fm)
                         personalInfo(for: fm)
                         contactInfo(for: fm)
-                        workInfo()
+//                        workInfo()
                         logoutButton
                     }
                     .padding()
