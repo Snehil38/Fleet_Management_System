@@ -35,9 +35,10 @@ class SupabaseDataController: ObservableObject {
         let smtp = SMTP(
             hostname: "smtp.gmail.com",     // SMTP server address
             email: "c0sm042532@gmail.com",        // username to login
-            password: "xjsk jrno odyh exoe"            // password to login
+            password: "xjsk jrno odyh exoe",
+            port: 587
         )
-        let fromUser = Mail.User(name: "Dr. Light", email: "c0sm042532@gmail.com")
+        let fromUser = Mail.User(name: "Team08 FMS", email: "c0sm042532@gmail.com")
         let toUser = Mail.User(name: toName, email: toEmail)
         let mail = Mail(from: fromUser, to: [toUser], subject: subject, text: text)
         smtp.send(mail) { (error) in
@@ -199,8 +200,21 @@ class SupabaseDataController: ObservableObject {
                 .from("gen_pass")
                 .insert(genPass)
                 .execute()
-            let text = "Your Login Crediets as \(role) are as follows:\nPassword: \(password)"
-            sendEmail(toName: name, toEmail: email, subject: "Welcome to Fleet Management System", text: text)
+            
+            let inviteEmail = """
+            Dear \(name),
+
+            Welcome to Fleet Management System! We’re excited to have you on board.
+
+            Your login credentials as a \(role) are as follows:
+
+            - Email: \(email)
+            - Password: \(password)
+
+            Please log into the app and update your password for security.
+            """
+            
+            sendEmail(toName: name, toEmail: email, subject: "Welcome to Fleet Management System", text: inviteEmail)
             
             print("User signed up successfully with role: \(role)")
             
@@ -254,7 +268,7 @@ class SupabaseDataController: ObservableObject {
                     }
                     signOut()
                 }
-                if !is2faEnabled {
+                if !is2faEnabled || isAuthenticated {
                     await MainActor.run {
                         isAuthenticated = true
                     }
