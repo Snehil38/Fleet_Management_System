@@ -334,7 +334,7 @@ struct AddTripView: View {
                         .foregroundColor(.gray)
                     HStack {
                         TextField("Enter pickup location", text: $pickupLocation)
-                            .onChange(of: pickupLocation) { newValue in
+                            .onChange(of: pickupLocation) { newValue, _ in
                                 if newValue.count > 2 {
                                     searchCompleter.queryFragment = newValue + ", India"
                                     activeTextField = .pickup
@@ -369,7 +369,7 @@ struct AddTripView: View {
                         .foregroundColor(.gray)
                     HStack {
                         TextField("Enter dropoff location", text: $dropoffLocation)
-                            .onChange(of: dropoffLocation) { newValue in
+                            .onChange(of: dropoffLocation) { newValue, _ in
                                 if newValue.count > 2 {
                                     searchCompleter.queryFragment = newValue + ", India"
                                     activeTextField = .dropoff

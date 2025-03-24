@@ -187,7 +187,6 @@ struct TripStatusBadge: View {
         case .assigned: return "Assigned"
         case .inProgress: return "In Progress"
         case .completed: return "Completed"
-        default: return "Unknown" // For any other status
         }
     }
     
@@ -197,7 +196,6 @@ struct TripStatusBadge: View {
         case .assigned: return Color.blue.opacity(0.2)
         case .inProgress: return Color.orange.opacity(0.2)
         case .completed: return Color.green.opacity(0.2)
-        default: return Color.gray.opacity(0.2)
         }
     }
     
