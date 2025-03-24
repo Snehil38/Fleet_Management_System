@@ -159,8 +159,8 @@ private struct VehicleCard: View {
             Button("Delete", role: .destructive) {
                 Task {
                     await SupabaseDataController.shared.softDeleteVehichle(vehicleID: vehicle.id)
+                    vehicleManager.loadVehicles()
                 }
-                vehicleManager.loadVehicles()
             }
         } message: {
             Text("Are you sure you want to delete this vehicle? This action cannot be undone.")
@@ -264,13 +264,13 @@ private struct DeleteVehiclesView: View {
                         if selectedVehicles.contains(vehicle.id) {
                             Task {
                                 try await SupabaseDataController.shared.updateVehicle(vehicle: vehicle)
+                                vehicleManager.loadVehicles()
                             }
-                            vehicleManager.loadVehicles()
                         } else {
                             Task {
                                 try await SupabaseDataController.shared.insertVehicle(vehicle: vehicle)
+                                vehicleManager.loadVehicles()
                             }
-                            vehicleManager.loadVehicles()
                         }
                     }
                 }
@@ -298,8 +298,8 @@ private struct DeleteVehiclesView: View {
                         if let vehicle = vehicleManager.vehicles.first(where: { $0.id == id }) {
                             Task {
                                 await SupabaseDataController.shared.softDeleteVehichle(vehicleID: vehicle.id)
+                                vehicleManager.loadVehicles()
                             }
-                            vehicleManager.loadVehicles()
                         }
                     }
                     dismiss()
