@@ -39,7 +39,7 @@ struct TripsView: View {
         switch selectedFilter {
         case .all:
             var allTrips: [Trip] = []
-            if tripController.currentTrip.status == .current && availabilityManager.isAvailable {
+            if tripController.currentTrip.status == .inProgress && availabilityManager.isAvailable {
                 allTrips.append(tripController.currentTrip)
             }
             
@@ -50,7 +50,7 @@ struct TripsView: View {
             
             return allTrips
         case .current:
-            return tripController.currentTrip.status == .current && availabilityManager.isAvailable ? 
+            return tripController.currentTrip.status == .inProgress && availabilityManager.isAvailable ? 
                 [tripController.currentTrip] : []
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
@@ -63,7 +63,7 @@ struct TripsView: View {
                     address: delivery.location,
                     eta: "",
                     distance: "",
-                    status: .delivered,
+                    status: .completed,
                     vehicleDetails: Vehicle(
                         name: "Tesla",
                         year: 2023,
@@ -144,23 +144,27 @@ struct TripCard: View {
     
     private var statusText: String {
         switch trip.status {
-        case .current:
-            return "Current"
-        case .upcoming:
-            return "Upcoming"
-        case .delivered:
-            return "Delivered"
+        case .inProgress:
+            return "In Progress"
+        case .pending:
+            return "Pending"
+        case .completed:
+            return "Completed"
+        case .assigned:
+            return "Assigned"
         }
     }
     
     private var statusColor: Color {
         switch trip.status {
-        case .current:
+        case .inProgress:
             return .blue
-        case .upcoming:
+        case .pending:
             return .green
-        case .delivered:
+        case .completed:
             return .gray
+        case .assigned:
+            return .yellow
         }
     }
 }

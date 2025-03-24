@@ -3,7 +3,8 @@ import CoreLocation
 
 // Trip Status Enum
 enum TripStatus {
-    case upcoming, current, delivered
+    case pending, inProgress, completed, assigned
+    
 }
 
 // Trip Model
@@ -29,7 +30,7 @@ struct Trip: Identifiable {
             address: "JNPT Port Road, Navi Mumbai, Maharashtra 400707",
             eta: "25 mins",
             distance: "8.5 km",
-            status: .current,
+            status: .inProgress,
             vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
 //                VehicleDetails(
 //                number: "TRK-001",
@@ -57,7 +58,7 @@ struct Trip: Identifiable {
                 address: "Tughlakabad, New Delhi, 110020",
                 eta: "1.5 hours",
                 distance: "22 km",
-                status: .upcoming,
+                status: .pending,
                 vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 28.5244,  // Delhi coordinates

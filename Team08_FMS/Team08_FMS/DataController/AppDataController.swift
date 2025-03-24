@@ -57,7 +57,7 @@ class AppDataController {
         case .electricalSystemsCertified:
             return "Electrical Systems Certified"
         case .heavyEquipmentTechnician:
-            return "Heavy Equiment Technician"
+            return "Heavy Equipment Technician"
         }
     }
 }

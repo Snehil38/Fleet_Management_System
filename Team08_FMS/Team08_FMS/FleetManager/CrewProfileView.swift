@@ -103,7 +103,7 @@ struct CrewProfileView: View {
     var body: some View {
         Form {
             // Basic Information Section.
-            Section("Basic Information") {
+            Section(header: Text("Basic Information")) {
                 if isEditing {
                     VStack(alignment: .leading, spacing: 4) {
                         TextField("Name", text: $editedName)
@@ -115,8 +115,8 @@ struct CrewProfileView: View {
                         }
                     }
                     
-                    LabeledContent("ID", value: crewMember.id.uuidString)
-                    LabeledContent("Role", value: role)
+                    LabeledContent(label: "ID", value: crewMember.id.uuidString)
+                    LabeledContent(label: "Role", value: role)
                     
                     Picker("Status", selection: $editedStatus) {
                         ForEach([Status.available, .offDuty], id: \.self) { status in
@@ -125,9 +125,9 @@ struct CrewProfileView: View {
                         }
                     }
                 } else {
-                    LabeledContent("Name", value: crewMember.name)
-                    LabeledContent("ID", value: crewMember.id.uuidString)
-                    LabeledContent("Role", value: role)
+                    LabeledContent(label:"Name", value: crewMember.name)
+                    LabeledContent(label:"ID", value: crewMember.id.uuidString)
+                    LabeledContent(label:"Role", value: role)
                     HStack {
                         Text("Status")
                         Spacer()
@@ -161,8 +161,8 @@ struct CrewProfileView: View {
                         }
                     }
                 } else {
-                    LabeledContent("Phone", value: "\(crewMember.phoneNumber)")
-                    LabeledContent("Email", value: crewMember.email)
+                    LabeledContent(label:"Phone", value: "\(crewMember.phoneNumber)")
+                    LabeledContent(label:"Email", value: crewMember.email)
                 }
             }
             
@@ -219,13 +219,13 @@ struct CrewProfileView: View {
                     }
                 } else {
                     if isDriver, let driver = crewMember as? Driver {
-                        LabeledContent("Experience", value: "\(driver.yearsOfExperience) years")
-                        LabeledContent("License", value: driver.driverLicenseNumber)
+                        LabeledContent(label:"Experience", value: "\(driver.yearsOfExperience) years")
+                        LabeledContent(label:"License", value: driver.driverLicenseNumber)
                     } else if let maintenance = crewMember as? MaintenancePersonnel {
-                        LabeledContent("Experience", value: "\(maintenance.yearsOfExperience) years")
-                        LabeledContent("Specialty", value: maintenance.speciality.rawValue)
+                        LabeledContent(label:"Experience", value: "\(maintenance.yearsOfExperience) years")
+                        LabeledContent(label:"Specialty", value: maintenance.speciality.rawValue)
                     }
-                    LabeledContent("Salary", value: "$\(String(format: "%.2f", crewMember.salary))")
+                    LabeledContent(label:"Salary", value: "$\(String(format: "%.2f", crewMember.salary))")
                 }
             }
             

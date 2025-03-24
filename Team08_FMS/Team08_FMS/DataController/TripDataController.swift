@@ -23,7 +23,7 @@ class TripDataController: ObservableObject {
             address: "JNPT Port Road, Navi Mumbai, Maharashtra 400707",
             eta: "25 mins",
             distance: "8.5 km",
-            status: .current,
+            status: .inProgress,
             vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
 //                VehicleDetails(
 //                number: "TRK-001",
@@ -49,7 +49,7 @@ class TripDataController: ObservableObject {
                 address: "Tughlakabad, New Delhi, 110020", 
                 eta: "1.5 hours", 
                 distance: "22 km",
-                status: .upcoming,
+                status: .pending,
                 vehicleDetails: Vehicle(
                     name: "Ford",
                     year: 2018,
@@ -83,7 +83,7 @@ class TripDataController: ObservableObject {
                 address: "ITPL Main Road, Whitefield, Bangalore 560066", 
                 eta: "45 mins", 
                 distance: "15 km",
-                status: .upcoming,
+                status: .pending,
                 vehicleDetails: Vehicle(
                     name: "Toyota",
                     year: 2022,
@@ -117,7 +117,7 @@ class TripDataController: ObservableObject {
                 address: "NH-44, Kompally, Hyderabad 500014", 
                 eta: "55 mins", 
                 distance: "18 km",
-                status: .upcoming,
+                status: .pending,
                 vehicleDetails: Vehicle(
                     name: "Tesla",
                     year: 2023,
@@ -222,7 +222,7 @@ class TripDataController: ObservableObject {
         
         // Mark the trip as delivered
         var updatedTrip = trip
-        updatedTrip.status = .delivered
+        updatedTrip.status = .completed
         
         // If this is the current trip, update it
         if currentTrip.id == trip.id {

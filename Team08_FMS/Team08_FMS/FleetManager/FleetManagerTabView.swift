@@ -17,21 +17,30 @@ struct FleetManagerTabView: View {
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
                 .tabItem {
-                    Label("Home", systemImage: "house.fill")
+                    Image(systemName: "gauge")
+                    Text("Dashboard")
+                }
+            
+            FleetTripsView()
+                .tabItem {
+                    Image(systemName: "shippingbox.fill")
+                    Text("Trips")
                 }
             
             VehiclesView()
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
                 .tabItem {
-                    Label("Vehicles", systemImage: "car.fill")
+                    Image(systemName: "car.fill")
+                    Text("Vehicles")
                 }
             // Crew Tab (only tab)
             FleetCrewManagementView()
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
                 .tabItem {
-                    Label("Crew", systemImage: "person.3")
+                    Image(systemName: "person.2.fill")
+                    Text("Crew")
                 }
         }
     }

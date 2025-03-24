@@ -78,7 +78,7 @@ struct DriverTabView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 24) {
                         // Current Delivery Card
-                        if currentTrip.status == .current && availabilityManager.isAvailable {
+                        if currentTrip.status == .inProgress && availabilityManager.isAvailable {
                             currentDeliveryCard
                         }
                         
@@ -529,7 +529,7 @@ struct DriverTabView: View {
                         onStart: {
                             // Make this trip current
                             currentTrip = trip
-                            currentTrip.status = .current
+                            currentTrip.status = .inProgress
                             if let index = tripQueue.firstIndex(where: { $0.id == trip.id }) {
                                 tripQueue.remove(at: index)
                             }
@@ -714,16 +714,16 @@ struct DriverTabView: View {
             
             // Clear current trip if no more trips
             if tripQueue.isEmpty && upcomingTrips.isEmpty {
-                currentTrip.status = .delivered
+                currentTrip.status = .completed
             }
         }
     }
     
     private func acceptTrip(_ trip: Trip) {
         // If there's no current trip, make this the current trip
-        if currentTrip.status != .current {
+        if currentTrip.status != .inProgress {
             currentTrip = trip
-            currentTrip.status = .current
+            currentTrip.status = .inProgress
             if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
                 upcomingTrips.remove(at: index)
             }
