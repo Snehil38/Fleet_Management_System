@@ -112,12 +112,12 @@ struct FleetManagerDashboardTabView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
-                        Button {
-                            showingMessages = true
-                        } label: {
-                            Image(systemName: "message.fill")
-                                .foregroundColor(.blue)
-                        }
+//                        Button {
+//                            showingMessages = false
+//                        } label: {
+//                            Image(systemName: "message.fill")
+//                                .foregroundColor(.blue)
+//                        }
 
                         Button {
                             showingProfile = true
