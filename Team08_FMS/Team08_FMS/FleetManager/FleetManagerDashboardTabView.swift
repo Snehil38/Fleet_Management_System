@@ -281,8 +281,8 @@ struct AddTripView: View {
     @State private var pickupCoordinate: CLLocationCoordinate2D?
     @State private var dropoffCoordinate: CLLocationCoordinate2D?
     @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
-        span: MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 25) // Adjusted to show more of India
+        center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
+        span: MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 25)
     )
     @State private var routePolyline: MKPolyline?
     
@@ -300,6 +300,7 @@ struct AddTripView: View {
     @State private var fuelCost: Double = 0.0
     @State private var tripCost: Double = 0.0
     @State private var isCalculating = false
+    @State private var selectedTab = 0
     
     let cargoTypes = ["General Goods", "Perishable", "Hazardous", "Heavy Machinery", "Liquids", "Livestock"]
     
@@ -312,166 +313,221 @@ struct AddTripView: View {
     }
     
     var body: some View {
-        Form {
-            // Map Section with adjusted styling
-            Section {
-                MapView(
-                    pickupCoordinate: pickupCoordinate,
-                    dropoffCoordinate: dropoffCoordinate,
-                    routePolyline: routePolyline,
-                    region: $region
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: 300) // Increased height
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .listRowInsets(EdgeInsets())
-                .padding(.vertical, 8)
-            }
-            .listRowBackground(Color.clear)
-            
-            // Route Information
-            Section(header: Text("ROUTE INFORMATION").foregroundColor(.gray)) {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Pickup Location
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Pickup Location")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        HStack {
-                            Image(systemName: "mappin.circle.fill")
-                                .foregroundColor(.blue)
-                                .font(.system(size: 22))
-                            TextField("Enter pickup location", text: $pickupLocation)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .onChange(of: pickupLocation) { newValue, _ in
-                                    if newValue.count > 2 {
-                                        searchCompleter.queryFragment = newValue + ", India"
-                                        activeTextField = .pickup
-                                    } else {
-                                        searchResults = []
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Map View
+                    MapView(
+                        pickupCoordinate: pickupCoordinate,
+                        dropoffCoordinate: dropoffCoordinate,
+                        routePolyline: routePolyline,
+                        region: $region
+                    )
+                    .frame(height: 250)
+                    .clipShape(RoundedRectangle(cornerRadius: 0))
+                    
+                    // Content Cards
+                    VStack(spacing: 20) {
+                        // Route Information Card
+                        VStack(spacing: 16) {
+                            Text("ROUTE INFORMATION")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            // Pickup Location
+                            HStack(spacing: 12) {
+                                Image(systemName: "mappin.circle.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 24))
+                                TextField("Enter pickup location", text: $pickupLocation)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .onChange(of: pickupLocation) { newValue in
+                                        if newValue.count > 2 {
+                                            searchCompleter.queryFragment = newValue + ", India"
+                                            activeTextField = .pickup
+                                        } else {
+                                            searchResults = []
+                                        }
+                                    }
+                                if !pickupLocation.isEmpty {
+                                    Button(action: {
+                                        pickupLocation = ""
+                                        pickupCoordinate = nil
+                                        updateMapRegion()
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.gray)
                                     }
                                 }
+                            }
                             
-                            if !pickupLocation.isEmpty {
-                                Button(action: {
-                                    pickupLocation = ""
-                                    pickupCoordinate = nil
-                                    updateMapRegion()
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.gray)
+                            // Dropoff Location
+                            HStack(spacing: 12) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .foregroundColor(.red)
+                                    .font(.system(size: 24))
+                                TextField("Enter dropoff location", text: $dropoffLocation)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .onChange(of: dropoffLocation) { newValue in
+                                        if newValue.count > 2 {
+                                            searchCompleter.queryFragment = newValue + ", India"
+                                            activeTextField = .dropoff
+                                        } else {
+                                            searchResults = []
+                                        }
+                                    }
+                                if !dropoffLocation.isEmpty {
+                                    Button(action: {
+                                        dropoffLocation = ""
+                                        dropoffCoordinate = nil
+                                        updateMapRegion()
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.gray)
+                                    }
                                 }
                             }
                         }
-                    }
-                    
-                    if activeTextField == .pickup && !searchResults.isEmpty {
-                        LocationSearchResults(results: searchResults) { result in
-                            searchForLocation(result.title, isPickup: true)
-                        }
-                    }
-                    
-                    // Dropoff Location
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Dropoff Location")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        HStack {
-                            Image(systemName: "mappin.and.ellipse")
-                                .foregroundColor(.red)
-                                .font(.system(size: 22))
-                            TextField("Enter dropoff location", text: $dropoffLocation)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .onChange(of: dropoffLocation) { newValue, _ in
-                                    if newValue.count > 2 {
-                                        searchCompleter.queryFragment = newValue + ", India"
-                                        activeTextField = .dropoff
-                                    } else {
-                                        searchResults = []
-                                    }
-                                }
-                            
-                            if !dropoffLocation.isEmpty {
-                                Button(action: {
-                                    dropoffLocation = ""
-                                    dropoffCoordinate = nil
-                                    updateMapRegion()
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.gray)
+                        .padding(16)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.05), radius: 10)
+                        
+                        // Search Results
+                        if !searchResults.isEmpty {
+                            LocationSearchResults(results: searchResults) { result in
+                                if activeTextField == .pickup {
+                                    searchForLocation(result.title, isPickup: true)
+                                } else {
+                                    searchForLocation(result.title, isPickup: false)
                                 }
                             }
                         }
-                    }
-                    
-                    if activeTextField == .dropoff && !searchResults.isEmpty {
-                        LocationSearchResults(results: searchResults) { result in
-                            searchForLocation(result.title, isPickup: false)
+                        
+                        // Trip Details Card
+                        VStack(spacing: 16) {
+                            // Cargo Section
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("CARGO DETAILS")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                
+                                Menu {
+                                    ForEach(cargoTypes, id: \.self) { type in
+                                        Button(type) {
+                                            cargoType = type
+                                        }
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(cargoType)
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Image(systemName: "chevron.down")
+                                            .foregroundColor(.gray)
+                                    }
+                                    .padding()
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(10)
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            // Schedule Section
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("SCHEDULE")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                
+                                VStack(spacing: 16) {
+                                    DatePicker("Start Date", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
+                                    DatePicker("Delivery Date", selection: $deliveryDate, in: startDate..., displayedComponents: [.date, .hourAndMinute])
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.05), radius: 10)
+                        
+                        // Trip Analysis Card (if available)
+                        if distance > 0 {
+                            VStack(spacing: 16) {
+                                Text("TRIP ANALYSIS")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                HStack(spacing: 20) {
+                                    // Distance
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "arrow.left.and.right")
+                                            .font(.title2)
+                                            .foregroundColor(.blue)
+                                        Text("\(String(format: "%.1f", distance)) km")
+                                            .font(.headline)
+                                        Text("Distance")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    
+                                    // Fuel Cost
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "fuelpump.fill")
+                                            .font(.title2)
+                                            .foregroundColor(.blue)
+                                        Text("$\(String(format: "%.2f", fuelCost))")
+                                            .font(.headline)
+                                        Text("Fuel Cost")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                            .padding(16)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(16)
+                            .shadow(color: Color.black.opacity(0.05), radius: 10)
                         }
                     }
+                    .padding(16)
                 }
             }
             
-            // Cargo Details
-            Section(header: Text("CARGO DETAILS").foregroundColor(.gray)) {
-                HStack {
-                    Text("Cargo Type")
-                    Spacer()
-                    Picker("", selection: $cargoType) {
-                        ForEach(cargoTypes, id: \.self) { type in
-                            Text(type).tag(type)
+            // Bottom Action Button
+            VStack {
+                Button(action: distance > 0 ? saveTrip : calculateRoute) {
+                    HStack {
+                        if isCalculating {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .padding(.trailing, 8)
                         }
+                        Text(distance > 0 ? "Create Trip" : "Calculate Route")
+                            .fontWeight(.semibold)
                     }
-                    .pickerStyle(MenuPickerStyle())
-                    .accentColor(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(isFormValid ? Color.blue : Color.gray)
+                    .foregroundColor(.white)
+                    .cornerRadius(16)
                 }
-            }
-            
-            // Schedule
-            Section(header: Text("SCHEDULE").foregroundColor(.gray)) {
-                DatePicker("Start Date", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
-                DatePicker("Delivery Date", selection: $deliveryDate, in: startDate..., displayedComponents: [.date, .hourAndMinute])
-            }
-            
-            // Trip Analysis
-            if distance > 0 {
-                Section(header: Text("TRIP ANALYSIS").foregroundColor(.gray)) {
-                    HStack {
-                        Text("Distance")
-                        Spacer()
-                        Text("\(String(format: "%.1f", distance)) km")
-                            .fontWeight(.medium)
-                    }
-                    
-                    HStack {
-                        Text("Estimated Fuel Cost")
-                        Spacer()
-                        Text("$\(String(format: "%.2f", fuelCost))")
-                            .fontWeight(.medium)
-                    }
-                }
-            }
-            
-            // Action Buttons
-            Section {
-                if distance > 0 {
-                    Button(action: saveTrip) {
-                        Text("Create Trip")
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                    }
-                    .listRowBackground(Color.blue)
-                } else {
-                    Button(action: calculateRoute) {
-                        Text("Calculate Route")
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                    }
-                    .disabled(!isFormValid || isCalculating)
-                    .listRowBackground(isFormValid ? Color.blue : Color.gray)
-                }
+                .disabled(!isFormValid || isCalculating)
+                .padding(16)
+                .background(Color(.systemBackground))
             }
         }
+        .edgesIgnoringSafeArea(.bottom)
         .navigationTitle("Add New Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
