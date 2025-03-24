@@ -282,7 +282,7 @@ struct AddTripView: View {
     @State private var dropoffCoordinate: CLLocationCoordinate2D?
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
-        span: MKCoordinateSpan(latitudeDelta: 15, longitudeDelta: 15)
+        span: MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 25) // Adjusted to show more of India
     )
     @State private var routePolyline: MKPolyline?
     
@@ -295,7 +295,7 @@ struct AddTripView: View {
     // Trip details state
     @State private var cargoType = "General Goods"
     @State private var startDate = Date()
-    @State private var deliveryDate = Date().addingTimeInterval(86400) // Next day
+    @State private var deliveryDate = Date().addingTimeInterval(86400)
     @State private var distance: Double = 0.0
     @State private var fuelCost: Double = 0.0
     @State private var tripCost: Double = 0.0
@@ -313,7 +313,7 @@ struct AddTripView: View {
     
     var body: some View {
         Form {
-            // Map Section
+            // Map Section with adjusted styling
             Section {
                 MapView(
                     pickupCoordinate: pickupCoordinate,
@@ -321,39 +321,48 @@ struct AddTripView: View {
                     routePolyline: routePolyline,
                     region: $region
                 )
-                .frame(height: 200)
-                .cornerRadius(12)
+                .frame(maxWidth: .infinity)
+                .frame(height: 300) // Increased height
+                .clipShape(RoundedRectangle(cornerRadius: 12))
                 .listRowInsets(EdgeInsets())
+                .padding(.vertical, 8)
             }
+            .listRowBackground(Color.clear)
             
             // Route Information
-            Section(header: Text("Route Information")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Pickup Location")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    HStack {
-                        TextField("Enter pickup location", text: $pickupLocation)
-                            .onChange(of: pickupLocation) { newValue, _ in
-                                if newValue.count > 2 {
-                                    searchCompleter.queryFragment = newValue + ", India"
-                                    activeTextField = .pickup
-                                } else {
-                                    searchResults = []
+            Section(header: Text("ROUTE INFORMATION").foregroundColor(.gray)) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Pickup Location
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Pickup Location")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        HStack {
+                            Image(systemName: "mappin.circle.fill")
+                                .foregroundColor(.blue)
+                                .font(.system(size: 22))
+                            TextField("Enter pickup location", text: $pickupLocation)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .onChange(of: pickupLocation) { newValue, _ in
+                                    if newValue.count > 2 {
+                                        searchCompleter.queryFragment = newValue + ", India"
+                                        activeTextField = .pickup
+                                    } else {
+                                        searchResults = []
+                                    }
+                                }
+                            
+                            if !pickupLocation.isEmpty {
+                                Button(action: {
+                                    pickupLocation = ""
+                                    pickupCoordinate = nil
+                                    updateMapRegion()
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.gray)
                                 }
                             }
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
-                        Button(action: {
-                            // Clear pickup location
-                            pickupLocation = ""
-                            pickupCoordinate = nil
-                            updateMapRegion()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
                         }
-                        .opacity(pickupLocation.isEmpty ? 0 : 1)
                     }
                     
                     if activeTextField == .pickup && !searchResults.isEmpty {
@@ -361,34 +370,38 @@ struct AddTripView: View {
                             searchForLocation(result.title, isPickup: true)
                         }
                     }
-                }
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Dropoff Location")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    HStack {
-                        TextField("Enter dropoff location", text: $dropoffLocation)
-                            .onChange(of: dropoffLocation) { newValue, _ in
-                                if newValue.count > 2 {
-                                    searchCompleter.queryFragment = newValue + ", India"
-                                    activeTextField = .dropoff
-                                } else {
-                                    searchResults = []
+                    
+                    // Dropoff Location
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Dropoff Location")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        HStack {
+                            Image(systemName: "mappin.and.ellipse")
+                                .foregroundColor(.red)
+                                .font(.system(size: 22))
+                            TextField("Enter dropoff location", text: $dropoffLocation)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .onChange(of: dropoffLocation) { newValue, _ in
+                                    if newValue.count > 2 {
+                                        searchCompleter.queryFragment = newValue + ", India"
+                                        activeTextField = .dropoff
+                                    } else {
+                                        searchResults = []
+                                    }
+                                }
+                            
+                            if !dropoffLocation.isEmpty {
+                                Button(action: {
+                                    dropoffLocation = ""
+                                    dropoffCoordinate = nil
+                                    updateMapRegion()
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.gray)
                                 }
                             }
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
-                        Button(action: {
-                            // Clear dropoff location
-                            dropoffLocation = ""
-                            dropoffCoordinate = nil
-                            updateMapRegion()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
                         }
-                        .opacity(dropoffLocation.isEmpty ? 0 : 1)
                     }
                     
                     if activeTextField == .dropoff && !searchResults.isEmpty {
@@ -400,33 +413,29 @@ struct AddTripView: View {
             }
             
             // Cargo Details
-            Section(header: Text("Cargo Details")) {
-                Picker("Cargo Type", selection: $cargoType) {
-                    ForEach(cargoTypes, id: \.self) { type in
-                        Text(type).tag(type)
+            Section(header: Text("CARGO DETAILS").foregroundColor(.gray)) {
+                HStack {
+                    Text("Cargo Type")
+                    Spacer()
+                    Picker("", selection: $cargoType) {
+                        ForEach(cargoTypes, id: \.self) { type in
+                            Text(type).tag(type)
+                        }
                     }
+                    .pickerStyle(MenuPickerStyle())
+                    .accentColor(.blue)
                 }
-                .pickerStyle(MenuPickerStyle())
             }
             
             // Schedule
-            Section(header: Text("Schedule")) {
+            Section(header: Text("SCHEDULE").foregroundColor(.gray)) {
                 DatePicker("Start Date", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
                 DatePicker("Delivery Date", selection: $deliveryDate, in: startDate..., displayedComponents: [.date, .hourAndMinute])
             }
             
             // Trip Analysis
-            if isCalculating {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .padding()
-                        Spacer()
-                    }
-                }
-            } else if distance > 0 {
-                Section(header: Text("Trip Analysis")) {
+            if distance > 0 {
+                Section(header: Text("TRIP ANALYSIS").foregroundColor(.gray)) {
                     HStack {
                         Text("Distance")
                         Spacer()
@@ -440,48 +449,26 @@ struct AddTripView: View {
                         Text("$\(String(format: "%.2f", fuelCost))")
                             .fontWeight(.medium)
                     }
-                    
-                    HStack {
-                        Text("Total Trip Cost")
-                        Spacer()
-                        Text("$\(String(format: "%.2f", tripCost))")
-                            .fontWeight(.medium)
-                            .foregroundColor(.blue)
-                    }
                 }
             }
             
-            // Calculate Button
+            // Action Buttons
             Section {
-                Button {
-                    calculateRoute()
-                } label: {
-                    HStack {
-                        Spacer()
-                        if isCalculating {
-                            ProgressView()
-                                .padding(.trailing, 10)
-                        }
-                        Text("Calculate Trip")
-                        Spacer()
+                if distance > 0 {
+                    Button(action: saveTrip) {
+                        Text("Create Trip")
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.white)
                     }
-                }
-                .disabled(!isFormValid || isCalculating)
-            }
-            
-            // Create Trip Button
-            if distance > 0 {
-                Section {
-                    Button {
-                        saveTrip()
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text("Create Trip")
-                            Spacer()
-                        }
+                    .listRowBackground(Color.blue)
+                } else {
+                    Button(action: calculateRoute) {
+                        Text("Calculate Route")
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.white)
                     }
-                    .disabled(!isFormValid)
+                    .disabled(!isFormValid || isCalculating)
+                    .listRowBackground(isFormValid ? Color.blue : Color.gray)
                 }
             }
         }
@@ -493,10 +480,6 @@ struct AddTripView: View {
                     dismiss()
                 }
             }
-        }
-        .onTapGesture {
-            // Dismiss location suggestions when tapping elsewhere
-            hideSearchResults()
         }
         .onAppear {
             setupSearchCompleter()
@@ -558,28 +541,23 @@ struct AddTripView: View {
             let centerLat = (pickup.latitude + dropoff.latitude) / 2
             let centerLon = (pickup.longitude + dropoff.longitude) / 2
             
-            // Calculate span to fit both points
-            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.5
-            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.5
+            // Calculate span to fit both points with padding
+            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.8 // Increased padding
+            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.8 // Increased padding
             
             region = MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
-                span: MKCoordinateSpan(latitudeDelta: max(latDelta, 0.02), longitudeDelta: max(lonDelta, 0.02))
+                span: MKCoordinateSpan(latitudeDelta: max(latDelta, 0.05), longitudeDelta: max(lonDelta, 0.05))
             )
-            
-            // Calculate route if both locations are set
-            if !isCalculating {
-                calculateRoute()
-            }
         } else if let pickup = pickupCoordinate {
             region = MKCoordinateRegion(
                 center: pickup,
-                span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // Increased zoom level
             )
         } else if let dropoff = dropoffCoordinate {
             region = MKCoordinateRegion(
                 center: dropoff,
-                span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // Increased zoom level
             )
         }
     }
