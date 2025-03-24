@@ -12,7 +12,7 @@ struct CrewProfileView: View {
     let crewMember: any CrewMemberProtocol
     @Environment(\.presentationMode) private var presentationMode
     @EnvironmentObject private var dataManager: CrewDataController
-    
+
     // Editing state variables – note that for numeric fields we work with Strings for TextField binding.
     @State private var isEditing = false
     @State private var editedName: String = ""
@@ -25,15 +25,99 @@ struct CrewProfileView: View {
     @State private var editedSpecialty: Specialization?
     
     @State private var showingDeleteAlert = false
+
+    // MARK: - Touched States
+    @State private var nameEdited = false
+    @State private var phoneEdited = false
+    @State private var emailEdited = false
+    @State private var experienceEdited = false
+    @State private var salaryEdited = false
+    @State private var licenseEdited = false
+    @State private var specialtyEdited = false
+
+    // MARK: - Save Operation State
+    @State private var isSaving = false
+
+    // MARK: - Field Validations
+
+    private var isNameValid: Bool {
+        let trimmed = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Only letters and spaces allowed.
+        let regex = "^[A-Za-z ]+$"
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+
+    private var isPhoneValid: Bool {
+        let trimmed = editedPhone.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, Int(trimmed) != nil else { return false }
+        return true
+    }
+
+    private var isEmailValid: Bool {
+        let trimmed = editedEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Basic email regex.
+        let regex = #"^\S+@\S+\.\S+$"#
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+
+    private var isExperienceValid: Bool {
+        if let exp = Int(editedExperience), exp >= 0 {
+            return true
+        }
+        return false
+    }
+
+    private var isSalaryValid: Bool {
+        if let sal = Double(editedSalary), sal > 0 {
+            return true
+        }
+        return false
+    }
+
+    private var isLicenseValid: Bool {
+        // For drivers, license must not be empty.
+        if isDriver {
+            return !editedLicense.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return true
+    }
+
+    private var isSpecialtyValid: Bool {
+        // For non-drivers, a specialty must be selected.
+        return isDriver ? true : (editedSpecialty != nil)
+    }
+
+    // Overall form validation.
+    private var isFormValid: Bool {
+        isNameValid &&
+        isPhoneValid &&
+        isEmailValid &&
+        isExperienceValid &&
+        isSalaryValid &&
+        isLicenseValid &&
+        isSpecialtyValid
+    }
     
     var body: some View {
         Form {
-            // Basic Information Section
+            // Basic Information Section.
             Section("Basic Information") {
                 if isEditing {
-                    TextField("Name", text: $editedName)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Name", text: $editedName)
+                            .onChange(of: editedName) { _, _ in nameEdited = true }
+                        if nameEdited && !isNameValid {
+                            Text("Name cannot be empty and must not contain numbers.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
                     LabeledContent("ID", value: crewMember.id.uuidString)
                     LabeledContent("Role", value: role)
+                    
                     Picker("Status", selection: $editedStatus) {
                         ForEach([Status.available, .offDuty], id: \.self) { status in
                             Text(AppDataController.shared.getStatusString(status: status))
@@ -53,29 +137,86 @@ struct CrewProfileView: View {
                 }
             }
             
-            // Contact Information Section
+            // Contact Information Section.
             Section("Contact Information") {
-                LabeledContent("Phone", value: "\(crewMember.phoneNumber)")
-                LabeledContent("Email", value: crewMember.email)
+                if isEditing {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Phone", text: $editedPhone)
+                            .keyboardType(.numberPad)
+                            .onChange(of: editedPhone) { _, _ in phoneEdited = true }
+                        if phoneEdited && !isPhoneValid {
+                            Text("Phone must be numeric and cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Email", text: $editedEmail)
+                            .keyboardType(.emailAddress)
+                            .onChange(of: editedEmail) { _, _ in emailEdited = true }
+                        if emailEdited && !isEmailValid {
+                            Text("Enter a valid email address.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                } else {
+                    LabeledContent("Phone", value: "\(crewMember.phoneNumber)")
+                    LabeledContent("Email", value: crewMember.email)
+                }
             }
             
-            // Professional Details Section
+            // Professional Details Section.
             Section("Professional Details") {
                 if isEditing {
-                    TextField("Experience (years)", text: $editedExperience)
-                        .keyboardType(.numberPad)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Experience (years)", text: $editedExperience)
+                            .keyboardType(.numberPad)
+                            .onChange(of: editedExperience) { _, _ in experienceEdited = true }
+                        if experienceEdited && !isExperienceValid {
+                            Text("Experience must be a nonnegative number.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
                     if isDriver {
-                        TextField("License Number", text: $editedLicense)
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField("License Number", text: $editedLicense)
+                                .onChange(of: editedLicense) { _, _ in licenseEdited = true }
+                            if licenseEdited && !isLicenseValid {
+                                Text("License number cannot be empty.")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                        }
                     } else {
-                        Picker("Specialty", selection: $editedSpecialty) {
-                            ForEach(Specialization.allCases) { specialty in
-                                Text(AppDataController.shared.getSpecialityString(speciality: specialty))
-                                    .tag(specialty)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Picker("Specialty", selection: $editedSpecialty) {
+                                ForEach(Specialization.allCases) { specialty in
+                                    Text(AppDataController.shared.getSpecialityString(speciality: specialty))
+                                        .tag(specialty as Specialization?)
+                                }
+                            }
+                            .onChange(of: editedSpecialty) { _, _ in specialtyEdited = true }
+                            if specialtyEdited && !isSpecialtyValid {
+                                Text("Please select a specialty.")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
                             }
                         }
                     }
-                    TextField("Monthly Salary", text: $editedSalary)
-                        .keyboardType(.decimalPad)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Monthly Salary", text: $editedSalary)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: editedSalary) { _, _ in salaryEdited = true }
+                        if salaryEdited && !isSalaryValid {
+                            Text("Salary must be a positive number.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
                 } else {
                     if isDriver, let driver = crewMember as? Driver {
                         LabeledContent("Experience", value: "\(driver.yearsOfExperience) years")
@@ -88,7 +229,7 @@ struct CrewProfileView: View {
                 }
             }
             
-            // Delete Section
+            // Delete Section.
             Section {
                 Button(role: .destructive) {
                     showingDeleteAlert = true
@@ -112,6 +253,7 @@ struct CrewProfileView: View {
                     }
                     isEditing.toggle()
                 }
+                .disabled(isEditing && (!isFormValid || isSaving))
             }
         }
         .onAppear {
@@ -127,7 +269,7 @@ struct CrewProfileView: View {
         }
     }
     
-    // Helper computed properties
+    // Helper computed properties.
     var isDriver: Bool {
         crewMember is Driver
     }
@@ -155,6 +297,8 @@ struct CrewProfileView: View {
     
     // Save changes back to the data controller.
     private func saveChanges() {
+        guard !isSaving else { return }
+        isSaving = true
         if isDriver, let driver = crewMember as? Driver,
            let index = dataManager.drivers.firstIndex(where: { $0.id == driver.id }) {
             dataManager.drivers[index].name = editedName
@@ -167,6 +311,7 @@ struct CrewProfileView: View {
             dataManager.drivers[index].salary = Double(editedSalary) ?? dataManager.drivers[index].salary
             dataManager.drivers[index].updatedAt = Date()
             Task {
+                defer { isSaving = false }
                 await SupabaseDataController.shared.updateDriver(driver: dataManager.drivers[index])
             }
         }
@@ -182,6 +327,7 @@ struct CrewProfileView: View {
             dataManager.maintenancePersonnel[index].salary = Double(editedSalary) ?? dataManager.maintenancePersonnel[index].salary
             dataManager.maintenancePersonnel[index].updatedAt = Date()
             Task {
+                defer { isSaving = false }
                 await SupabaseDataController.shared.updateMaintenancePersonnel(personnel: dataManager.maintenancePersonnel[index])
             }
         }

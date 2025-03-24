@@ -181,6 +181,7 @@ struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var vehicleManager: VehicleManager
     @State private var isEditing = false
+    @State private var isSaving = false
 
     var vehicle: Vehicle?
     
@@ -211,15 +212,72 @@ struct VehicleDetailView: View {
     @State private var selectedRCItem: PhotosPickerItem?
     @State private var selectedInsuranceItem: PhotosPickerItem?
     
-    // Form validation check
-    private var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !year.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !vin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+    // MARK: - Field "Touched" States
+    @State private var nameEdited = false
+    @State private var yearEdited = false
+    @State private var makeEdited = false
+    @State private var modelEdited = false
+    @State private var vinEdited = false
+    @State private var licensePlateEdited = false
+    @State private var bodySubtypeEdited = false
+    @State private var msrpEdited = false
+    
+    // MARK: - Field Validations
+    
+    private var isNameValid: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Only letters (upper and lowercase) and spaces allowed.
+        let regex = "^[A-Za-z ]+$"
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+    
+    private var isYearValid: Bool {
+        if let y = Int(year) {
+            let currentYear = Calendar.current.component(.year, from: Date())
+            return y >= 1900 && y <= currentYear
+        }
+        return false
+    }
+    
+    private var isMakeValid: Bool {
+        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isModelValid: Bool {
+        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isVINValid: Bool {
+        let trimmed = vin.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count == 17
+    }
+    
+    private var isLicensePlateValid: Bool {
+        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isBodySubtypeValid: Bool {
         !bodySubtype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isMSRPValid: Bool {
+        if let msrpValue = Double(msrp) {
+            return msrpValue > 0
+        }
+        return false
+    }
+    
+    // Overall form validity using all validations.
+    private var isFormValid: Bool {
+        isNameValid &&
+        isYearValid &&
+        isMakeValid &&
+        isModelValid &&
+        isVINValid &&
+        isLicensePlateValid &&
+        isBodySubtypeValid &&
+        isMSRPValid
     }
     
     // Initialize with an existing vehicle if provided
@@ -251,23 +309,109 @@ struct VehicleDetailView: View {
     var body: some View {
         Form {
             if vehicle == nil || isEditing {
-                BasicInformationSection(
-                    name: $name,
-                    year: $year,
-                    make: $make,
-                    model: $model,
-                    vin: $vin,
-                    licensePlate: $licensePlate
-                )
+                // Basic Information Section with inline errors.
+                Section("Basic Information") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Name", text: $name)
+                            .onChange(of: name) { _, _ in nameEdited = true }
+                        if nameEdited && !isNameValid {
+                            Text("Name cannot be empty and must not contain numbers.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Year", text: $year)
+                            .keyboardType(.numberPad)
+                            .onChange(of: year) { _, _ in yearEdited = true }
+                        if yearEdited && !isYearValid {
+                            Text("Year must be a number between 1900 and the current year.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Make", text: $make)
+                            .onChange(of: make) { _, _ in makeEdited = true }
+                        if makeEdited && !isMakeValid {
+                            Text("Make cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Model", text: $model)
+                            .onChange(of: model) { _, _ in modelEdited = true }
+                        if modelEdited && !isModelValid {
+                            Text("Model cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("VIN", text: $vin)
+                            .onChange(of: vin) { _, _ in vinEdited = true }
+                        if vinEdited && !isVINValid {
+                            Text("VIN must be exactly 17 characters.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("License Plate", text: $licensePlate)
+                            .onChange(of: licensePlate) { _, _ in licensePlateEdited = true }
+                        if licensePlateEdited && !isLicensePlateValid {
+                            Text("License Plate cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
                 
-                VehicleDetailsSection(
-                    vehicleType: $vehicleType,
-                    color: $color,
-                    bodyType: $bodyType,
-                    bodySubtype: $bodySubtype,
-                    msrp: $msrp
-                )
+                // Vehicle Details Section with inline errors.
+                Section("Vehicle Details") {
+                    Picker("Vehicle Type", selection: $vehicleType) {
+                        ForEach(VehicleType.allCases, id: \.self) { type in
+                            Text(type.rawValue.capitalized)
+                        }
+                    }
+                    
+                    TextField("Color", text: $color)
+                    
+                    Picker("Body Type", selection: $bodyType) {
+                        ForEach(BodyType.allCases, id: \.self) { type in
+                            Text(type.rawValue.capitalized)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Body Subtype", text: $bodySubtype)
+                            .onChange(of: bodySubtype) { _, _ in bodySubtypeEdited = true }
+                        if bodySubtypeEdited && !isBodySubtypeValid {
+                            Text("Body Subtype cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("MSRP", text: $msrp)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: msrp) { _, _ in msrpEdited = true }
+                        if msrpEdited && !isMSRPValid {
+                            Text("MSRP must be a positive number.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
                 
+                // Documents Section remains unchanged.
                 DocumentsSection(
                     pollutionCertificate: $pollutionCertificate,
                     rc: $rc,
@@ -279,7 +423,7 @@ struct VehicleDetailView: View {
                     showingInsurancePicker: $showingInsurancePicker
                 )
             } else {
-                // View mode: show a read-only summary of the vehicle details
+                // View mode: show a read-only summary of the vehicle details.
                 Section("Basic Information") {
                     LabeledContent("Name", value: name)
                     LabeledContent("Year", value: year)
@@ -322,7 +466,7 @@ struct VehicleDetailView: View {
                         Button("Save") {
                             saveVehicle()
                         }
-                        .disabled(!isFormValid)
+                        .disabled(!isFormValid || isSaving)
                     } else {
                         Button("Edit") {
                             isEditing = true
@@ -334,7 +478,7 @@ struct VehicleDetailView: View {
                     Button("Save") {
                         saveVehicle()
                     }
-                    .disabled(!isFormValid)
+                    .disabled(!isFormValid || isSaving)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -370,6 +514,10 @@ struct VehicleDetailView: View {
     }
     
     private func saveVehicle() {
+        // Prevent duplicate taps.
+        guard !isSaving else { return }
+        isSaving = true
+
         let documents = VehicleDocuments(
             pollutionCertificate: pollutionCertificate ?? Data(),
             rc: rc ?? Data(),
@@ -399,6 +547,7 @@ struct VehicleDetailView: View {
             )
             
             Task {
+                defer { isSaving = false }
                 try await SupabaseDataController.shared.updateVehicle(vehicle: updatedVehicle)
                 vehicleManager.loadVehicles()
             }
@@ -421,6 +570,7 @@ struct VehicleDetailView: View {
                 documents: documents
             )
             Task {
+                defer { isSaving = false }
                 try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
                 vehicleManager.loadVehicles()
             }
@@ -465,36 +615,182 @@ struct VehicleSaveView: View {
     @State private var selectedRCItem: PhotosPickerItem?
     @State private var selectedInsuranceItem: PhotosPickerItem?
 
-    private var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !year.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !vin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+    // MARK: - Touched State Variables
+    @State private var nameEdited = false
+    @State private var yearEdited = false
+    @State private var makeEdited = false
+    @State private var modelEdited = false
+    @State private var vinEdited = false
+    @State private var licensePlateEdited = false
+    @State private var bodySubtypeEdited = false
+    @State private var msrpEdited = false
+    
+    // MARK: - Save Operation State
+    @State private var isSaving = false
+
+    // MARK: - Field Validations
+
+    // Name must not be empty, must not start with a number, and must not contain any digits.
+    private var isNameValid: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Only letters (upper and lowercase) and spaces allowed.
+        let regex = "^[A-Za-z ]+$"
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+
+    private var isYearValid: Bool {
+        if let y = Int(year) {
+            let currentYear = Calendar.current.component(.year, from: Date())
+            return y >= 1900 && y <= currentYear
+        }
+        return false
+    }
+
+    private var isMakeValid: Bool {
+        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isModelValid: Bool {
+        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isVINValid: Bool {
+        let trimmed = vin.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count == 17
+    }
+
+    private var isLicensePlateValid: Bool {
+        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isBodySubtypeValid: Bool {
         !bodySubtype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isMSRPValid: Bool {
+        if let msrpValue = Double(msrp) {
+            return msrpValue > 0
+        }
+        return false
+    }
+
+    // Overall form is valid if all validations pass.
+    private var isFormValid: Bool {
+        isNameValid &&
+        isYearValid &&
+        isMakeValid &&
+        isModelValid &&
+        isVINValid &&
+        isLicensePlateValid &&
+        isBodySubtypeValid &&
+        isMSRPValid
     }
 
     var body: some View {
         NavigationView {
             Form {
-                BasicInformationSection(
-                    name: $name,
-                    year: $year,
-                    make: $make,
-                    model: $model,
-                    vin: $vin,
-                    licensePlate: $licensePlate
-                )
+                Section(header: Text("Basic Information")) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Name", text: $name)
+                            .onChange(of: name) { _, _ in nameEdited = true }
+                        if nameEdited && !isNameValid {
+                            Text("Name must not be empty or contain numbers.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
 
-                VehicleDetailsSection(
-                    vehicleType: $vehicleType,
-                    color: $color,
-                    bodyType: $bodyType,
-                    bodySubtype: $bodySubtype,
-                    msrp: $msrp
-                )
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Year", text: $year)
+                            .keyboardType(.numberPad)
+                            .onChange(of: year) { _, _ in yearEdited = true }
+                        if yearEdited && !isYearValid {
+                            Text("Year must be a number between 1900 and the current year.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
 
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Make", text: $make)
+                            .onChange(of: make) { _, _ in makeEdited = true }
+                        if makeEdited && !isMakeValid {
+                            Text("Make cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Model", text: $model)
+                            .onChange(of: model) { _, _ in modelEdited = true }
+                        if modelEdited && !isModelValid {
+                            Text("Model cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("VIN", text: $vin)
+                            .onChange(of: vin) { _, _ in vinEdited = true }
+                        if vinEdited && !isVINValid {
+                            Text("VIN must be exactly 17 characters.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("License Plate", text: $licensePlate)
+                            .onChange(of: licensePlate) { _, _ in licensePlateEdited = true }
+                        if licensePlateEdited && !isLicensePlateValid {
+                            Text("License Plate cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+
+                Section(header: Text("Vehicle Details")) {
+                    Picker("Vehicle Type", selection: $vehicleType) {
+                        ForEach(VehicleType.allCases, id: \.self) { type in
+                            Text(type.rawValue.capitalized)
+                        }
+                    }
+                    
+                    TextField("Color", text: $color)
+                    
+                    Picker("Body Type", selection: $bodyType) {
+                        ForEach(BodyType.allCases, id: \.self) { type in
+                            Text(type.rawValue.capitalized)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Body Subtype", text: $bodySubtype)
+                            .onChange(of: bodySubtype) { _, _ in bodySubtypeEdited = true }
+                        if bodySubtypeEdited && !isBodySubtypeValid {
+                            Text("Body Subtype cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("MSRP", text: $msrp)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: msrp) { _, _ in msrpEdited = true }
+                        if msrpEdited && !isMSRPValid {
+                            Text("MSRP must be a positive number.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+
+                // Documents Section remains unchanged.
                 DocumentsSection(
                     pollutionCertificate: $pollutionCertificate,
                     rc: $rc,
@@ -513,7 +809,7 @@ struct VehicleSaveView: View {
                     Button("Save") {
                         saveVehicle()
                     }
-                    .disabled(!isFormValid)
+                    .disabled(!isFormValid || isSaving)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -521,7 +817,7 @@ struct VehicleSaveView: View {
                     }
                 }
             }
-            // Document pickers for uploading attachments
+            // Document pickers for uploading attachments.
             .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
             .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
             .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
@@ -550,6 +846,10 @@ struct VehicleSaveView: View {
     }
 
     private func saveVehicle() {
+        // Prevent duplicate taps.
+        guard !isSaving else { return }
+        isSaving = true
+
         let documents = VehicleDocuments(
             pollutionCertificate: pollutionCertificate ?? Data(),
             rc: rc ?? Data(),
@@ -575,10 +875,10 @@ struct VehicleSaveView: View {
         )
 
         Task {
+            defer { isSaving = false }
             try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
             vehicleManager.loadVehicles()
             dismiss()
         }
     }
 }
-
