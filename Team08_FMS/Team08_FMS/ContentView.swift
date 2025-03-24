@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var auth = SupabaseDataController.shared  // Observing changes
+    @EnvironmentObject private var auth: SupabaseDataController
 
     var body: some View {
         VStack {
@@ -40,4 +40,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(SupabaseDataController.shared)
+        .environmentObject(VehicleManager.shared)
+        .environmentObject(CrewDataController.shared)
 }

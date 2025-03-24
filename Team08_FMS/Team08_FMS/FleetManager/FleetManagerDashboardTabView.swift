@@ -11,6 +11,7 @@ import MapKit
 struct FleetManagerDashboardTabView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
+    @EnvironmentObject private var supabaseDataController: SupabaseDataController
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
     
@@ -148,6 +149,8 @@ struct FleetManagerDashboardTabView: View {
             .sheet(isPresented: $showingAddTripSheet) {
                 NavigationView {
                     AddTripView(dismiss: { showingAddTripSheet = false })
+                        .environmentObject(supabaseDataController)
+                        .environmentObject(vehicleManager)
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -274,6 +277,8 @@ struct AlertCard: View {
 // Enhanced trip creation view with real MapKit search
 struct AddTripView: View {
     let dismiss: () -> Void
+    @EnvironmentObject private var vehicleManager: VehicleManager
+    @EnvironmentObject private var supabaseDataController: SupabaseDataController
     
     // Map and location state
     @State private var pickupLocation = ""
@@ -293,6 +298,7 @@ struct AddTripView: View {
     @State private var searchCompleterDelegate: SearchCompleterDelegate? = nil
     
     // Trip details state
+    @State private var selectedVehicle: Vehicle?
     @State private var cargoType = "General Goods"
     @State private var startDate = Date()
     @State private var deliveryDate = Date().addingTimeInterval(86400)
@@ -301,6 +307,9 @@ struct AddTripView: View {
     @State private var tripCost: Double = 0.0
     @State private var isCalculating = false
     @State private var selectedTab = 0
+    @State private var notes: String = ""
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
     
     let cargoTypes = ["General Goods", "Perishable", "Hazardous", "Heavy Machinery", "Liquids", "Livestock"]
     
@@ -309,7 +318,11 @@ struct AddTripView: View {
     }
     
     var isFormValid: Bool {
-        !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation
+        !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation && selectedVehicle != nil
+    }
+    
+    var availableVehicles: [Vehicle] {
+        vehicleManager.vehicles.filter { $0.status == .available }
     }
     
     var body: some View {
@@ -405,6 +418,37 @@ struct AddTripView: View {
                             }
                         }
                         
+                        // Vehicle Selection Card
+                        VStack(spacing: 16) {
+                            Text("VEHICLE SELECTION")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Menu {
+                                ForEach(availableVehicles) { vehicle in
+                                    Button("\(vehicle.name) (\(vehicle.licensePlate))") {
+                                        selectedVehicle = vehicle
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(selectedVehicle == nil ? "Select Vehicle" : "\(selectedVehicle!.name) (\(selectedVehicle!.licensePlate))")
+                                        .foregroundColor(selectedVehicle == nil ? .gray : .primary)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.05), radius: 10)
+                        
                         // Trip Details Card
                         VStack(spacing: 16) {
                             // Cargo Section
@@ -449,6 +493,24 @@ struct AddTripView: View {
                                 .background(Color(.systemGray6))
                                 .cornerRadius(10)
                             }
+                        }
+                        .padding(16)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.05), radius: 10)
+                        
+                        // Notes Card
+                        VStack(spacing: 16) {
+                            Text("NOTES")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            TextEditor(text: $notes)
+                                .frame(height: 100)
+                                .padding(8)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
                         }
                         .padding(16)
                         .background(Color(.systemBackground))
@@ -536,6 +598,13 @@ struct AddTripView: View {
                     dismiss()
                 }
             }
+        }
+        .alert(isPresented: $showingAlert) {
+            Alert(
+                title: Text("Trip Creation"),
+                message: Text(alertMessage),
+                dismissButton: .default(Text("OK"))
+            )
         }
         .onAppear {
             setupSearchCompleter()
@@ -677,8 +746,38 @@ struct AddTripView: View {
     }
     
     private func saveTrip() {
-        // In a real app, this would save the trip to your data model
-        dismiss()
+        Task {
+            guard let vehicle = selectedVehicle else { return }
+            
+            let tripName = "TRP-\(UUID().uuidString.prefix(8))"
+            
+            do {
+                let success = try await supabaseDataController.createTrip(
+                    name: tripName,
+                    destination: dropoffLocation,
+                    address: dropoffLocation, // Using dropoff location as address
+                    vehicleId: vehicle.id,
+                    driverId: nil, // Driver will be assigned later
+                    startTime: startDate,
+                    endTime: deliveryDate,
+                    startLat: pickupCoordinate?.latitude,
+                    startLong: pickupCoordinate?.longitude,
+                    endLat: dropoffCoordinate?.latitude,
+                    endLong: dropoffCoordinate?.longitude,
+                    notes: "Cargo Type: \(cargoType)\nEstimated Distance: \(String(format: "%.1f", distance)) km\nEstimated Fuel Cost: $\(String(format: "%.2f", fuelCost))\n\(notes)"
+                )
+                
+                if success {
+                    dismiss()
+                } else {
+                    alertMessage = "Failed to create trip. Please try again."
+                    showingAlert = true
+                }
+            } catch {
+                alertMessage = "Error: \(error.localizedDescription)"
+                showingAlert = true
+            }
+        }
     }
 }
 

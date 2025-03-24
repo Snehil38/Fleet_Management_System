@@ -204,7 +204,7 @@ class SupabaseDataController: ObservableObject {
             let inviteEmail = """
             Dear \(name),
 
-            Welcome to Fleet Management System! We’re excited to have you on board.
+            Welcome to Fleet Management System! We're excited to have you on board.
 
             Your login credentials as a \(role) are as follows:
 
@@ -1119,6 +1119,53 @@ class SupabaseDataController: ObservableObject {
             print("Update success: \(response)")
         } catch {
             print("Error updating vehicle: \(error)")
+        }
+    }
+    
+    // MARK: - Trip Management
+    
+    struct TripPayload: Codable {
+        let name: String
+        let destination: String
+        let address: String
+        let vehicle_id: UUID
+        let driver_id: UUID?
+        let start_time: Date?
+        let end_time: Date?
+        let start_latitude: Double?
+        let start_longitude: Double?
+        let end_latitude: Double?
+        let end_longitude: Double?
+        let notes: String?
+    }
+    
+    func createTrip(name: String, destination: String, address: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?) async throws -> Bool {
+        let payload = TripPayload(
+            name: name,
+            destination: destination,
+            address: address,
+            vehicle_id: vehicleId,
+            driver_id: driverId,
+            start_time: startTime,
+            end_time: endTime,
+            start_latitude: startLat,
+            start_longitude: startLong,
+            end_latitude: endLat,
+            end_longitude: endLong,
+            notes: notes
+        )
+        
+        do {
+            let response = try await supabase
+                .from("trips")
+                .insert(payload)
+                .execute()
+            
+            print("Trip created successfully: \(response)")
+            return true
+        } catch {
+            print("Error creating trip: \(error)")
+            return false
         }
     }
 }
