@@ -14,7 +14,7 @@ class AppDataController {
         
     }
     
-    private func randomPasswordGenerator(length: Int) -> String {
+    func randomPasswordGenerator(length: Int) -> String {
         let lowercase = "abcdefghijklmnopqrstuvwxyz"
         let uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         let digits = "0123456789"
