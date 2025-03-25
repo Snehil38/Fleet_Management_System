@@ -349,7 +349,7 @@ class TripDataController: ObservableObject {
                 try await updateTripInspectionStatus(tripId: trip.id, isPreTrip: false, completed: true)
             }
             
-            // Update trip status in Supabase to completed
+            // Update trip status in Supabase to delivered
             try await supabaseController.updateTrip(id: trip.id, status: "completed")
             print("Updated trip status to 'completed'")
             
@@ -369,7 +369,7 @@ class TripDataController: ObservableObject {
             
             // Create a DeliveryDetails from the trip and add to recent deliveries
             let newDelivery = DeliveryDetails(
-                id: trip.id, // Keep the same ID for consistency
+                id: trip.id,
                 location: trip.destination,
                 date: formatDate(trip.endTime ?? Date()),
                 status: "Delivered",
@@ -394,6 +394,33 @@ class TripDataController: ObservableObject {
         } catch {
             print("Error marking trip as delivered: \(error)")
             throw TripError.updateError("Failed to mark trip as delivered: \(error.localizedDescription)")
+        }
+    }
+    
+    // Add a function to start a trip (update from upcoming to current)
+    @MainActor
+    func startTrip(trip: Trip) async throws {
+        print("Starting trip \(trip.id)")
+        
+        do {
+            // Update trip status in Supabase to current
+            try await supabaseController.updateTrip(id: trip.id, status: "current")
+            print("Updated trip status to 'current'")
+            
+            // Update start time in Supabase
+            let response = try await supabaseController.databaseFrom("trips")
+                .update(["start_time": Date()])
+                .eq("id", value: trip.id)
+                .execute()
+            
+            print("Updated trip start_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Refresh trips to ensure everything is in sync with server
+            try await fetchTrips()
+            print("Trips refreshed after starting trip")
+        } catch {
+            print("Error starting trip: \(error)")
+            throw TripError.updateError("Failed to start trip: \(error.localizedDescription)")
         }
     }
     

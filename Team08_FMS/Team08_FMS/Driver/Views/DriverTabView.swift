@@ -1235,6 +1235,9 @@ struct QueuedTripRow: View {
     let onStart: () -> Void
     let onDecline: () -> Void
     @State private var showingDeclineAlert = false
+    @StateObject private var tripController = TripDataController.shared
+    @State private var alertMessage = ""
+    @State private var showingAlert = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1277,7 +1280,17 @@ struct QueuedTripRow: View {
             .cornerRadius(8)
             
             HStack(spacing: 12) {
-                Button(action: onStart) {
+                Button(action: {
+                    Task {
+                        do {
+                            try await tripController.startTrip(trip: trip)
+                            onStart()
+                        } catch {
+                            alertMessage = error.localizedDescription
+                            showingAlert = true
+                        }
+                    }
+                }) {
                     HStack {
                         Image(systemName: "play.fill")
                         Text("Start Trip")
@@ -1312,6 +1325,11 @@ struct QueuedTripRow: View {
                 },
                 secondaryButton: .cancel()
             )
+        }
+        .alert("Error", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
         }
     }
 }
