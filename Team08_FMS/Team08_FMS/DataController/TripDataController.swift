@@ -212,17 +212,18 @@ class TripDataController: ObservableObject {
                 // Find current trip (in progress)
                 if let currentTrip = tripsWithVehicles.first(where: { $0.status == TripStatus.inProgress }) {
                     self.currentTrip = currentTrip
+                } else {
+                    self.currentTrip = nil
                 }
                 
-                // Filter upcoming trips (only pending or assigned, explicitly exclude delivered)
+                // Filter upcoming trips (only pending or assigned)
                 self.upcomingTrips = tripsWithVehicles.filter { trip in
-                    (trip.status == .pending || trip.status == .assigned) && 
-                    trip.status != .delivered
+                    trip.status == .pending || trip.status == .assigned
                 }
                 
                 // Convert completed/delivered trips to delivery details
-                let completedTrips = tripsWithVehicles.filter { 
-                    $0.status == .delivered 
+                let completedTrips = tripsWithVehicles.filter { trip in 
+                    trip.status == .delivered && trip.hasCompletedPostTrip
                 }
                 
                 self.recentDeliveries = completedTrips.compactMap { trip in

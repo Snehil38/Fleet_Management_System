@@ -5,7 +5,7 @@ import CoreLocation
 enum TripStatus: String, Codable {
     case pending = "upcoming"
     case inProgress = "current"
-    case delivered = "completed"
+    case delivered = "delivered"
     case assigned = "assigned"
 }
 

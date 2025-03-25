@@ -68,6 +68,11 @@ struct TripsView: View {
                 allTrips.append(contentsOf: tripController.upcomingTrips)
             }
             
+            // Add delivered trips
+            allTrips.append(contentsOf: tripController.recentDeliveries.map { delivery in
+                createTripFromDelivery(delivery)
+            })
+            
             return allTrips
         case .current:
             if let currentTrip = tripController.currentTrip,
@@ -78,62 +83,67 @@ struct TripsView: View {
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
-            // Map recent deliveries to Trip objects
+            // Convert recent deliveries to Trip objects
             return tripController.recentDeliveries.map { delivery in
-                // Extract information from delivery notes
-                let deliveryNotes = delivery.notes
-                var cargoType = "General Cargo"
-                var tripName = "Trip-\(delivery.id.uuidString.prefix(4))"
-                var distance = ""
-                var startingPoint = ""
-                
-                // Parse notes to extract structured data
-                let lines = deliveryNotes.split(separator: "\n")
-                for line in lines {
-                    if line.hasPrefix("Trip:") {
-                        tripName = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
-                    } else if line.hasPrefix("Cargo:") {
-                        cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
-                    } else if line.hasPrefix("Distance:") {
-                        distance = String(line.dropFirst(9).trimmingCharacters(in: .whitespaces))
-                    } else if line.hasPrefix("From:") {
-                        startingPoint = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
-                    }
-                }
-                
-                // Create a Trip object with the delivery information
-                return Trip(
-                    id: delivery.id, // Use the original trip ID
-                    name: tripName,
-                    destination: delivery.location,
-                    address: delivery.location,
-                    eta: "",
-                    distance: distance,
-                    status: .delivered,
-                    vehicleDetails: Vehicle(
-                        name: "Vehicle",
-                        year: 2023,
-                        make: "Unknown",
-                        model: "Unknown",
-                        vin: "Unknown",
-                        licensePlate: delivery.vehicle,
-                        vehicleType: .truck,
-                        color: "Unknown",
-                        bodyType: .cargo,
-                        bodySubtype: "Unknown",
-                        msrp: 0.0,
-                        pollutionExpiry: Date(),
-                        insuranceExpiry: Date(),
-                        status: .available,
-                        documents: VehicleDocuments()
-                    ),
-                    sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                    destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                    startingPoint: startingPoint.isEmpty ? delivery.location : startingPoint,
-                    notes: deliveryNotes
-                )
+                createTripFromDelivery(delivery)
             }
         }
+    }
+    
+    // Helper function to create Trip from DeliveryDetails
+    private func createTripFromDelivery(_ delivery: DeliveryDetails) -> Trip {
+        // Extract information from delivery notes
+        let deliveryNotes = delivery.notes
+        var cargoType = "General Cargo"
+        var tripName = "Trip-\(delivery.id.uuidString.prefix(4))"
+        var distance = ""
+        var startingPoint = ""
+        
+        // Parse notes to extract structured data
+        let lines = deliveryNotes.split(separator: "\n")
+        for line in lines {
+            if line.hasPrefix("Trip:") {
+                tripName = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("Cargo:") {
+                cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("Distance:") {
+                distance = String(line.dropFirst(9).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("From:") {
+                startingPoint = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
+            }
+        }
+        
+        // Create a Trip object with the delivery information
+        return Trip(
+            id: delivery.id,
+            name: tripName,
+            destination: delivery.location,
+            address: delivery.location,
+            eta: "",
+            distance: distance,
+            status: .delivered,
+            vehicleDetails: Vehicle(
+                name: "Vehicle",
+                year: 2023,
+                make: "Unknown",
+                model: "Unknown",
+                vin: "Unknown",
+                licensePlate: delivery.vehicle,
+                vehicleType: .truck,
+                color: "Unknown",
+                bodyType: .cargo,
+                bodySubtype: "Unknown",
+                msrp: 0.0,
+                pollutionExpiry: Date(),
+                insuranceExpiry: Date(),
+                status: .available,
+                documents: VehicleDocuments()
+            ),
+            sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            startingPoint: startingPoint.isEmpty ? delivery.location : startingPoint,
+            notes: deliveryNotes
+        )
     }
 }
 
