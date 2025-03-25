@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
+    @State private var showingError = false
     
     var body: some View {
         NavigationView {
@@ -40,6 +41,24 @@ struct FleetTripsView: View {
                 }
             }
             .navigationTitle("Trips")
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") {
+                    showingError = false
+                }
+            } message: {
+                if let error = tripController.error {
+                    switch error {
+                    case .fetchError(let message),
+                         .decodingError(let message),
+                         .vehicleError(let message),
+                         .updateError(let message):
+                        Text(message)
+                    }
+                }
+            }
+            .onChange(of: tripController.error) { error in
+                showingError = error != nil
+            }
         }
     }
 }

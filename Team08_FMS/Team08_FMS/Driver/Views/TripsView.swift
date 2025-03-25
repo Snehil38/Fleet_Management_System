@@ -5,6 +5,7 @@ struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @State private var selectedFilter: TripFilter = .all
+    @State private var showingError = false
     
     enum TripFilter {
         case all, current, upcoming, delivered
@@ -33,6 +34,24 @@ struct TripsView: View {
             }
         }
         .navigationTitle("Trips")
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") {
+                showingError = false
+            }
+        } message: {
+            if let error = tripController.error {
+                switch error {
+                case .fetchError(let message),
+                     .decodingError(let message),
+                     .vehicleError(let message),
+                     .updateError(let message):
+                    Text(message)
+                }
+            }
+        }
+        .onChange(of: tripController.error) { error in
+            showingError = error != nil
+        }
     }
     
     private var filteredTrips: [Trip] {
@@ -58,6 +77,7 @@ struct TripsView: View {
             // Filter recent deliveries to show only delivered trips
             return tripController.recentDeliveries.map { delivery in
                 Trip(
+                    id: UUID(),
                     name: delivery.vehicle,
                     destination: delivery.location,
                     address: delivery.location,

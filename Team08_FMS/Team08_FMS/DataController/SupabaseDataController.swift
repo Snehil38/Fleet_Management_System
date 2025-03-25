@@ -1167,4 +1167,17 @@ class SupabaseDataController: ObservableObject {
             return nil
         }
     }
+
+    // Add these new public methods
+    public func databaseFrom(_ table: String) -> PostgrestQueryBuilder {
+        return supabase.database.from(table)
+    }
+
+    public func updateTrip(id: UUID, status: String) async throws {
+        try await supabase.database
+            .from("trips")
+            .update(["trip_status": status])
+            .eq("id", value: id)
+            .execute()
+    }
 }

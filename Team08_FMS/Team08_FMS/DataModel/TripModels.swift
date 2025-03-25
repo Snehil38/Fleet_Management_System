@@ -2,14 +2,16 @@ import SwiftUI
 import CoreLocation
 
 // Trip Status Enum
-enum TripStatus {
-    case pending, inProgress, completed, assigned
-    
+enum TripStatus: String, Codable {
+    case pending = "upcoming"
+    case inProgress = "in_progress"
+    case completed = "completed"
+    case assigned = "assigned"
 }
 
 // Trip Model
 struct Trip: Identifiable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let destination: String
     let address: String
@@ -25,6 +27,7 @@ struct Trip: Identifiable {
     
     static func mockCurrentTrip() -> Trip {
         Trip(
+            id: UUID(),
             name: "TRP-001",
             destination: "Nhava Sheva Port Terminal",
             address: "JNPT Port Road, Navi Mumbai, Maharashtra 400707",
@@ -53,6 +56,7 @@ struct Trip: Identifiable {
     static func mockUpcomingTrips() -> [Trip] {
         [
             Trip(
+                id: UUID(),
                 name: "DEL-002",
                 destination: "ICD Tughlakabad",
                 address: "Tughlakabad, New Delhi, 110020",
@@ -83,4 +87,76 @@ struct DeliveryDetails: Identifiable {
     let driver: String
     let vehicle: String
     let notes: String
+}
+
+// Supabase Trip Model
+struct SupabaseTrip: Codable, Identifiable {
+    let id: UUID
+    let destination: String
+    let trip_status: TripStatus
+    let has_completed_pre_trip: Bool
+    let has_completed_post_trip: Bool
+    let vehicle_id: UUID
+    let driver_id: UUID?
+    let start_time: Date?
+    let end_time: Date?
+    let notes: String?
+    let created_at: Date
+    let updated_at: Date?
+    let is_deleted: Bool
+    let start_latitude: Double?
+    let start_longitude: Double?
+    let end_latitude: Double?
+    let end_longitude: Double?
+    let pickup: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, destination, trip_status, has_completed_pre_trip, has_completed_post_trip
+        case vehicle_id, driver_id, start_time, end_time, notes, created_at, updated_at
+        case is_deleted, start_latitude, start_longitude, end_latitude, end_longitude, pickup
+    }
+}
+
+extension Trip {
+    init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
+        self.id = supabaseTrip.id
+        self.name = "TRP-\(supabaseTrip.id.uuidString.prefix(8))"
+        self.destination = supabaseTrip.destination
+        self.address = supabaseTrip.pickup ?? "Unknown"
+        self.eta = supabaseTrip.end_time?.timeIntervalSince(Date()).etaString ?? ""
+        self.distance = ""  // Would need to calculate this
+        self.status = supabaseTrip.trip_status
+        self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
+        self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
+        self.vehicleDetails = vehicle
+        
+        if let startLat = supabaseTrip.start_latitude,
+           let startLong = supabaseTrip.start_longitude {
+            self.sourceCoordinate = CLLocationCoordinate2D(latitude: startLat, longitude: startLong)
+        } else {
+            self.sourceCoordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        }
+        
+        if let endLat = supabaseTrip.end_latitude,
+           let endLong = supabaseTrip.end_longitude {
+            self.destinationCoordinate = CLLocationCoordinate2D(latitude: endLat, longitude: endLong)
+        } else {
+            self.destinationCoordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        }
+        
+        self.startingPoint = supabaseTrip.pickup ?? "Unknown"
+    }
+}
+
+extension TimeInterval {
+    var etaString: String {
+        let hours = Int(self) / 3600
+        let minutes = Int(self) / 60 % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes) mins"
+        }
+    }
 } 
