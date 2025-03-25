@@ -5,7 +5,7 @@ struct CurrentDeliveryCard: View {
     @StateObject private var tripController = TripDataController.shared
     
     var body: some View {
-        if let currentTrip = tripController.currentTrip {
+        if let currentTrip = tripController.currentTrips.first {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Current Delivery")
                     .font(.headline)

@@ -58,9 +58,9 @@ struct TripsView: View {
         switch selectedFilter {
         case .all:
             var allTrips: [Trip] = []
-            if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                allTrips.append(currentTrip)
+            // Add current trips if driver is available
+            if availabilityManager.isAvailable {
+                allTrips.append(contentsOf: tripController.currentTrips)
             }
             
             // Only include upcoming trips if driver is available
@@ -69,24 +69,15 @@ struct TripsView: View {
             }
             
             // Add delivered trips
-            allTrips.append(contentsOf: tripController.recentDeliveries.map { delivery in
-                createTripFromDelivery(delivery)
-            })
+            allTrips.append(contentsOf: tripController.deliveredTrips)
             
             return allTrips
         case .current:
-            if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                return [currentTrip]
-            }
-            return []
+            return availabilityManager.isAvailable ? tripController.currentTrips : []
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
-            // Convert recent deliveries to Trip objects
-            return tripController.recentDeliveries.map { delivery in
-                createTripFromDelivery(delivery)
-            }
+            return tripController.deliveredTrips
         }
     }
     

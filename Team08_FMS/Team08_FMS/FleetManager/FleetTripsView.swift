@@ -3,13 +3,39 @@ import SwiftUI
 struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
     @State private var showingError = false
+    @State private var selectedFilter: TripFilter = .current
+    
+    enum TripFilter {
+        case current, upcoming, delivered
+    }
+    
+    var filteredTrips: [Trip] {
+        switch selectedFilter {
+        case .current:
+            return tripController.currentTrips
+        case .upcoming:
+            return tripController.upcomingTrips
+        case .delivered:
+            return tripController.deliveredTrips
+        }
+    }
     
     var body: some View {
         NavigationView {
             VStack {
+                // Segmented control for filtering
+                Picker("Trip Filter", selection: $selectedFilter) {
+                    Text("Current").tag(TripFilter.current)
+                    Text("Upcoming").tag(TripFilter.upcoming)
+                    Text("Delivered").tag(TripFilter.delivered)
+                }
+                .pickerStyle(.segmented)
+                .padding()
+                
                 // Simple header section
                 HStack {
-                    Text("All Trips")
+                    Text(selectedFilter == .current ? "Current Trips" : 
+                         selectedFilter == .upcoming ? "Upcoming Trips" : "Delivered Trips")
                         .font(.headline)
                     
                     Spacer()
@@ -21,31 +47,24 @@ struct FleetTripsView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top)
                 
                 // Trip list
-                if tripController.upcomingTrips.isEmpty {
+                if filteredTrips.isEmpty {
                     EmptyTripsView()
                         .onAppear {
-                            print("No upcoming trips to display")
+                            print("No trips to display for filter: \(selectedFilter)")
                         }
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(tripController.upcomingTrips) { trip in
+                            ForEach(filteredTrips) { trip in
                                 NavigationLink(destination: TripDetailView(trip: trip)) {
                                     TripCardView(trip: trip)
                                 }
                                 .buttonStyle(PlainButtonStyle())
-                                .onAppear {
-                                    print("Rendering trip: \(trip.name)")
-                                }
                             }
                         }
                         .padding()
-                        .onAppear {
-                            print("Displaying \(tripController.upcomingTrips.count) trips")
-                        }
                     }
                 }
             }
@@ -69,8 +88,6 @@ struct FleetTripsView: View {
                 showingError = error != nil
             }
             .onAppear {
-                print("FleetTripsView appeared")
-                print("Current trips count: \(tripController.upcomingTrips.count)")
                 Task {
                     try? await tripController.refreshTrips()
                 }

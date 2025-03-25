@@ -22,8 +22,9 @@ enum TripError: Error, Equatable {
 class TripDataController: ObservableObject {
     static let shared = TripDataController()
     
-    @Published var currentTrip: Trip?
+    @Published var currentTrips: [Trip] = []
     @Published var upcomingTrips: [Trip] = []
+    @Published var deliveredTrips: [Trip] = []
     @Published var recentDeliveries: [DeliveryDetails] = []
     @Published var error: TripError?
     @Published var isLoading = false
@@ -41,16 +42,9 @@ class TripDataController: ObservableObject {
     private func fetchTrips() async throws {
         print("Fetching trips...")
         do {
-            // Get the current driver's ID
-            guard let driverId = supabaseController.userID else {
-                print("No driver ID found")
-                throw TripError.fetchError("No driver ID found")
-            }
-            
             // Create a decoder with custom date decoding strategy
             let decoder = JSONDecoder()
             let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             
@@ -58,37 +52,41 @@ class TripDataController: ObservableObject {
                 let container = try decoder.singleValueContainer()
                 let dateString = try container.decode(String.self)
                 
-                // Try parsing with different date formats
-                let formats = [
-                    // Full timestamps with different variations
-                    "yyyy-MM-dd'T'HH:mm:ss",
-                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
-                    "yyyy-MM-dd'T'HH:mm:ssZ",
-                    // Date-only format (for pollution_expiry, etc.)
-                    "yyyy-MM-dd"
-                ]
+                print("Attempting to decode date: \(dateString)")
                 
-                for format in formats {
-                    dateFormatter.dateFormat = format
-                    if let date = dateFormatter.date(from: dateString) {
-                        return date
-                    }
+                // Try ISO8601 first
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                if let date = dateFormatter.date(from: dateString) {
+                    print("Successfully decoded date using ISO8601 format")
+                    return date
                 }
                 
-                // If none of the formats work, try removing microseconds
-                if let dotIndex = dateString.firstIndex(of: ".") {
-                    let truncated = String(dateString[..<dotIndex])
-                    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-                    if let date = dateFormatter.date(from: truncated) {
-                        return date
-                    }
+                // Try with microseconds
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                if let date = dateFormatter.date(from: dateString) {
+                    print("Successfully decoded date with microseconds")
+                    return date
+                }
+                
+                // Try with timezone
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+                if let date = dateFormatter.date(from: dateString) {
+                    print("Successfully decoded date with timezone")
+                    return date
+                }
+                
+                // Try just the date
+                dateFormatter.dateFormat = "yyyy-MM-dd"
+                if let date = dateFormatter.date(from: dateString) {
+                    print("Successfully decoded just the date")
+                    return date
                 }
                 
                 print("Failed to decode date string: \(dateString)")
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
             }
             
-            // Fetch trips with vehicle details in a single query
+            // Fetch all non-deleted trips, ordered by created_at
             let response = try await supabaseController.supabase
                 .database
                 .from("trips")
@@ -129,8 +127,8 @@ class TripDataController: ObservableObject {
                         status
                     )
                 """)
-                .eq("driver_id", value: driverId)
                 .eq("is_deleted", value: false)
+                .order("created_at", ascending: false)
                 .execute()
             
             // Print raw response for debugging
@@ -157,28 +155,10 @@ class TripDataController: ObservableObject {
                 let end_longitude: Double?
                 let pickup: String?
                 let vehicles: Vehicle
-                
-                // Add computed properties to parse distance and fuel cost
-                var parsedDistance: String {
-                    guard let notes = notes,
-                          let distanceRange = notes.range(of: "Distance: "),
-                          let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    return String(notes[distanceRange.upperBound..<endRange.lowerBound])
-                }
-                
-                var parsedFuelCost: String {
-                    guard let notes = notes,
-                          let fuelRange = notes.range(of: "Estimated Fuel Cost: "),
-                          let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    return String(notes[fuelRange.upperBound..<endRange.lowerBound])
-                }
             }
             
             let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
+            print("Successfully processed \(joinedData.count) trips")
             
             // Convert joined data to Trip objects
             let tripsWithVehicles = joinedData.map { data -> Trip in
@@ -205,91 +185,39 @@ class TripDataController: ObservableObject {
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
             
-            print("Successfully processed \(tripsWithVehicles.count) trips")
-            
             // Update published properties
             await MainActor.run {
-                // Find current trip (in progress)
-                if let currentTrip = tripsWithVehicles.first(where: { $0.status == TripStatus.inProgress }) {
-                    self.currentTrip = currentTrip
-                } else {
-                    self.currentTrip = nil
-                }
+                // Sort trips by status
+                self.currentTrips = tripsWithVehicles.filter { $0.status == .inProgress }
+                self.upcomingTrips = tripsWithVehicles.filter { $0.status == .pending || $0.status == .assigned }
+                self.deliveredTrips = tripsWithVehicles.filter { $0.status == .delivered }
                 
-                // Filter upcoming trips (only pending or assigned)
-                self.upcomingTrips = tripsWithVehicles.filter { trip in
-                    trip.status == .pending || trip.status == .assigned
-                }
+                print("Trips by status:")
+                print("Current: \(self.currentTrips.count)")
+                print("Upcoming: \(self.upcomingTrips.count)")
+                print("Delivered: \(self.deliveredTrips.count)")
                 
                 // Convert completed/delivered trips to delivery details
                 let completedTrips = tripsWithVehicles.filter { trip in 
                     trip.status == .delivered && trip.hasCompletedPostTrip
                 }
                 
-                self.recentDeliveries = completedTrips.compactMap { trip in
-                    guard let joinedData = joinedData.first(where: { $0.id == trip.id }) else { return nil }
-                    
-                    // Extract additional details from notes if available
-                    var cargoType = "General Cargo"
-                    if let notes = trip.notes,
-                       let cargoRange = notes.range(of: "Cargo Type: ") {
-                        let noteText = notes[cargoRange.upperBound...]
-                        if let endOfCargo = noteText.firstIndex(of: "\n") {
-                            cargoType = String(noteText[..<endOfCargo])
-                        } else {
-                            cargoType = String(noteText)
-                        }
-                    }
-                    
-                    // Include distance and fuel cost in the notes
-                    let distance = joinedData.parsedDistance
-                    let fuelCost = joinedData.parsedFuelCost
-                    
-                    return DeliveryDetails(
+                self.recentDeliveries = completedTrips.map { trip in
+                    DeliveryDetails(
                         id: trip.id,
                         location: trip.destination,
-                        date: formatDate(trip.endTime ?? joinedData.created_at),
+                        date: formatDate(trip.endTime ?? trip.startTime ?? Date()),
                         status: "Delivered",
                         driver: "Current Driver",
                         vehicle: trip.vehicleDetails.licensePlate,
-                        notes: """
-                               Trip: \(trip.name)
-                               Cargo: \(cargoType)
-                               Distance: \(distance)
-                               Estimated Fuel Cost: \(fuelCost)
-                               From: \(trip.startingPoint)
-                               \(trip.notes ?? "")
-                               """
+                        notes: trip.notes ?? ""
                     )
                 }
-                
-                // Sort recent deliveries by date (newest first)
-                self.recentDeliveries.sort { lhs, rhs in
-                    // Extract dates from formatted strings (basic parsing)
-                    let lhsIsToday = lhs.date.contains("Today")
-                    let rhsIsToday = rhs.date.contains("Today")
-                    let lhsIsYesterday = lhs.date.contains("Yesterday")
-                    let rhsIsYesterday = rhs.date.contains("Yesterday")
-                    
-                    if lhsIsToday && !rhsIsToday {
-                        return true
-                    } else if !lhsIsToday && rhsIsToday {
-                        return false
-                    } else if lhsIsYesterday && !rhsIsToday && !rhsIsYesterday {
-                        return true
-                    } else if !lhsIsYesterday && !lhsIsToday && (rhsIsToday || rhsIsYesterday) {
-                        return false
-                    }
-                    
-                    // If both are from the same period, compare the actual times
-                    return lhs.date > rhs.date
-                }
-                
-                self.error = nil
             }
+            
         } catch {
             print("Error fetching trips: \(error)")
-            throw TripError.fetchError("Failed to fetch trips: \(error.localizedDescription)")
+            throw TripError.fetchError(error.localizedDescription)
         }
     }
     
@@ -314,7 +242,7 @@ class TripDataController: ObservableObject {
     
     // Update getCurrentTripData to handle optional currentTrip
     func getCurrentTripData() -> Trip? {
-        return currentTrip
+        return currentTrips.first
     }
     
     // Add a function to get upcomingTrips data
@@ -363,9 +291,9 @@ class TripDataController: ObservableObject {
             print("Updated trip end_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
             // Update local state - remove from current trip
-            if let currentTrip = self.currentTrip, currentTrip.id == trip.id {
-                self.currentTrip = nil
-                print("Removed trip from current trip")
+            if let currentTrip = self.currentTrips.first(where: { $0.id == trip.id }) {
+                self.currentTrips.remove(at: self.currentTrips.firstIndex(of: currentTrip)!)
+                print("Removed trip from current trips")
             }
             
             // Create a DeliveryDetails from the trip and add to recent deliveries
@@ -404,7 +332,7 @@ class TripDataController: ObservableObject {
         print("Starting trip \(trip.id)")
         
         // Check if there's already a trip in progress
-        if let currentTrip = self.currentTrip {
+        if !currentTrips.isEmpty {
             throw TripError.updateError("Cannot start a new trip while another trip is in progress")
         }
         
@@ -413,9 +341,11 @@ class TripDataController: ObservableObject {
             try await supabaseController.updateTrip(id: trip.id, status: "current")
             print("Updated trip status to 'current'")
             
-            // Then update the start time in a separate call
+            // Format date to match database format
             let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             let formattedDate = dateFormatter.string(from: Date())
             
             let response = try await supabaseController.databaseFrom("trips")
@@ -432,7 +362,7 @@ class TripDataController: ObservableObject {
             if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
                 var updatedTrip = upcomingTrips[index]
                 updatedTrip.status = .inProgress
-                self.currentTrip = updatedTrip
+                self.currentTrips.append(updatedTrip)
                 upcomingTrips.remove(at: index)
             }
             
@@ -475,14 +405,14 @@ class TripDataController: ObservableObject {
             print("Update success response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
             // Then update our local model to reflect changes immediately
-            if let currentTrip = self.currentTrip, currentTrip.id == tripId {
+            if let currentTrip = self.currentTrips.first(where: { $0.id == tripId }) {
                 var updatedTrip = currentTrip
                 if isPreTrip {
                     updatedTrip.hasCompletedPreTrip = completed
                 } else {
                     updatedTrip.hasCompletedPostTrip = completed
                 }
-                self.currentTrip = updatedTrip
+                self.currentTrips[self.currentTrips.firstIndex(of: currentTrip)!] = updatedTrip
                 print("Updated local trip model with \(field)=\(completed)")
             } else {
                 print("Warning: Current trip is nil or doesn't match the updated trip ID")
