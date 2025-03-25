@@ -10,23 +10,44 @@ enum TripStatus: String, Codable {
 }
 
 // Trip Model
-struct Trip: Identifiable {
+struct Trip: Identifiable, Equatable {
     let id: UUID
     let name: String
     let destination: String
     let address: String
-    let eta: String
+    var eta: String
     let distance: String
     var status: TripStatus
     var hasCompletedPreTrip: Bool
     var hasCompletedPostTrip: Bool
     let vehicleDetails: Vehicle
-    let sourceCoordinate: CLLocationCoordinate2D
-    let destinationCoordinate: CLLocationCoordinate2D
-    let startingPoint: String
     let notes: String?
     let startTime: Date?
     let endTime: Date?
+    let sourceCoordinate: CLLocationCoordinate2D
+    let destinationCoordinate: CLLocationCoordinate2D
+    let startingPoint: String
+    
+    static func == (lhs: Trip, rhs: Trip) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.name == rhs.name &&
+               lhs.destination == rhs.destination &&
+               lhs.address == rhs.address &&
+               lhs.eta == rhs.eta &&
+               lhs.distance == rhs.distance &&
+               lhs.status == rhs.status &&
+               lhs.hasCompletedPreTrip == rhs.hasCompletedPreTrip &&
+               lhs.hasCompletedPostTrip == rhs.hasCompletedPostTrip &&
+               lhs.vehicleDetails == rhs.vehicleDetails &&
+               lhs.notes == rhs.notes &&
+               lhs.startTime == rhs.startTime &&
+               lhs.endTime == rhs.endTime &&
+               lhs.sourceCoordinate.latitude == rhs.sourceCoordinate.latitude &&
+               lhs.sourceCoordinate.longitude == rhs.sourceCoordinate.longitude &&
+               lhs.destinationCoordinate.latitude == rhs.destinationCoordinate.latitude &&
+               lhs.destinationCoordinate.longitude == rhs.destinationCoordinate.longitude &&
+               lhs.startingPoint == rhs.startingPoint
+    }
     
     init(id: UUID = UUID(), name: String, destination: String, address: String, eta: String, distance: String, status: TripStatus, hasCompletedPreTrip: Bool = false, hasCompletedPostTrip: Bool = false, vehicleDetails: Vehicle, sourceCoordinate: CLLocationCoordinate2D, destinationCoordinate: CLLocationCoordinate2D, startingPoint: String, notes: String? = nil, startTime: Date? = nil, endTime: Date? = nil) {
         self.id = id
@@ -144,7 +165,7 @@ struct Trip: Identifiable {
 }
 
 // Delivery Details Model
-struct DeliveryDetails: Identifiable {
+struct DeliveryDetails: Identifiable, Equatable {
     let id = UUID()
     let location: String
     let date: String
@@ -152,6 +173,16 @@ struct DeliveryDetails: Identifiable {
     let driver: String
     let vehicle: String
     let notes: String
+    
+    static func == (lhs: DeliveryDetails, rhs: DeliveryDetails) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.location == rhs.location &&
+               lhs.date == rhs.date &&
+               lhs.status == rhs.status &&
+               lhs.driver == rhs.driver &&
+               lhs.vehicle == rhs.vehicle &&
+               lhs.notes == rhs.notes
+    }
 }
 
 // Supabase Trip Model

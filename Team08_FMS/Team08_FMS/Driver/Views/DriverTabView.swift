@@ -62,6 +62,21 @@ struct DriverTabView: View {
             .tag(1)
         }
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
+        .onChange(of: tripController.currentTrip) { newTrip in
+            currentTrip = newTrip
+        }
+        .onChange(of: tripController.upcomingTrips) { newTrips in
+            upcomingTrips = newTrips
+        }
+        .onChange(of: tripController.recentDeliveries) { newDeliveries in
+            recentDeliveries = newDeliveries
+        }
+        .onAppear {
+            // Refresh data when view appears
+            Task {
+                try? await tripController.refreshTrips()
+            }
+        }
     }
     
     private var mainContentView: some View {

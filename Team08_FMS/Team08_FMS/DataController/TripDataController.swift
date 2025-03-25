@@ -54,10 +54,17 @@ class TripDataController: ObservableObject {
     private func fetchTrips() async throws {
         print("Fetching trips...")
         do {
-            // Fetch all non-deleted trips
+            // Get the current driver's ID
+            guard let driverId = supabaseController.userID else {
+                print("No driver ID found")
+                throw TripError.fetchError("No driver ID found")
+            }
+
+            // Fetch all non-deleted trips for the current driver
             let response = try await supabaseController.databaseFrom("trips")
                 .select("*")
                 .eq("is_deleted", value: false)
+                .eq("driver_id", value: driverId)
                 .order("created_at", ascending: false)
                 .execute()
             
@@ -186,11 +193,11 @@ class TripDataController: ObservableObject {
                 self.recentDeliveries = completedTrips.map { trip in
                     DeliveryDetails(
                         location: trip.destination,
-                        date: trip.eta,
+                        date: formatDate(trip.endTime ?? Date()),
                         status: "Delivered",
                         driver: "Current Driver",
                         vehicle: trip.vehicleDetails.licensePlate,
-                        notes: "Trip completed successfully"
+                        notes: trip.notes ?? "Trip completed successfully"
                     )
                 }
                 
@@ -204,6 +211,25 @@ class TripDataController: ObservableObject {
             } else {
                 throw TripError.fetchError("Failed to fetch trips: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        if calendar.isDateInToday(date) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return "Today, \(formatter.string(from: date))"
+        } else if calendar.isDateInYesterday(date) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return "Yesterday, \(formatter.string(from: date))"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d, h:mm a"
+            return formatter.string(from: date)
         }
     }
     
@@ -388,21 +414,26 @@ class TripDataController: ObservableObject {
     }
     
     // Add a function to mark a trip as delivered
+    @MainActor
     func markTripAsDelivered(trip: Trip) {
         Task {
             do {
-                print("Marking trip \(trip.id) as delivered...")
                 // Update trip status in Supabase
-                try await supabaseController.updateTrip(id: trip.id, status: TripStatus.delivered.rawValue)
+                try await supabaseController.updateTrip(id: trip.id, status: "delivered")
                 
-                print("Successfully marked trip as delivered")
-                // Fetch updated data
+                // Update end time
+                let response = try await supabaseController.databaseFrom("trips")
+                    .update(["end_time": Date()])
+                    .eq("id", value: trip.id)
+                    .execute()
+                
+                print("Marked trip as delivered: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+                
+                // Refresh trips to update UI
                 try await fetchTrips()
             } catch {
                 print("Error marking trip as delivered: \(error)")
-                await MainActor.run {
-                    self.error = .updateError("Failed to mark trip as delivered: \(error.localizedDescription)")
-                }
+                self.error = TripError.updateError("Failed to mark trip as delivered: \(error.localizedDescription)")
             }
         }
     }
@@ -412,5 +443,23 @@ class TripDataController: ObservableObject {
     func refreshTrips() async throws {
         print("Manual refresh triggered")
         try await fetchTrips()
+    }
+    
+    @MainActor
+    func updateTripInspectionStatus(tripId: UUID, isPreTrip: Bool, completed: Bool) async throws {
+        do {
+            let field = isPreTrip ? "has_completed_pre_trip" : "has_completed_post_trip"
+            let response = try await supabaseController.databaseFrom("trips")
+                .update([field: completed])
+                .eq("id", value: tripId)
+                .execute()
+            
+            print("Updated trip inspection status: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Refresh trips to update UI
+            try await fetchTrips()
+        } catch {
+            throw TripError.updateError("Failed to update trip inspection status: \(error.localizedDescription)")
+        }
     }
 } 

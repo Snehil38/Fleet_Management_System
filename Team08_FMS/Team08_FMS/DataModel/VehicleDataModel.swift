@@ -52,7 +52,7 @@ enum BodyType: String, Codable, CaseIterable {
     }
 }
 
-struct VehicleDocuments: Codable {
+struct VehicleDocuments: Codable, Equatable {
     var pollutionCertificate: Data?
     var rc: Data?
     var insurance: Data?
@@ -88,7 +88,7 @@ struct VehiclePayload: Codable {
     let insurance: String?
 }
 
-struct Vehicle: Identifiable, Codable {
+struct Vehicle: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var name: String
     var year: Int
@@ -125,6 +125,26 @@ struct Vehicle: Identifiable, Codable {
         case status
         case driverId = "driver_id"
         case documents
+    }
+    
+    static func == (lhs: Vehicle, rhs: Vehicle) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.name == rhs.name &&
+               lhs.year == rhs.year &&
+               lhs.make == rhs.make &&
+               lhs.model == rhs.model &&
+               lhs.vin == rhs.vin &&
+               lhs.licensePlate == rhs.licensePlate &&
+               lhs.vehicleType == rhs.vehicleType &&
+               lhs.color == rhs.color &&
+               lhs.bodyType == rhs.bodyType &&
+               lhs.bodySubtype == rhs.bodySubtype &&
+               lhs.msrp == rhs.msrp &&
+               lhs.pollutionExpiry == rhs.pollutionExpiry &&
+               lhs.insuranceExpiry == rhs.insuranceExpiry &&
+               lhs.status == rhs.status &&
+               lhs.driverId == rhs.driverId &&
+               lhs.documents == rhs.documents
     }
 }
 
