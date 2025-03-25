@@ -741,8 +741,7 @@ struct AddTripView: View {
         Task {
             guard let vehicle = selectedVehicle else { return }
             
-//            let tripName = "TRP-\(UUID().uuidString.prefix(8))"
-            let estimatedHours = distance / 40.0 // Convert to hours
+            let estimatedHours = distance / 40.0
             
             do {
                 let success = try await supabaseDataController.createTrip(
