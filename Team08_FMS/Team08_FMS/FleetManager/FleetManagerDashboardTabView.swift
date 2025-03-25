@@ -343,12 +343,12 @@ struct AddTripView: View {
                         // Primary Information Group
                         Group {
                             // Route Information Card
-                            CardView(title: "ROUTE INFORMATION") {
+                            CardView(title: "ROUTE INFORMATION", systemImage: "map") {
                                 VStack(spacing: 16) {
                                     // Pickup Location
                                     LocationInputField(
                                         icon: "mappin.circle.fill",
-                                        iconColor: .blue,
+                                        iconColor: Color(red: 0.2, green: 0.5, blue: 1.0),
                                         placeholder: "Enter pickup location",
                                         text: $pickupLocation,
                                         onClear: {
@@ -369,7 +369,7 @@ struct AddTripView: View {
                                     // Dropoff Location
                                     LocationInputField(
                                         icon: "mappin.and.ellipse",
-                                        iconColor: .red,
+                                        iconColor: Color(red: 0.9, green: 0.3, blue: 0.3),
                                         placeholder: "Enter dropoff location",
                                         text: $dropoffLocation,
                                         onClear: {
@@ -404,7 +404,7 @@ struct AddTripView: View {
                         // Secondary Information Group
                         Group {
                             // Vehicle Selection Card
-                            CardView(title: "VEHICLE SELECTION") {
+                            CardView(title: "VEHICLE SELECTION", systemImage: "car.fill") {
                                 Menu {
                                     ForEach(availableVehicles) { vehicle in
                                         Button("\(vehicle.name) (\(vehicle.licensePlate))") {
@@ -426,7 +426,7 @@ struct AddTripView: View {
                             }
                             
                             // Cargo Details Card
-                            CardView(title: "CARGO DETAILS") {
+                            CardView(title: "CARGO DETAILS", systemImage: "shippingbox.fill") {
                                 Menu {
                                     ForEach(cargoTypes, id: \.self) { type in
                                         Button(type) {
@@ -448,20 +448,23 @@ struct AddTripView: View {
                             }
                             
                             // Schedule Card
-                            CardView(title: "SCHEDULE") {
+                            CardView(title: "SCHEDULE", systemImage: "calendar") {
                                 VStack(spacing: 16) {
                                     // Start Date
-                                    DatePicker("Start Date", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
-                                        .onChange(of: startDate) { newDate in
-                                            // If we have a calculated route, update delivery date based on new start date
-                                            if distance > 0 {
-                                                let estimatedHours = distance / 40.0
-                                                let timeInterval = estimatedHours * 3600
-                                                deliveryDate = newDate.addingTimeInterval(timeInterval)
-                                            }
+                                    DatePicker("Start Date", 
+                                        selection: $startDate,
+                                        in: Date()..., // This sets the minimum date to today
+                                        displayedComponents: [.date, .hourAndMinute]
+                                    )
+                                    .onChange(of: startDate) { newDate in
+                                        if distance > 0 {
+                                            let estimatedHours = distance / 40.0
+                                            let timeInterval = estimatedHours * 3600
+                                            deliveryDate = newDate.addingTimeInterval(timeInterval)
                                         }
+                                    }
+                                    .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
                                     
-                                    // Only show delivery date if route is calculated
                                     if distance > 0 {
                                         Divider()
                                         
@@ -472,14 +475,14 @@ struct AddTripView: View {
                                             
                                             HStack {
                                                 Image(systemName: "calendar")
-                                                    .foregroundColor(.blue)
+                                                    .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
                                                 Text(deliveryDate, style: .date)
                                                     .font(.headline)
                                             }
                                             
                                             HStack {
                                                 Image(systemName: "clock")
-                                                    .foregroundColor(.blue)
+                                                    .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
                                                 Text(deliveryDate, style: .time)
                                                     .font(.headline)
                                             }
@@ -492,25 +495,17 @@ struct AddTripView: View {
                                 .cornerRadius(10)
                             }
                             
-                            // Notes Card
-                            CardView(title: "NOTES") {
-                                TextEditor(text: $notes)
-                                    .frame(height: 100)
-                                    .padding(8)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
-                            }
-                            
                             // Trip Estimates Card (if available)
                             if distance > 0 {
-                                CardView(title: "TRIP ESTIMATES") {
+                                CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
                                     VStack(spacing: 16) {
                                         // Distance and Time Row
                                         HStack(spacing: 20) {
                                             EstimateItem(
                                                 icon: "arrow.left.and.right",
                                                 title: "Total Distance",
-                                                value: String(format: "%.1f km", distance)
+                                                value: String(format: "%.1f km", distance),
+                                                valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
                                             )
                                             
                                             Divider()
@@ -518,13 +513,9 @@ struct AddTripView: View {
                                             EstimateItem(
                                                 icon: "clock.fill",
                                                 title: "Est. Travel Time",
-                                                value: String(format: "%.1f hours", distance / 40.0)
+                                                value: String(format: "%.1f hours", distance / 40.0),
+                                                valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
                                             )
-                                            .onAppear {
-                                                let hours = distance / 40.0
-                                                let timeInterval = hours * 3600
-                                                deliveryDate = startDate.addingTimeInterval(timeInterval)
-                                            }
                                         }
                                         
                                         Divider()
@@ -534,7 +525,7 @@ struct AddTripView: View {
                                             icon: "fuelpump.fill",
                                             title: "Est. Fuel Cost",
                                             value: String(format: "$%.2f", fuelCost),
-                                            valueColor: .blue
+                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
                                         )
                                     }
                                     .padding()
@@ -940,18 +931,25 @@ struct MapView: UIViewRepresentable {
 struct CardView<Content: View>: View {
     let title: String
     let content: Content
+    let systemImage: String
     
-    init(title: String, @ViewBuilder content: () -> Content) {
+    init(title: String, systemImage: String, @ViewBuilder content: () -> Content) {
         self.title = title
+        self.systemImage = systemImage
         self.content = content()
     }
     
     var body: some View {
         VStack(spacing: 16) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .foregroundColor(.blue)
+                    .font(.system(size: 18))
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                Spacer()
+            }
             
             content
         }
