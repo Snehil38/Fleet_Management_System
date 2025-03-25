@@ -302,9 +302,9 @@ struct VehicleDetailView: View {
             _pollutionExpiry = State(initialValue: vehicle.pollutionExpiry)
             _insuranceExpiry = State(initialValue: vehicle.insuranceExpiry)
             
-            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
-            _rc = State(initialValue: vehicle.documents?.rc)
-            _insurance = State(initialValue: vehicle.documents?.insurance)
+//            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
+//            _rc = State(initialValue: vehicle.documents?.rc)
+//            _insurance = State(initialValue: vehicle.documents?.insurance)
         }
     }
     
@@ -321,7 +321,7 @@ struct VehicleDetailView: View {
                 // View mode sections
                 readOnlyBasicInfoSection
                 readOnlyVehicleDetailsSection
-                readOnlyDocumentsSection
+//                readOnlyDocumentsSection
             }
         }
         .navigationTitle("Vehicle Details")
@@ -353,11 +353,11 @@ struct VehicleDetailView: View {
                 }
             }
         }
-        .onAppear {
-            if let vehicle = vehicle {
-                loadVehicleDetails()
-            }
-        }
+//        .onAppear {
+//            if let vehicle = vehicle {
+//                loadVehicleDetails()
+//            }
+//        }
         .overlay {
             if isLoadingDetails && vehicle != nil && !isEditing {
                 Color.black.opacity(0.1)
@@ -439,82 +439,82 @@ struct VehicleDetailView: View {
     }
     
     // MARK: - Read-Only Document Section
-    private var readOnlyDocumentsSection: some View {
-        Section("Documents") {
-            if isLoadingDetails {
-                ProgressView("Loading documents...")
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding()
-            } else if let error = detailLoadError {
-                VStack(alignment: .center, spacing: 10) {
-                    Text("Failed to load documents")
-                        .foregroundColor(.red)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Button("Retry") {
-                        loadVehicleDetails()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding()
-            } else {
-                // Display document information
-                if let pollution = pollutionCertificate {
-                    HStack {
-                        Text("Pollution Certificate")
-                        Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                    }
-                    Text("Expires: \(pollutionExpiry.formatted(date: .long, time: .omitted))")
-                        .font(.caption)
-                } else {
-                    HStack {
-                        Text("Pollution Certificate")
-                        Spacer()
-                        Text("Not available")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                if let rc = rc {
-                    HStack {
-                        Text("RC")
-                        Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                    }
-                } else {
-                    HStack {
-                        Text("RC")
-                        Spacer()
-                        Text("Not available")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                if let insurance = insurance {
-                    HStack {
-                        Text("Insurance")
-                        Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                    }
-                    Text("Expires: \(insuranceExpiry.formatted(date: .long, time: .omitted))")
-                        .font(.caption)
-                } else {
-                    HStack {
-                        Text("Insurance")
-                        Spacer()
-                        Text("Not available")
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-        }
-    }
+//    private var readOnlyDocumentsSection: some View {
+//        Section("Documents") {
+//            if isLoadingDetails {
+//                ProgressView("Loading documents...")
+//                    .frame(maxWidth: .infinity, alignment: .center)
+//                    .padding()
+//            } else if let error = detailLoadError {
+//                VStack(alignment: .center, spacing: 10) {
+//                    Text("Failed to load documents")
+//                        .foregroundColor(.red)
+//                    Text(error)
+//                        .font(.caption)
+//                        .foregroundColor(.secondary)
+//                    Button("Retry") {
+//                        loadVehicleDetails()
+//                    }
+//                    .buttonStyle(.bordered)
+//                }
+//                .frame(maxWidth: .infinity, alignment: .center)
+//                .padding()
+//            } else {
+//                // Display document information
+//                if let pollution = pollutionCertificate {
+//                    HStack {
+//                        Text("Pollution Certificate")
+//                        Spacer()
+//                        Image(systemName: "checkmark.circle.fill")
+//                            .foregroundColor(.green)
+//                    }
+//                    Text("Expires: \(pollutionExpiry.formatted(date: .long, time: .omitted))")
+//                        .font(.caption)
+//                } else {
+//                    HStack {
+//                        Text("Pollution Certificate")
+//                        Spacer()
+//                        Text("Not available")
+//                            .foregroundColor(.secondary)
+//                    }
+//                }
+//                
+//                if let rc = rc {
+//                    HStack {
+//                        Text("RC")
+//                        Spacer()
+//                        Image(systemName: "checkmark.circle.fill")
+//                            .foregroundColor(.green)
+//                    }
+//                } else {
+//                    HStack {
+//                        Text("RC")
+//                        Spacer()
+//                        Text("Not available")
+//                            .foregroundColor(.secondary)
+//                    }
+//                }
+//                
+//                if let insurance = insurance {
+//                    HStack {
+//                        Text("Insurance")
+//                        Spacer()
+//                        Image(systemName: "checkmark.circle.fill")
+//                            .foregroundColor(.green)
+//                    }
+//                    Text("Expires: \(insuranceExpiry.formatted(date: .long, time: .omitted))")
+//                        .font(.caption)
+//                } else {
+//                    HStack {
+//                        Text("Insurance")
+//                        Spacer()
+//                        Text("Not available")
+//                            .foregroundColor(.secondary)
+//                    }
+//                }
+//            }
+//        }
+//    }
     
     // Extract complex section into a separate computed property
     private var basicInformationSection: some View {
@@ -625,12 +625,6 @@ struct VehicleDetailView: View {
         // Prevent duplicate taps.
         guard !isSaving else { return }
         isSaving = true
-
-        let documents = VehicleDocuments(
-            pollutionCertificate: pollutionCertificate ?? Data(),
-            rc: rc ?? Data(),
-            insurance: insurance ?? Data()
-        )
         
         if let originalVehicle = vehicle {
             // Build an updated Vehicle using current state values.
@@ -650,8 +644,7 @@ struct VehicleDetailView: View {
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
                 status: originalVehicle.status,
-                driverId: originalVehicle.driverId,
-                documents: documents
+                driverId: originalVehicle.driverId
             )
             
             Task {
@@ -678,8 +671,7 @@ struct VehicleDetailView: View {
                 msrp: Double(msrp) ?? 0,
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
-                status: .available,
-                documents: documents
+                status: .available
             )
             Task {
                 defer { isSaving = false }
@@ -700,37 +692,36 @@ struct VehicleDetailView: View {
         }
     }
 
-    private func loadVehicleDetails() {
-        guard let vehicle = vehicle, vehicle.documents == nil else { return }
+//    private func loadVehicleDetails() {
+//        
+//        isLoadingDetails = true
+//        detailLoadError = nil
         
-        isLoadingDetails = true
-        detailLoadError = nil
-        
-        Task {
-            do {
-                if let fullDetails = try await SupabaseDataController.shared.fetchVehicleDetails(vehicleId: vehicle.id) {
-                    await MainActor.run {
-                        // Only update the document data
-                        pollutionCertificate = fullDetails.documents?.pollutionCertificate
-                        rc = fullDetails.documents?.rc
-                        insurance = fullDetails.documents?.insurance
-                        
-                        isLoadingDetails = false
-                    }
-                } else {
-                    await MainActor.run {
-                        detailLoadError = "Could not find detailed vehicle information"
-                        isLoadingDetails = false
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    detailLoadError = error.localizedDescription
-                    isLoadingDetails = false
-                }
-            }
-        }
-    }
+//        Task {
+//            do {
+//                if let fullDetails = try await SupabaseDataController.shared.fetchVehicleDetails(vehicleId: vehicle.id) {
+//                    await MainActor.run {
+//                        // Only update the document data
+//                        pollutionCertificate = fullDetails.documents?.pollutionCertificate
+//                        rc = fullDetails.documents?.rc
+//                        insurance = fullDetails.documents?.insurance
+//                        
+//                        isLoadingDetails = false
+//                    }
+//                } else {
+//                    await MainActor.run {
+//                        detailLoadError = "Could not find detailed vehicle information"
+//                        isLoadingDetails = false
+//                    }
+//                }
+//            } catch {
+//                await MainActor.run {
+//                    detailLoadError = error.localizedDescription
+//                    isLoadingDetails = false
+//                }
+//            }
+//        }
+//    }
 }
 
 struct VehicleSaveView: View {
@@ -966,30 +957,30 @@ struct VehicleSaveView: View {
                 }
             }
             // Document pickers for uploading attachments.
-            .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
-            .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
-            .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
-            .onChange(of: selectedPollutionItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        pollutionCertificate = data
-                    }
-                }
-            }
-            .onChange(of: selectedRCItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        rc = data
-                    }
-                }
-            }
-            .onChange(of: selectedInsuranceItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        insurance = data
-                    }
-                }
-            }
+//            .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
+//            .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
+//            .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
+//            .onChange(of: selectedPollutionItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        pollutionCertificate = data
+//                    }
+//                }
+//            }
+//            .onChange(of: selectedRCItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        rc = data
+//                    }
+//                }
+//            }
+//            .onChange(of: selectedInsuranceItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        insurance = data
+//                    }
+//                }
+//            }
         }
     }
 
@@ -998,11 +989,11 @@ struct VehicleSaveView: View {
         guard !isSaving else { return }
         isSaving = true
 
-        let documents = VehicleDocuments(
-            pollutionCertificate: pollutionCertificate ?? Data(),
-            rc: rc ?? Data(),
-            insurance: insurance ?? Data()
-        )
+//        let documents = VehicleDocuments(
+//            pollutionCertificate: pollutionCertificate ?? Data(),
+//            rc: rc ?? Data(),
+//            insurance: insurance ?? Data()
+//        )
 
         let newVehicle = Vehicle(
             name: name,
@@ -1018,8 +1009,7 @@ struct VehicleSaveView: View {
             msrp: Double(msrp) ?? 0,
             pollutionExpiry: pollutionExpiry,
             insuranceExpiry: insuranceExpiry,
-            status: .available,
-            documents: documents
+            status: .available
         )
 
         Task {

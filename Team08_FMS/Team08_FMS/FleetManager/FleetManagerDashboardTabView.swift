@@ -456,7 +456,7 @@ struct AddTripView: View {
                                         in: Date()..., // This sets the minimum date to today
                                         displayedComponents: [.date, .hourAndMinute]
                                     )
-                                    .onChange(of: startDate) { newDate in
+                                    .onChange(of: startDate) { newDate, _ in
                                         if distance > 0 {
                                             let estimatedHours = distance / 40.0
                                             let timeInterval = estimatedHours * 3600
@@ -741,7 +741,7 @@ struct AddTripView: View {
         Task {
             guard let vehicle = selectedVehicle else { return }
             
-            let tripName = "TRP-\(UUID().uuidString.prefix(8))"
+//            let tripName = "TRP-\(UUID().uuidString.prefix(8))"
             let estimatedHours = distance / 40.0 // Convert to hours
             
             do {

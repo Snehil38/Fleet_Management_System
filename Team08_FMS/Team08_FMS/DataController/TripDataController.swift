@@ -41,11 +41,6 @@ class TripDataController: ObservableObject {
     private func fetchTrips() async throws {
         print("Fetching trips...")
         do {
-            // Get the current driver's ID
-            guard let driverId = supabaseController.userID else {
-                print("No driver ID found")
-                throw TripError.fetchError("No driver ID found")
-            }
             
             // Create a decoder with custom date decoding strategy
             let decoder = JSONDecoder()
@@ -90,7 +85,6 @@ class TripDataController: ObservableObject {
             
             // Fetch trips with vehicle details in a single query
             let response = try await supabaseController.supabase
-                .database
                 .from("trips")
                 .select("""
                     id,
@@ -129,7 +123,6 @@ class TripDataController: ObservableObject {
                         status
                     )
                 """)
-                .eq("driver_id", value: driverId)
                 .eq("is_deleted", value: false)
                 .execute()
             

@@ -65,14 +65,14 @@ struct FleetTripsView: View {
                     }
                 }
             }
-            .onChange(of: tripController.error) { error in
+            .onChange(of: tripController.error) { error, _ in
                 showingError = error != nil
             }
             .onAppear {
                 print("FleetTripsView appeared")
                 print("Current trips count: \(tripController.upcomingTrips.count)")
                 Task {
-                    try? await tripController.refreshTrips()
+                    await tripController.refreshTrips()
                 }
             }
         }
@@ -240,7 +240,6 @@ struct TripStatusBadge: View {
         case .assigned: return Color.blue
         case .inProgress: return Color.orange
         case .delivered: return Color.green
-        default: return Color.gray
         }
     }
 }
