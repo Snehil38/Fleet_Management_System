@@ -125,7 +125,7 @@ struct Trip: Identifiable, Equatable {
         self.name = supabaseTrip.pickup ?? "Trip-\(supabaseTrip.id.uuidString.prefix(8))"
         self.destination = supabaseTrip.destination
         self.address = supabaseTrip.pickup ?? "Unknown"
-        self.status = supabaseTrip.trip_status
+        self.status = TripStatus(rawValue: supabaseTrip.trip_status) ?? .pending
         self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
         self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
         self.vehicleDetails = vehicle
@@ -189,7 +189,7 @@ struct DeliveryDetails: Identifiable, Equatable {
 struct SupabaseTrip: Codable, Identifiable {
     let id: UUID
     let destination: String
-    let trip_status: TripStatus
+    let trip_status: String
     let has_completed_pre_trip: Bool
     let has_completed_post_trip: Bool
     let vehicle_id: UUID
@@ -197,7 +197,7 @@ struct SupabaseTrip: Codable, Identifiable {
     let start_time: Date?
     let end_time: Date?
     let notes: String?
-    let created_at: Date
+    let created_at: Date?
     let updated_at: Date?
     let is_deleted: Bool
     let start_latitude: Double?
@@ -205,57 +205,6 @@ struct SupabaseTrip: Codable, Identifiable {
     let end_latitude: Double?
     let end_longitude: Double?
     let pickup: String?
-    
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case destination
-        case trip_status = "trip_status"
-        case has_completed_pre_trip
-        case has_completed_post_trip
-        case vehicle_id
-        case driver_id
-        case start_time
-        case end_time
-        case notes
-        case created_at
-        case updated_at
-        case is_deleted
-        case start_latitude
-        case start_longitude
-        case end_latitude
-        case end_longitude
-        case pickup
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        id = try container.decode(UUID.self, forKey: .id)
-        destination = try container.decode(String.self, forKey: .destination)
-        
-        // Handle trip_status as a string that needs to be converted to TripStatus
-        let statusString = try container.decode(String.self, forKey: .trip_status)
-        guard let status = TripStatus(rawValue: statusString) else {
-            throw DecodingError.dataCorruptedError(forKey: .trip_status, in: container, debugDescription: "Invalid trip status: \(statusString)")
-        }
-        trip_status = status
-        
-        has_completed_pre_trip = try container.decode(Bool.self, forKey: .has_completed_pre_trip)
-        has_completed_post_trip = try container.decode(Bool.self, forKey: .has_completed_post_trip)
-        vehicle_id = try container.decode(UUID.self, forKey: .vehicle_id)
-        driver_id = try container.decodeIfPresent(UUID.self, forKey: .driver_id)
-        start_time = try container.decodeIfPresent(Date.self, forKey: .start_time)
-        end_time = try container.decodeIfPresent(Date.self, forKey: .end_time)
-        notes = try container.decodeIfPresent(String.self, forKey: .notes)
-        created_at = try container.decode(Date.self, forKey: .created_at)
-        updated_at = try container.decodeIfPresent(Date.self, forKey: .updated_at)
-        is_deleted = try container.decode(Bool.self, forKey: .is_deleted)
-        start_latitude = try container.decodeIfPresent(Double.self, forKey: .start_latitude)
-        start_longitude = try container.decodeIfPresent(Double.self, forKey: .start_longitude)
-        end_latitude = try container.decodeIfPresent(Double.self, forKey: .end_latitude)
-        end_longitude = try container.decodeIfPresent(Double.self, forKey: .end_longitude)
-        pickup = try container.decodeIfPresent(String.self, forKey: .pickup)
-    }
 }
 
 extension TimeInterval {

@@ -20,7 +20,7 @@ class SupabaseDataController: ObservableObject {
     @Published var alertMessage = ""
     @Published var session: Session?
     
-    private let supabase = SupabaseClient(
+     let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
         supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrZnJ2enh3amxpbWhodmR3d3FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTA5MjUsImV4cCI6MjA1Nzc4NjkyNX0.7vNQWGbjOYFeynNt8N8V-DzoJbS3qq28o3LAa1XvLnw"
     )

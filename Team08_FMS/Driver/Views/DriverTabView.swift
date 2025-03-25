@@ -56,4 +56,103 @@ private func markCurrentTripDelivered() {
         // The UI will be updated automatically when fetchTrips() completes
         // in the markTripAsDelivered method
     }
+}
+
+struct DriverTabView: View {
+    @StateObject private var availabilityManager = DriverAvailabilityManager.shared
+    @StateObject private var tripController = TripDataController.shared
+
+    // ... existing state properties ...
+    
+    @State private var isRefreshing = false
+    @State private var lastRefreshTime = Date()
+    private let minimumRefreshInterval: TimeInterval = 5 // Minimum seconds between refreshes
+    
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            mainContentView
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+                .tag(0)
+            
+            NavigationView {
+                TripsView()
+            }
+            .tabItem {
+                Label("Trips", systemImage: "car.fill")
+            }
+            .tag(1)
+        }
+        .animation(.easeInOut(duration: 0.3), value: selectedTab)
+        .onChange(of: tripController.currentTrip) { newTrip in
+            currentTrip = newTrip
+        }
+        .onChange(of: tripController.upcomingTrips) { newTrips in
+            upcomingTrips = newTrips
+        }
+        .onChange(of: tripController.recentDeliveries) { newDeliveries in
+            recentDeliveries = newDeliveries
+        }
+        .onAppear {
+            refreshTripsIfNeeded()
+        }
+    }
+    
+    private var mainContentView: some View {
+        ZStack {
+            // ... existing background gradient ...
+            
+            NavigationView {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        // ... existing content ...
+                    }
+                    .padding(.top, 8)
+                }
+                .navigationTitle("Home")
+                .navigationBarTitleDisplayMode(.large)
+                .refreshable {
+                    await refreshTrips()
+                }
+                .toolbar {
+                    // ... existing toolbar items ...
+                }
+            }
+            
+            if isRefreshing {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.1))
+            }
+        }
+        // ... existing modifiers ...
+    }
+    
+    private func refreshTripsIfNeeded() {
+        let now = Date()
+        if now.timeIntervalSince(lastRefreshTime) >= minimumRefreshInterval {
+            Task {
+                await refreshTrips()
+            }
+        }
+    }
+    
+    private func refreshTrips() async {
+        guard !isRefreshing else { return }
+        
+        isRefreshing = true
+        defer { 
+            isRefreshing = false
+            lastRefreshTime = Date()
+        }
+        
+        do {
+            try await tripController.refreshTrips()
+        } catch {
+            alertMessage = "Failed to refresh trips: \(error.localizedDescription)"
+            showingAlert = true
+        }
+    }
 } 
