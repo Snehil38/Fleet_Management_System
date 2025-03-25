@@ -34,6 +34,9 @@ struct FleetManagerTabView: View {
                     Label("Crew", systemImage: "person.3")
                 }
         }
+        .task {
+            vehicleManager.loadVehicles()
+        }
     }
 }
 

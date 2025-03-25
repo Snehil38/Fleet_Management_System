@@ -810,30 +810,30 @@ struct VehicleSaveView: View {
                 }
             }
             // Document pickers for uploading attachments.
-            .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
-            .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
-            .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
-            .onChange(of: selectedPollutionItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        pollutionCertificate = data
-                    }
-                }
-            }
-            .onChange(of: selectedRCItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        rc = data
-                    }
-                }
-            }
-            .onChange(of: selectedInsuranceItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        insurance = data
-                    }
-                }
-            }
+//            .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
+//            .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
+//            .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
+//            .onChange(of: selectedPollutionItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        pollutionCertificate = data
+//                    }
+//                }
+//            }
+//            .onChange(of: selectedRCItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        rc = data
+//                    }
+//                }
+//            }
+//            .onChange(of: selectedInsuranceItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        insurance = data
+//                    }
+//                }
+//            }
         }
     }
 
@@ -842,11 +842,11 @@ struct VehicleSaveView: View {
         guard !isSaving else { return }
         isSaving = true
 
-        let documents = VehicleDocuments(
-            pollutionCertificate: pollutionCertificate ?? Data(),
-            rc: rc ?? Data(),
-            insurance: insurance ?? Data()
-        )
+//        let documents = VehicleDocuments(
+//            pollutionCertificate: pollutionCertificate ?? Data(),
+//            rc: rc ?? Data(),
+//            insurance: insurance ?? Data()
+//        )
 
         let newVehicle = Vehicle(
             name: name,
