@@ -222,6 +222,7 @@ struct EmptyTripsView: View {
 // Trip card view
 struct TripCardView: View {
     let trip: Trip
+    @State private var showingAssignSheet = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -295,20 +296,47 @@ struct TripCardView: View {
             }
             .padding()
             
-            // Show assignment details if assigned
+            // Vehicle and Driver Info
             if trip.status != .pending {
                 let vehicleInfo = "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model) (\(trip.vehicleDetails.licensePlate))"
                 Divider()
                 
-                HStack(spacing: 24) {
-                    HStack {
-                        Image(systemName: "car.fill")
-                            .foregroundColor(.blue)
-                        Text(vehicleInfo)
-                            .font(.subheadline)
+                VStack(spacing: 12) {
+                    HStack(spacing: 24) {
+                        HStack {
+                            Image(systemName: "car.fill")
+                                .foregroundColor(.blue)
+                            Text(vehicleInfo)
+                                .font(.subheadline)
+                        }
+                        
+                        Spacer()
                     }
                     
-                    Spacer()
+                    // Driver Assignment Button or Driver Info
+                    if trip.driverId == nil {
+                        Button(action: {
+                            showingAssignSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "person.badge.plus")
+                                Text("Assign Driver")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundColor(.blue)
+                            .cornerRadius(8)
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "person.fill")
+                                .foregroundColor(.green)
+                            Text("Driver Assigned")
+                                .font(.subheadline)
+                                .foregroundColor(.green)
+                        }
+                    }
                 }
                 .padding()
             }
@@ -316,6 +344,9 @@ struct TripCardView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5)
+        .sheet(isPresented: $showingAssignSheet) {
+            AssignDriverView(trip: trip)
+        }
     }
 }
 
@@ -506,5 +537,93 @@ struct LabeledContent: View {
                 .font(.subheadline)
                 .multilineTextAlignment(.trailing)
         }
+    }
+}
+
+// Driver Assignment View
+struct AssignDriverView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var crewController = CrewDataController.shared
+    let trip: Trip
+    @State private var selectedDriverId: UUID?
+    @State private var isLoading = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                if crewController.drivers.isEmpty {
+                    Text("No available drivers")
+                        .foregroundColor(.gray)
+                } else {
+                    ForEach(crewController.drivers) { driver in
+                        DriverRow(driver: driver, isSelected: selectedDriverId == driver.userID)
+                            .onTapGesture {
+                                selectedDriverId = driver.userID
+                            }
+                    }
+                }
+            }
+            .navigationTitle("Assign Driver")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Assign") {
+                        assignDriver()
+                    }
+                    .disabled(selectedDriverId == nil || isLoading)
+                }
+            }
+            .onAppear {
+                crewController.update()
+            }
+        }
+    }
+    
+    private func assignDriver() {
+        guard let driverId = selectedDriverId else { return }
+        isLoading = true
+        
+        Task {
+            do {
+                try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
+                await MainActor.run {
+                    dismiss()
+                }
+            } catch {
+                print("Error assigning driver: \(error)")
+            }
+            isLoading = false
+        }
+    }
+}
+
+struct DriverRow: View {
+    let driver: Driver
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(driver.name)
+                    .font(.headline)
+                Text(driver.email)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+            
+            Spacer()
+            
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.blue)
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 } 

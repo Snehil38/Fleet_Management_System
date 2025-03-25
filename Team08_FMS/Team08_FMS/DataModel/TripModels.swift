@@ -28,6 +28,7 @@ struct Trip: Identifiable, Equatable {
     let destinationCoordinate: CLLocationCoordinate2D
     let startingPoint: String
     let pickup: String?
+    let driverId: UUID?
     
     static func == (lhs: Trip, rhs: Trip) -> Bool {
         return lhs.id == rhs.id &&
@@ -48,10 +49,11 @@ struct Trip: Identifiable, Equatable {
                lhs.destinationCoordinate.latitude == rhs.destinationCoordinate.latitude &&
                lhs.destinationCoordinate.longitude == rhs.destinationCoordinate.longitude &&
                lhs.startingPoint == rhs.startingPoint &&
-               lhs.pickup == rhs.pickup
+               lhs.pickup == rhs.pickup &&
+               lhs.driverId == rhs.driverId
     }
     
-    init(id: UUID = UUID(), name: String, destination: String, address: String, eta: String, distance: String, status: TripStatus, hasCompletedPreTrip: Bool = false, hasCompletedPostTrip: Bool = false, vehicleDetails: Vehicle, sourceCoordinate: CLLocationCoordinate2D, destinationCoordinate: CLLocationCoordinate2D, startingPoint: String, notes: String? = nil, startTime: Date? = nil, endTime: Date? = nil, pickup: String? = nil) {
+    init(id: UUID = UUID(), name: String, destination: String, address: String, eta: String, distance: String, status: TripStatus, hasCompletedPreTrip: Bool = false, hasCompletedPostTrip: Bool = false, vehicleDetails: Vehicle, sourceCoordinate: CLLocationCoordinate2D, destinationCoordinate: CLLocationCoordinate2D, startingPoint: String, notes: String? = nil, startTime: Date? = nil, endTime: Date? = nil, pickup: String? = nil, driverId: UUID? = nil) {
         self.id = id
         self.name = name
         self.destination = destination
@@ -69,6 +71,7 @@ struct Trip: Identifiable, Equatable {
         self.startTime = startTime
         self.endTime = endTime
         self.pickup = pickup
+        self.driverId = driverId
     }
     
     static func mockCurrentTrip() -> Trip {
@@ -90,7 +93,8 @@ struct Trip: Identifiable, Equatable {
                 longitude: 72.9492
             ),
             startingPoint: "Mumbai",
-            pickup: "Mumbai Central"
+            pickup: "Mumbai Central",
+            driverId: nil
         )
     }
     
@@ -113,7 +117,8 @@ struct Trip: Identifiable, Equatable {
                     latitude: 28.5085,  // ICD Tughlakabad coordinates
                     longitude: 77.2626
                 ),
-                startingPoint: "New Delhi"
+                startingPoint: "New Delhi",
+                driverId: nil
             )
         ]
     }
@@ -131,6 +136,7 @@ struct Trip: Identifiable, Equatable {
         self.startTime = supabaseTrip.start_time
         self.endTime = supabaseTrip.end_time
         self.pickup = supabaseTrip.pickup
+        self.driverId = supabaseTrip.driver_id
         
         // Extract distance and ETA from notes
         if let notes = supabaseTrip.notes,
