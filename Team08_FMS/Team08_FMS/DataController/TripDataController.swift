@@ -24,7 +24,7 @@ class TripDataController: ObservableObject {
             eta: "25 mins",
             distance: "8.5 km",
             status: .inProgress,
-            vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
+            vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available),
 //                VehicleDetails(
 //                number: "TRK-001",
 //                type: "Heavy Truck",
@@ -64,8 +64,7 @@ class TripDataController: ObservableObject {
                     msrp: 45000.0,
                     pollutionExpiry: Date(),
                     insuranceExpiry: Date(),
-                    status: .inService,
-                    documents: VehicleDocuments()
+                    status: .inService
                 ),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 28.5244,
@@ -98,8 +97,7 @@ class TripDataController: ObservableObject {
                     msrp: 28000.0,
                     pollutionExpiry: Date(),
                     insuranceExpiry: Date(),
-                    status: .available,
-                    documents: VehicleDocuments()
+                    status: .available
                 ),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 12.9716,
@@ -132,8 +130,7 @@ class TripDataController: ObservableObject {
                     msrp: 55000.0,
                     pollutionExpiry: Date(),
                     insuranceExpiry: Date(),
-                    status: .available,
-                    documents: VehicleDocuments()
+                    status: .available
                 ),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 17.3850,

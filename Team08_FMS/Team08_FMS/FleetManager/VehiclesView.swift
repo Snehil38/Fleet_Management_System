@@ -86,17 +86,17 @@ private struct VehicleCard: View {
                 }
 
                 // Document status indicators
-                HStack(spacing: 12) {
-                    Label("RC", systemImage: vehicle.documents?.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents?.rc != nil ? .green : .red)
-
-                    Label("Insurance", systemImage: vehicle.documents?.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents?.insurance != nil ? .green : .red)
-
-                    Label("Pollution", systemImage: vehicle.documents?.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents?.pollutionCertificate != nil ? .green : .red)
-                }
-                .font(.caption)
+//                HStack(spacing: 12) {
+//                    Label("RC", systemImage: vehicle.documents?.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+//                        .foregroundColor(vehicle.documents?.rc != nil ? .green : .red)
+//
+//                    Label("Insurance", systemImage: vehicle.documents?.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+//                        .foregroundColor(vehicle.documents?.insurance != nil ? .green : .red)
+//
+//                    Label("Pollution", systemImage: vehicle.documents?.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+//                        .foregroundColor(vehicle.documents?.pollutionCertificate != nil ? .green : .red)
+//                }
+//                .font(.caption)
             }
             .padding()
         }
@@ -333,8 +333,6 @@ struct VehiclesView: View {
 
     private var filteredVehicles: [Vehicle] {
         let vehicles: [Vehicle]
-        
-        vehicleManager.loadVehicles()
         if let status = selectedStatus {
             // Filter directly from the published array
             vehicles = vehicleManager.vehicles.filter { $0.status == status }
@@ -391,6 +389,9 @@ struct VehiclesView: View {
             }
             .sheet(isPresented: $showingAddVehicle) {
                 VehicleSaveView(vehicleManager: vehicleManager)
+            }
+            .task {
+                vehicleManager.loadVehicles()
             }
 //            .sheet(isPresented: $showingDeleteMode) {
 //                DeleteVehiclesView(vehicleManager: vehicleManager)
