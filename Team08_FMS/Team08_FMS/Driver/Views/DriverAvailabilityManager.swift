@@ -6,4 +6,9 @@ class DriverAvailabilityManager: ObservableObject {
     static let shared = DriverAvailabilityManager()
     
     private init() {}
+    
+    // Update availability
+    func updateAvailability(newStatus: Bool) {
+        isAvailable = newStatus
+    }
 } 

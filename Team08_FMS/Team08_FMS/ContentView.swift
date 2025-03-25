@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var auth = SupabaseDataController.shared  // Observing changes
+    @EnvironmentObject private var auth: SupabaseDataController
 
     var body: some View {
         VStack {
@@ -26,15 +26,21 @@ struct ContentView: View {
                     case "maintenance_personnel":
                         MaintenancePersonnelTabView()
                     default:
-                        RoleSelectionView() // Handles unknown role case
+                        RoleSelectionView()
                     }
                 }
             }
         }
-        .animation(.easeInOut, value: auth.isAuthenticated) // Smooth transition
+        .animation(.easeInOut, value: auth.isAuthenticated)
+        .task {
+            await auth.autoLogin()
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(SupabaseDataController.shared)
+        .environmentObject(VehicleManager.shared)
+        .environmentObject(CrewDataController.shared)
 }

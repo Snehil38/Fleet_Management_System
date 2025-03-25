@@ -80,6 +80,7 @@
 //    var updatedAt: Date?
 //    var isDeleted: Bool = false
 //    var status: Status
+//    var salary: Double
 //}
 //
 //

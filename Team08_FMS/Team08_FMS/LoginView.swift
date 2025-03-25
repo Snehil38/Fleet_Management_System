@@ -60,6 +60,7 @@ struct LoginView: View {
     @StateObject private var dataController = SupabaseDataController.shared
     @State private var isLoading: Bool = false
     @State private var navigateToVerify = false
+    @State private var isPasswordVisible: Bool = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -79,12 +80,37 @@ struct LoginView: View {
                 .shadow(radius: 1)
                 .padding(.horizontal, 20)
             
-            SecureField("Password", text: $password)
+            ZStack(alignment: .trailing) {
+                Group {
+                    if isPasswordVisible {
+                        TextField("Password", text: $password)
+                            .autocapitalization(.none)
+                    } else {
+                        SecureField("Password", text: $password)
+                    }
+                }
                 .padding(10)
                 .background(Color.white)
                 .cornerRadius(25)
                 .shadow(radius: 1)
                 .padding(.horizontal, 20)
+                
+                Button(action: {
+                    isPasswordVisible.toggle()
+                }) {
+                    Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                        .foregroundColor(.gray)
+                        .padding(.trailing, 30)
+                }
+            }
+                        
+            // Optional: Display validation error message when password is not empty but invalid
+            if !password.isEmpty && !isValidPassword(password) {
+                Text("Password must be at least 6 characters long, include uppercase, lowercase, a digit, and a special character.")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 20)
+            }
             
             Button(action: {
                 dataController.signInWithPassword(email: email, password: password, roleName: selectedRole) { success, error in
@@ -92,7 +118,6 @@ struct LoginView: View {
                         print("success")
                         if !dataController.isGenPass, dataController.is2faEnabled {
                             email = email
-                            UserDefaults.standard.set(email, forKey: "email")
                             if dataController.roleMatched {
                                 dataController.sendOTP(email: email) { success, error in
                                     if success {
@@ -119,7 +144,7 @@ struct LoginView: View {
                     .padding(.horizontal, 20)
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(isLoading || email.isEmpty || password.isEmpty)
+            .disabled(isLoading || email.isEmpty || !isValidPassword(password))
         }
         .padding()
         .alert(isPresented: $dataController.showAlert) {  // 🔹 Uses showAlert state from controller
@@ -128,6 +153,11 @@ struct LoginView: View {
         .navigationDestination(isPresented: $navigateToVerify) {
             VerifyOTPView(email: email)
         }
+    }
+    
+    private func isValidPassword(_ password: String) -> Bool {
+        let passwordRegex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[#$@!%&*?])[A-Za-z\\d#$@!%&*?]{6,}$"
+        return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
     }
 }
 
@@ -191,6 +221,9 @@ struct VerifyOTPView: View {
             }
         }
         .padding()
+        .alert(isPresented: $dataController.showAlert) {  // 🔹 Uses showAlert state from controller
+            Alert(title: Text("Alert"), message: Text(dataController.alertMessage), dismissButton: .default(Text("OK")))
+        }
     }
 }
 

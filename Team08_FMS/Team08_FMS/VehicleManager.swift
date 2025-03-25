@@ -1,125 +1,52 @@
 import Foundation
 
 class VehicleManager: ObservableObject {
-    @Published private(set) var vehicles: [Vehicle] = []
-    private let vehiclesKey = "savedVehicles"
-
+    
+    static let shared = VehicleManager()
+    
+    @Published var vehicles: [Vehicle] = []
+    @Published var isLoading: Bool = false
+    @Published var loadError: String? = nil
+    
     init() {
         loadVehicles()
     }
 
-    private func loadVehicles() {
-        if let data = UserDefaults.standard.data(forKey: vehiclesKey),
-           let decodedVehicles = try? JSONDecoder().decode([Vehicle].self, from: data) {
-            vehicles = decodedVehicles
+    func loadVehiclesAsync() async {
+        if isLoading { return }
+        
+        await MainActor.run {
+            isLoading = true
+            loadError = nil
+        }
+        
+        do {
+            let vehicles = try await SupabaseDataController.shared.fetchVehicles()
+            
+            await MainActor.run {
+                self.vehicles = vehicles
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                self.loadError = error.localizedDescription
+                self.isLoading = false
+            }
         }
     }
-
-    private func saveVehicles() {
-        if let encoded = try? JSONEncoder().encode(vehicles) {
-            UserDefaults.standard.set(encoded, forKey: vehiclesKey)
+    
+    func loadVehicles() {
+        Task {
+            await loadVehiclesAsync()
         }
     }
-
-    func addVehicle(name: String, year: Int, make: String, model: String, vin: String, licensePlate: String, vehicleType: VehicleType, color: String, bodyType: BodyType, bodySubtype: String, msrp: Double, pollutionExpiry: Date, insuranceExpiry: Date, documents: VehicleDocuments) {
-        let newVehicle = Vehicle(
-            id: UUID(),
-            name: name,
-            year: year,
-            make: make,
-            model: model,
-            vin: vin,
-            licensePlate: licensePlate,
-            vehicleType: vehicleType,
-            color: color,
-            bodyType: bodyType,
-            bodySubtype: bodySubtype,
-            msrp: msrp,
-            pollutionExpiry: pollutionExpiry,
-            insuranceExpiry: insuranceExpiry,
-            status: .available,
-            driverId: nil,
-            documents: documents
-        )
-        vehicles.append(newVehicle)
-        saveVehicles()
-    }
-
-    func updateVehicle(_ vehicle: Vehicle, name: String, year: Int, make: String, model: String, vin: String, licensePlate: String, vehicleType: VehicleType, color: String, bodyType: BodyType, bodySubtype: String, msrp: Double, pollutionExpiry: Date, insuranceExpiry: Date, documents: VehicleDocuments) {
-        if let index = vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-            let updatedVehicle = Vehicle(
-                id: vehicle.id,
-                name: name,
-                year: year,
-                make: make,
-                model: model,
-                vin: vin,
-                licensePlate: licensePlate,
-                vehicleType: vehicleType,
-                color: color,
-                bodyType: bodyType,
-                bodySubtype: bodySubtype,
-                msrp: msrp,
-                pollutionExpiry: pollutionExpiry,
-                insuranceExpiry: insuranceExpiry,
-                status: vehicle.status,
-                driverId: vehicle.driverId,
-                documents: documents
-            )
-            vehicles[index] = updatedVehicle
-            saveVehicles()
-        }
-    }
-
-    func deleteVehicle(_ vehicle: Vehicle) {
-        vehicles.removeAll { $0.id == vehicle.id }
-        saveVehicles()
-    }
-
-    func getVehiclesByStatus(_ status: VehicleStatus?) -> [Vehicle] {
-        if let status = status {
-            return vehicles.filter { $0.status == status }
-        }
-        return vehicles
-    }
-
-    // MARK: - Status Management
-
-    func assignDriverToVehicle(vehicleId: UUID, driverId: UUID) {
-        if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
-            var vehicle = vehicles[index]
-            vehicle.driverId = driverId
-            vehicle.status = .inService
-            vehicles[index] = vehicle
-            saveVehicles()
-        }
-    }
-
-    func removeDriverFromVehicle(vehicleId: UUID) {
-        if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
-            var vehicle = vehicles[index]
-            vehicle.driverId = nil
-            vehicle.status = .available
-            vehicles[index] = vehicle
-            saveVehicles()
-        }
-    }
-
-    func markVehicleForMaintenance(vehicleId: UUID) {
-        if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
-            var vehicle = vehicles[index]
-            vehicle.status = .underMaintenance
-            vehicles[index] = vehicle
-            saveVehicles()
-        }
-    }
-
-    func markVehicleAsIdle(vehicleId: UUID) {
-        if let index = vehicles.firstIndex(where: { $0.id == vehicleId }) {
-            var vehicle = vehicles[index]
-            vehicle.status = .available
-            vehicles[index] = vehicle
-            saveVehicles()
+ 
+    func fetchVehicleDetails(vehicleId: UUID) async throws -> Vehicle? {
+        do {
+            return try await SupabaseDataController.shared.fetchVehicleDetails(vehicleId: vehicleId)
+        } catch {
+            print("Error fetching vehicle details: \(error.localizedDescription)")
+            throw error
         }
     }
 }

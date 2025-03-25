@@ -19,15 +19,42 @@ class CrewDataController: ObservableObject {
     
     private init() {
         loadFleetManagers()
-        loadDrivers()
-        loadMaintenancePersonnel()
+        
+        Task {
+            do {
+                let driver = try await SupabaseDataController.shared.fetchDrivers()
+                let personnel = try await SupabaseDataController.shared.fetchMaintenancePersonnel()
+                print(maintenancePersonnel)
+                await MainActor.run {
+                    drivers = driver
+                    maintenancePersonnel = personnel
+                }
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
     }
     
     // MARK: - Loading Sample Data
+    func update() {
+        Task {
+            do {
+                let driver = try await SupabaseDataController.shared.fetchDrivers()
+                let personnel = try await SupabaseDataController.shared.fetchMaintenancePersonnel()
+                await MainActor.run {
+                    drivers = driver
+                    maintenancePersonnel = personnel
+                }
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
     
     private func loadFleetManagers() {
         fleetManagers = [
             FleetManager(
+                userID: UUID(),
                 id: UUID(),
                 name: "Alice Johnson",
                 profileImage: "fleetManager1",
@@ -37,6 +64,7 @@ class CrewDataController: ObservableObject {
                 updatedAt: Date()
             ),
             FleetManager(
+                userID: UUID(),
                 id: UUID(),
                 name: "Bob Williams",
                 profileImage: "fleetManager2",
@@ -51,6 +79,7 @@ class CrewDataController: ObservableObject {
     private func loadDrivers() {
         drivers = [
             Driver(
+                userID: UUID(),
                 name: "Charlie Davis",
                 profileImage: "DR", // or "driver1"
                 email: "charlie.davis@example.com",
@@ -67,6 +96,7 @@ class CrewDataController: ObservableObject {
                 status: .available
             ),
             Driver(
+                userID: UUID(),
                 name: "Diana Prince",
                 profileImage: "DI", // or "driver2"
                 email: "diana.prince@example.com",
@@ -88,13 +118,14 @@ class CrewDataController: ObservableObject {
     private func loadMaintenancePersonnel() {
         maintenancePersonnel = [
             MaintenancePersonnel(
+                userID: UUID(),
                 name: "Edward King",
                 profileImage: "EK", // or "maintenance1"
                 email: "edward.king@example.com",
                 phoneNumber: 555_555_6666,
                 certifications: .aseCertified,
                 yearsOfExperience: 6,
-                specialty: .engineRepair,
+                speciality: .engineRepair,
                 salary: 4000.0,
                 address: "789 Oak Avenue",
                 createdAt: Date(),
@@ -103,13 +134,14 @@ class CrewDataController: ObservableObject {
                 status: .available
             ),
             MaintenancePersonnel(
+                userID: UUID(),
                 name: "Fiona Queen",
                 profileImage: "FQ", // or "maintenance2"
                 email: "fiona.queen@example.com",
                 phoneNumber: 555_777_8888,
                 certifications: .heavyEquipmentTechnician,
                 yearsOfExperience: 4,
-                specialty: .generalMaintenance,
+                speciality: .generalMaintenance,
                 salary: 3800.0,
                 address: "321 Pine Road",
                 createdAt: Date(),

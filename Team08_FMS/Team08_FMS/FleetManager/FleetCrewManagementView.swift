@@ -7,45 +7,11 @@
 
 import SwiftUI
 
-//struct CrewMember: Identifiable {
-//    let id: String
-//    let name: String
-//    let avatar: String
-//    let role: String
-//    let status: Status
-//    let salary: Double
-//    let details: [DetailItem]
-//
-//    enum Status: String {
-//        case available = "Available"
-//        case busy = "Busy"
-//        case offline = "Offline"
-//
-//        var color: Color {
-//            switch self {
-//            case .available: return Color.green
-//            case .busy: return Color.yellow
-//            case .offline: return Color.red
-//            }
-//        }
-//
-//        var backgroundColor: Color {
-//            switch self {
-//            case .available: return Color.green.opacity(0.2)
-//            case .busy: return Color.yellow.opacity(0.2)
-//            case .offline: return Color.red.opacity(0.2)
-//            }
-//        }
-//    }
-//}
-
 struct FleetCrewManagementView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @State private var crewType: CrewType = .drivers
     @State private var showingAddDriverSheet = false
     @State private var showingAddMaintenanceSheet = false
-    @State private var showingProfile = false
-    @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: Status?  // Updated to use our new Status enum
 
@@ -94,7 +60,7 @@ struct FleetCrewManagementView: View {
                             
                             ForEach([Status.available, .busy, .offDuty], id: \.self) { status in
                                 FilterChip(
-                                    title: status.rawValue,
+                                    title: AppDataController.shared.getStatusString(status: status),
                                     isSelected: selectedStatus == status,
                                     action: { selectedStatus = status }
                                 )
@@ -109,7 +75,7 @@ struct FleetCrewManagementView: View {
                         if filteredCrew.isEmpty {
                             EmptyStateView(type: crewType)
                         } else {
-                            ForEach(Array(filteredCrew.enumerated()), id: \.element.id) { (_, crew) in
+                            ForEach(filteredCrew, id: \.id) { crew in
                                 CrewCardView(crewMember: crew)
                                     .padding(.horizontal)
                             }
@@ -131,32 +97,7 @@ struct FleetCrewManagementView: View {
                         } label: {
                             Image(systemName: "plus")
                         }
-                        Button {
-                            showingMessages = true
-                        } label: {
-                            Image(systemName: "message.fill")
-                                .foregroundColor(.blue)
-                        }
-
-                        Button {
-                            showingProfile = true
-                        } label: {
-                            Image(systemName: "person.circle.fill")
-                                .foregroundColor(.blue)
-                        }
                     }
-                }
-            }
-            .sheet(isPresented: $showingProfile) {
-                NavigationView {
-                    FleetManagerProfileView()
-                        .environmentObject(dataManager)
-                }
-            }
-            .sheet(isPresented: $showingMessages) {
-                NavigationView {
-                    ContactView()
-                        .environmentObject(dataManager)
                 }
             }
             .sheet(isPresented: $showingAddDriverSheet) {
@@ -250,12 +191,12 @@ struct CrewCardView: View {
                     
                     Spacer()
                     
-                    Text(currentCrew.status.rawValue)
+                    Text(AppDataController.shared.getStatusString(status: currentCrew.status))
                         .font(.subheadline)
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(statusColor)
+                        .background(currentCrew.status.color)
                         .clipShape(Capsule())
                 }
                 .padding()
@@ -267,14 +208,18 @@ struct CrewCardView: View {
                     if let driver = currentCrew as? Driver {
                         HStack {
                             Label("Experience: \(driver.yearsOfExperience) yrs", systemImage: "clock.fill")
+                                .font(.caption)
                             Spacer()
                             Label("License: \(driver.driverLicenseNumber)", systemImage: "car.fill")
+                                .font(.caption)
                         }
                     } else if let maintenance = currentCrew as? MaintenancePersonnel {
                         HStack {
                             Label("Experience: \(maintenance.yearsOfExperience) yrs", systemImage: "clock.fill")
+                                .font(.caption)
                             Spacer()
-                            Label("Specialty: \(maintenance.specialty.rawValue)", systemImage: "wrench.fill")
+                            Label("Specialty: \(AppDataController.shared.getSpecialityString(speciality: maintenance.speciality))", systemImage: "wrench.fill")
+                                .font(.caption)
                         }
                     }
                 }
@@ -292,20 +237,94 @@ struct CrewCardView: View {
                 Label("Delete Crew Member", systemImage: "trash")
             }
             
-            if currentCrew.status != .busy {
+            if currentCrew.status == .available {
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Busy", systemImage: "checkmark.circle.fill")
+//                }
+                
                 Button {
-                    updateCrewStatus(.busy)
+                    Task {
+                        if currentCrew is Driver {
+                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
+                        }
+                        else {
+                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
+                        }
+                        CrewDataController.shared.update()
+                    }
                 } label: {
-                    Label("Mark as Busy", systemImage: "person.fill.checkmark")
+                    Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
                 }
             }
             
-            if currentCrew.status != .available {
+//            else if currentCrew.status == .busy {
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Available", systemImage: "checkmark.circle.fill")
+//                }
+//                
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
+//                }
+//            }
+            
+            else if currentCrew.status == .offDuty {
                 Button {
-                    updateCrewStatus(.available)
+                    Task {
+                        if currentCrew is Driver {
+                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
+                        }
+                        else {
+                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
+                        }
+                        CrewDataController.shared.update()
+                    }
                 } label: {
                     Label("Mark as Available", systemImage: "checkmark.circle.fill")
                 }
+                
+//                Button {
+//                    Task {
+//                        if currentCrew is Driver {
+//                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        else {
+//                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.busy, for: currentCrew.id)
+//                        }
+//                        CrewDataController.shared.update()
+//                    }
+//                } label: {
+//                    Label("Mark as Busy", systemImage: "checkmark.circle.fill")
+//                }
             }
             
             Button {
@@ -335,14 +354,6 @@ struct CrewCardView: View {
         else { return "Maintenance" }
     }
     
-    var statusColor: Color {
-        switch currentCrew.status {
-        case .available: return .green
-        case .busy: return .orange
-        case .offDuty: return .gray
-        }
-    }
-    
     private func updateCrewStatus(_ newStatus: Status) {
         if currentCrew is Driver {
             dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
@@ -353,10 +364,18 @@ struct CrewCardView: View {
     
     private func deleteCrew() {
         if currentCrew is Driver {
-            dataManager.deleteDriver(currentCrew.id)
-        } else {
-            dataManager.deleteMaintenancePersonnel(currentCrew.id)
+            Task {
+                await SupabaseDataController.shared.softDeleteDriver(for: currentCrew.id)
+                CrewDataController.shared.update()
+            }
         }
+        else {
+            Task {
+                await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: currentCrew.id)
+                CrewDataController.shared.update()
+            }
+        }
+        CrewDataController.shared.update()
     }
 }
 

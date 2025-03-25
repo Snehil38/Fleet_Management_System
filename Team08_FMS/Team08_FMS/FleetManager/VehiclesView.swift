@@ -8,8 +8,8 @@
 import SwiftUI
 
 private struct VehicleCard: View {
-    let vehicle: Vehicle
-    let vehicleManager: VehicleManager
+    var vehicle: Vehicle
+    @ObservedObject var vehicleManager: VehicleManager
     @State private var showingDeleteAlert = false
     @State private var showingOptions = false
 
@@ -87,14 +87,14 @@ private struct VehicleCard: View {
 
                 // Document status indicators
                 HStack(spacing: 12) {
-                    Label("RC", systemImage: vehicle.documents.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents.rc != nil ? .green : .red)
+                    Label("RC", systemImage: vehicle.documents?.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(vehicle.documents?.rc != nil ? .green : .red)
 
-                    Label("Insurance", systemImage: vehicle.documents.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents.insurance != nil ? .green : .red)
+                    Label("Insurance", systemImage: vehicle.documents?.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(vehicle.documents?.insurance != nil ? .green : .red)
 
-                    Label("Pollution", systemImage: vehicle.documents.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(vehicle.documents.pollutionCertificate != nil ? .green : .red)
+                    Label("Pollution", systemImage: vehicle.documents?.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(vehicle.documents?.pollutionCertificate != nil ? .green : .red)
                 }
                 .font(.caption)
             }
@@ -110,21 +110,42 @@ private struct VehicleCard: View {
                 Label("Delete Vehicle", systemImage: "trash")
             }
 
-            if vehicle.status != .underMaintenance {
+            if vehicle.status == .underMaintenance {
                 Button {
-                    vehicleManager.markVehicleForMaintenance(vehicleId: vehicle.id)
+                    Task {
+                        await SupabaseDataController.shared.updateVehichleStatus(newStatus: VehicleStatus.available, vehicleID: vehicle.id)
+                    }
+                    if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                        DispatchQueue.main.async {
+                            vehicleManager.vehicles[index].status = .underMaintenance
+                        }
+                    }
                 } label: {
-                    Label("Mark for Maintenance", systemImage: "wrench.fill")
+                    Label("Mark as available", systemImage: "checkmark.circle.fill")
                 }
             }
 
-            if vehicle.status != .available {
+            if vehicle.status == .available {
                 Button {
-                    vehicleManager.markVehicleAsIdle(vehicleId: vehicle.id)
+                    Task {
+                        // Update on the server
+                        await SupabaseDataController.shared.updateVehichleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
+                        
+                        // Update the local state immediately
+                        if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                            DispatchQueue.main.async {
+                                vehicleManager.vehicles[index].status = .underMaintenance
+                            }
+                        }
+                        
+                        // Optionally, save the updated vehicles array to UserDefaults
+                        // vehicleManager.saveVehicles()   // Make sure this method is accessible if needed
+                    }
                 } label: {
-                    Label("Mark as Idle", systemImage: "checkmark.circle.fill")
+                    Label("Mark as under maintenance", systemImage: "checkmark.circle.fill")
                 }
             }
+
 
             Button {
                 // Add share functionality here
@@ -136,7 +157,10 @@ private struct VehicleCard: View {
         .alert("Delete Vehicle", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                vehicleManager.deleteVehicle(vehicle)
+                Task {
+                    await SupabaseDataController.shared.softDeleteVehichle(vehicleID: vehicle.id)
+                    await vehicleManager.loadVehiclesAsync()
+                }
             }
         } message: {
             Text("Are you sure you want to delete this vehicle? This action cannot be undone.")
@@ -192,7 +216,7 @@ private struct StatusFilterView: View {
                     action: { selectedStatus = nil }
                 )
                 
-                ForEach(VehicleStatus.allValues, id: \.self) { status in
+                ForEach([VehicleStatus.available, .inService, .underMaintenance], id: \.self) { status in
                     FilterChip(
                         title: status.rawValue.capitalized,
                         isSelected: selectedStatus == status,
@@ -266,7 +290,10 @@ private struct DeleteVehiclesView: View {
                 Button("Delete", role: .destructive) {
                     for id in selectedVehicles {
                         if let vehicle = vehicleManager.vehicles.first(where: { $0.id == id }) {
-                            vehicleManager.deleteVehicle(vehicle)
+                            Task {
+                                await SupabaseDataController.shared.softDeleteVehichle(vehicleID: vehicle.id)
+                                await vehicleManager.loadVehiclesAsync()
+                            }
                         }
                     }
                     dismiss()
@@ -299,7 +326,15 @@ struct VehiclesView: View {
     }
 
     private var filteredVehicles: [Vehicle] {
-        let vehicles = vehicleManager.getVehiclesByStatus(selectedStatus)
+        let vehicles: [Vehicle]
+        
+        // Don't call loadVehicles here as it was causing unnecessary reloads
+        if let status = selectedStatus {
+            // Filter directly from the published array
+            vehicles = vehicleManager.vehicles.filter { $0.status == status }
+        } else {
+            vehicles = vehicleManager.vehicles
+        }
         return vehicles.filter(matchesSearch)
     }
 
@@ -309,9 +344,49 @@ struct VehiclesView: View {
                 VStack(spacing: 16) {
                     SearchBarView(searchText: $searchText)
                     StatusFilterView(selectedStatus: $selectedStatus)
-                    VehicleListView(vehicles: filteredVehicles, vehicleManager: vehicleManager)
+                    
+                    if vehicleManager.isLoading && vehicleManager.vehicles.isEmpty {
+                        ProgressView("Loading vehicles...")
+                            .padding(.top, 50)
+                    } else if vehicleManager.loadError != nil && vehicleManager.vehicles.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 40))
+                                .foregroundColor(.orange)
+                            Text("Failed to load vehicles")
+                                .font(.headline)
+                            Text(vehicleManager.loadError ?? "Unknown error")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Button("Retry") {
+                                vehicleManager.loadVehicles()
+                            }
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .padding()
+                    } else {
+                        VehicleListView(vehicles: filteredVehicles, vehicleManager: vehicleManager)
+                    }
+                    
+                    if vehicleManager.isLoading && !vehicleManager.vehicles.isEmpty {
+                        ProgressView()
+                            .padding()
+                    }
                 }
                 .padding(.vertical)
+            }
+            .refreshable {
+                await refreshVehicles()
+            }
+            .onAppear {
+                if vehicleManager.vehicles.isEmpty {
+                    vehicleManager.loadVehicles()
+                }
             }
             .navigationTitle("Vehicles")
             .toolbar {
@@ -320,19 +395,6 @@ struct VehiclesView: View {
                         Button(action: { showingAddVehicle = true }) {
                             Image(systemName: "plus")
                         }
-//                        Button {
-//                            showingMessages = true
-//                        } label: {
-//                            Image(systemName: "message.fill")
-//                                .foregroundColor(.blue)
-//                        }
-//
-//                        Button {
-//                            showingProfile = true
-//                        } label: {
-//                            Image(systemName: "person.circle.fill")
-//                                .foregroundColor(.blue)
-//                        }
                     }
                 }
             }
@@ -349,12 +411,13 @@ struct VehiclesView: View {
                 }
             }
             .sheet(isPresented: $showingAddVehicle) {
-                VehicleDetailView(vehicleManager: vehicleManager)
+                VehicleSaveView(vehicleManager: vehicleManager)
             }
-//            .sheet(isPresented: $showingDeleteMode) {
-//                DeleteVehiclesView(vehicleManager: vehicleManager)
-//            }
         }
+    }
+    
+    func refreshVehicles() async {
+        await vehicleManager.loadVehiclesAsync()
     }
 }
 
