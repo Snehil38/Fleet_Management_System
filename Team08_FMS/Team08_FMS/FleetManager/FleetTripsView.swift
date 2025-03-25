@@ -296,21 +296,24 @@ struct TripCardView: View {
             }
             .padding()
             
-            // Vehicle and Driver Info
-            if trip.status != .pending {
-                let vehicleInfo = "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model) (\(trip.vehicleDetails.licensePlate))"
+            // Show driver assignment section for all trips except completed ones
+            if trip.status != .delivered {
                 Divider()
                 
                 VStack(spacing: 12) {
-                    HStack(spacing: 24) {
-                        HStack {
-                            Image(systemName: "car.fill")
-                                .foregroundColor(.blue)
-                            Text(vehicleInfo)
-                                .font(.subheadline)
+                    // Vehicle Info if available
+                    if trip.status != .pending {
+                        let vehicleInfo = "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model) (\(trip.vehicleDetails.licensePlate))"
+                        HStack(spacing: 24) {
+                            HStack {
+                                Image(systemName: "car.fill")
+                                    .foregroundColor(.blue)
+                                Text(vehicleInfo)
+                                    .font(.subheadline)
+                            }
+                            
+                            Spacer()
                         }
-                        
-                        Spacer()
                     }
                     
                     // Driver Assignment Button or Driver Info
