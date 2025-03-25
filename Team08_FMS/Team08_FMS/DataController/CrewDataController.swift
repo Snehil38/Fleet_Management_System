@@ -19,20 +19,6 @@ class CrewDataController: ObservableObject {
     
     private init() {
         loadFleetManagers()
-        
-        Task {
-            do {
-                let driver = try await SupabaseDataController.shared.fetchDrivers()
-                let personnel = try await SupabaseDataController.shared.fetchMaintenancePersonnel()
-                print(maintenancePersonnel)
-                await MainActor.run {
-                    drivers = driver
-                    maintenancePersonnel = personnel
-                }
-            } catch {
-                print(error.localizedDescription)
-            }
-        }
     }
     
     // MARK: - Loading Sample Data
