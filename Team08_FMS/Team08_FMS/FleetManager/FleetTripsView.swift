@@ -3,10 +3,33 @@ import SwiftUI
 struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
     @State private var showingError = false
+    @State private var selectedFilter = 0
+    
+    var filteredTrips: [Trip] {
+        switch selectedFilter {
+        case 0: // Current
+            return tripController.upcomingTrips.filter { $0.status == .inProgress }
+        case 1: // Upcoming
+            return tripController.upcomingTrips.filter { $0.status == .pending || $0.status == .assigned }
+        case 2: // Completed
+            return tripController.upcomingTrips.filter { $0.status == .delivered }
+        default:
+            return []
+        }
+    }
     
     var body: some View {
         NavigationView {
             VStack {
+                // Filter control
+                Picker("Trip Filter", selection: $selectedFilter) {
+                    Text("Current").tag(0)
+                    Text("Upcoming").tag(1)
+                    Text("Completed").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .padding()
+                
                 // Simple header section
                 HStack {
                     Text("All Trips")
@@ -24,15 +47,15 @@ struct FleetTripsView: View {
                 .padding(.top)
                 
                 // Trip list
-                if tripController.upcomingTrips.isEmpty {
+                if filteredTrips.isEmpty {
                     EmptyTripsView()
                         .onAppear {
-                            print("No upcoming trips to display")
+                            print("No trips to display for selected filter")
                         }
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(tripController.upcomingTrips) { trip in
+                            ForEach(filteredTrips) { trip in
                                 NavigationLink(destination: TripDetailView(trip: trip)) {
                                     TripCardView(trip: trip)
                                 }
@@ -44,7 +67,7 @@ struct FleetTripsView: View {
                         }
                         .padding()
                         .onAppear {
-                            print("Displaying \(tripController.upcomingTrips.count) trips")
+                            print("Displaying \(filteredTrips.count) trips")
                         }
                     }
                 }
