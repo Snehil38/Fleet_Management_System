@@ -205,7 +205,6 @@ struct TripStatusBadge: View {
         case .assigned: return Color.blue
         case .inProgress: return Color.orange
         case .completed: return Color.green
-        default: return Color.gray
         }
     }
 }
