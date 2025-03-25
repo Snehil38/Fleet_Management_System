@@ -341,29 +341,22 @@ struct TripCardView: View {
             if trip.status != .delivered {
                 Divider()
                 
-                VStack(spacing: 12) {
-                    // Driver Assignment Button or Driver Info
+                HStack {
                     if trip.driverId == nil {
-                        HStack {
-                            Image(systemName: "person.badge.plus")
-                                .foregroundColor(.blue)
-                            Text("Driver Unassigned")
-                                .foregroundColor(.blue)
-                                .fontWeight(.medium)
-                            
-                            Spacer()
-                        }
+                        Image(systemName: "person.badge.plus")
+                            .foregroundColor(.blue)
+                        Text("Driver Unassigned")
+                            .foregroundColor(.blue)
+                            .fontWeight(.medium)
                     } else {
-                        HStack {
-                            Image(systemName: "person.fill")
-                                .foregroundColor(.green)
-                            Text("Driver Assigned")
-                                .font(.subheadline)
-                                .foregroundColor(.green)
-                            
-                            Spacer()
-                        }
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.green)
+                        Text("Driver Assigned")
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
                     }
+                    
+                    Spacer()
                 }
                 .padding()
             }
@@ -372,9 +365,8 @@ struct TripCardView: View {
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5)
         .onTapGesture {
-            // Navigate to trip detail on tap
             if trip.driverId == nil {
-                // For unassigned trips, open assignment sheet
+                // Open assignment sheet for unassigned trips
                 showingAssignSheet = true
             }
         }
@@ -578,9 +570,12 @@ struct LabeledContent: View {
 struct AssignDriverView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var crewController = CrewDataController.shared
+    @StateObject private var tripController = TripDataController.shared
     let trip: Trip
     @State private var selectedDriverId: UUID?
     @State private var isLoading = false
+    @State private var errorMessage = ""
+    @State private var showingError = false
     
     var body: some View {
         NavigationView {
@@ -615,6 +610,20 @@ struct AssignDriverView: View {
             .onAppear {
                 crewController.update()
             }
+            .overlay {
+                if isLoading {
+                    ProgressView("Assigning driver...")
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(8)
+                        .shadow(radius: 2)
+                }
+            }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
         }
     }
     
@@ -624,14 +633,35 @@ struct AssignDriverView: View {
         
         Task {
             do {
-                try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
+                if trip.status == .pending {
+                    // If trip is pending, update both driver and status in a single operation
+                    try await SupabaseDataController.shared.databaseFrom("trips")
+                        .update([
+                            "driver_id": driverId,
+                            "trip_status": "assigned"
+                        ])
+                        .eq("id", value: trip.id)
+                        .execute()
+                } else {
+                    // Otherwise, just update the driver
+                    try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
+                }
+                
+                // Refresh the trips to update the UI
+                await tripController.refreshAllTrips()
+                
                 await MainActor.run {
+                    isLoading = false
                     dismiss()
                 }
             } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = "Error assigning driver: \(error.localizedDescription)"
+                    showingError = true
+                }
                 print("Error assigning driver: \(error)")
             }
-            isLoading = false
         }
     }
 }
