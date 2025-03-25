@@ -350,8 +350,8 @@ class TripDataController: ObservableObject {
             }
             
             // Update trip status in Supabase to delivered
-            try await supabaseController.updateTrip(id: trip.id, status: "completed")
-            print("Updated trip status to 'completed'")
+            try await supabaseController.updateTrip(id: trip.id, status: "delivered")
+            print("Updated trip status to 'delivered'")
             
             // Update end time in Supabase
             let response = try await supabaseController.databaseFrom("trips")
