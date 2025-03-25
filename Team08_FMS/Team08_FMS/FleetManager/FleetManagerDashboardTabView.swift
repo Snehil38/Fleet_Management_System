@@ -742,6 +742,7 @@ struct AddTripView: View {
             guard let vehicle = selectedVehicle else { return }
             
             let tripName = "TRP-\(UUID().uuidString.prefix(8))"
+            let estimatedHours = distance / 40.0 // Convert to hours
             
             do {
                 let success = try await supabaseDataController.createTrip(
@@ -755,7 +756,10 @@ struct AddTripView: View {
                     startLong: pickupCoordinate?.longitude,
                     endLat: dropoffCoordinate?.latitude,
                     endLong: dropoffCoordinate?.longitude,
-                    notes: "Cargo Type: \(cargoType)\nEstimated Distance: \(String(format: "%.1f", distance)) km\nEstimated Fuel Cost: $\(String(format: "%.2f", fuelCost))\n\(notes)"
+                    notes: "Cargo Type: \(cargoType)\nEstimated Distance: \(String(format: "%.1f", distance)) km\nEstimated Fuel Cost: $\(String(format: "%.2f", fuelCost))",
+                    distance: distance,
+                    time: estimatedHours,
+                    cost: fuelCost
                 )
                 
                 if success {
