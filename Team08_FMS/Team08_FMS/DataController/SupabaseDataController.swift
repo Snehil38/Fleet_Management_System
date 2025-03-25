@@ -795,63 +795,30 @@ class SupabaseDataController: ObservableObject {
     
     func fetchVehicles() async throws -> [Vehicle] {
         do {
+            // Specify only the fields we need for the list view
+            // This significantly reduces the data transfer size
             let response = try await supabase
                 .from("vehicles")
-                .select()
+                .select("id, name, year, make, model, vin, license_plate, vehicle_type, color, body_type, body_subtype, msrp, pollution_expiry, insurance_expiry, status, driver_id")
                 .notEquals("status", value: "Decommissioned")
+                .limit(100) // Add pagination to improve performance
                 .execute()
             
             let data = response.data
             
-            // Decode JSON as an array of dictionaries first.
-            guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
-                print("Invalid JSON structure")
-                return []
-            }
+            // Configure date formatter for decoding
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             
-            // Set up input formatter for "yyyy-MM-dd"
-            let inputFormatter = DateFormatter()
-            inputFormatter.dateFormat = "yyyy-MM-dd"
-            inputFormatter.locale = Locale(identifier: "en_US_POSIX")
-            
-            // Set up output formatter for "yyyy-MM-dd" (you can change this if needed)
-            let outputFormatter = DateFormatter()
-            outputFormatter.dateFormat = "yyyy-MM-dd"
-            outputFormatter.locale = Locale(identifier: "en_US_POSIX")
-            outputFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            
-            // Fix date format for pollution_expiry and insurance_expiry fields.
-            for i in 0..<jsonArray.count {
-                // Convert pollution_expiry from string to Date and back to formatted string.
-                if let pollutionExpiryString = jsonArray[i]["pollution_expiry"] as? String,
-                   let pollutionDate = inputFormatter.date(from: pollutionExpiryString) {
-                    let formattedPollutionExpiry = outputFormatter.string(from: pollutionDate)
-                    jsonArray[i]["pollution_expiry"] = formattedPollutionExpiry
-                }
-                
-                // Convert insurance_expiry from string to Date and back to formatted string.
-                if let insuranceExpiryString = jsonArray[i]["insurance_expiry"] as? String,
-                   let insuranceDate = inputFormatter.date(from: insuranceExpiryString) {
-                    let formattedInsuranceExpiry = outputFormatter.string(from: insuranceDate)
-                    jsonArray[i]["insurance_expiry"] = formattedInsuranceExpiry
-                }
-            }
-            
-            // Convert the transformed JSON array back to Data.
-            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
-            
-            // Create a date formatter for decoding dates from JSON.
-            let decoderDateFormatter = DateFormatter()
-            decoderDateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            decoderDateFormatter.dateFormat = "yyyy-MM-dd"
-            decoderDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            
+            // Configure decoder with date formatter
             let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .formatted(decoderDateFormatter)
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
             
-            // Decode into Vehicle model
-            let vehicles = try decoder.decode([Vehicle].self, from: transformedData)
-//            print("Decoded Vehicles: \(vehicles)")
+            // Decode data directly - just like maintenance personnel
+            let vehicles = try decoder.decode([Vehicle].self, from: data)
+            
             return vehicles
         } catch {
             print("Error fetching vehicles: \(error)")
@@ -1164,6 +1131,40 @@ class SupabaseDataController: ObservableObject {
         } catch {
             print("Error creating trip: \(error)")
             return false
+        }
+    }
+
+    // Optimized function to fetch a single vehicle with all details including documents
+    func fetchVehicleDetails(vehicleId: UUID) async throws -> Vehicle? {
+        do {
+            // First check if we already have this vehicle in memory
+            // If so, we can fetch just the documents to supplement the data
+            
+            let response = try await supabase
+                .from("vehicles")
+                .select("*") // Need all fields including documents
+                .eq("id", value: vehicleId)
+                .single() // Only need one record
+                .execute()
+            
+            let data = response.data
+            
+            // Configure date formatter for decoding
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            // Configure decoder with date formatter
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            
+            // Decode directly
+            let vehicle = try decoder.decode(Vehicle.self, from: data)
+            return vehicle
+        } catch {
+            print("Error fetching vehicle details: \(error)")
+            return nil
         }
     }
 }

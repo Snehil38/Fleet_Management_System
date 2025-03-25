@@ -182,6 +182,8 @@ struct VehicleDetailView: View {
     @ObservedObject var vehicleManager: VehicleManager
     @State private var isEditing = false
     @State private var isSaving = false
+    @State private var isLoadingDetails = false
+    @State private var detailLoadError: String? = nil
 
     var vehicle: Vehicle?
     
@@ -319,7 +321,7 @@ struct VehicleDetailView: View {
                 // View mode sections
                 readOnlyBasicInfoSection
                 readOnlyVehicleDetailsSection
-//                readOnlyDocumentsSection
+                readOnlyDocumentsSection
             }
         }
         .navigationTitle("Vehicle Details")
@@ -349,6 +351,22 @@ struct VehicleDetailView: View {
                 if let data = try? await newItem?.loadTransferable(type: Data.self) {
                     insurance = data
                 }
+            }
+        }
+        .onAppear {
+            if let vehicle = vehicle {
+                loadVehicleDetails()
+            }
+        }
+        .overlay {
+            if isLoadingDetails && vehicle != nil && !isEditing {
+                Color.black.opacity(0.1)
+                    .ignoresSafeArea()
+                ProgressView("Loading vehicle details...")
+                    .padding()
+                    .background(Color(UIColor.systemBackground).opacity(0.8))
+                    .cornerRadius(10)
+                    .shadow(radius: 3)
             }
         }
     }
@@ -420,22 +438,83 @@ struct VehicleDetailView: View {
         }
     }
     
-//    private var readOnlyDocumentsSection: some View {
-//        Section("Documents") {
-//            VehicleDocuments
-//            
-//            VehicleDocuments(
-//                title: "Registration Certificate",
-//                hasDocument: vehicle?.documents?.rc != nil
-//            )
-//            
-//            VehicleDocuments(
-//                title: "Insurance",
-//                hasDocument: vehicle?.documents?.insurance != nil,
-//                expiry: vehicle?.insuranceExpiry
-//            )
-//        }
-//    }
+    // MARK: - Read-Only Document Section
+    private var readOnlyDocumentsSection: some View {
+        Section("Documents") {
+            if isLoadingDetails {
+                ProgressView("Loading documents...")
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+            } else if let error = detailLoadError {
+                VStack(alignment: .center, spacing: 10) {
+                    Text("Failed to load documents")
+                        .foregroundColor(.red)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Button("Retry") {
+                        loadVehicleDetails()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding()
+            } else {
+                // Display document information
+                if let pollution = pollutionCertificate {
+                    HStack {
+                        Text("Pollution Certificate")
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                    Text("Expires: \(pollutionExpiry.formatted(date: .long, time: .omitted))")
+                        .font(.caption)
+                } else {
+                    HStack {
+                        Text("Pollution Certificate")
+                        Spacer()
+                        Text("Not available")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                if let rc = rc {
+                    HStack {
+                        Text("RC")
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                } else {
+                    HStack {
+                        Text("RC")
+                        Spacer()
+                        Text("Not available")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                if let insurance = insurance {
+                    HStack {
+                        Text("Insurance")
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                    Text("Expires: \(insuranceExpiry.formatted(date: .long, time: .omitted))")
+                        .font(.caption)
+                } else {
+                    HStack {
+                        Text("Insurance")
+                        Spacer()
+                        Text("Not available")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+    }
     
     // Extract complex section into a separate computed property
     private var basicInformationSection: some View {
@@ -577,8 +656,12 @@ struct VehicleDetailView: View {
             
             Task {
                 defer { isSaving = false }
-                try await SupabaseDataController.shared.updateVehicle(vehicle: updatedVehicle)
-                vehicleManager.loadVehicles()
+                do {
+                    try await SupabaseDataController.shared.updateVehicle(vehicle: updatedVehicle)
+                    await vehicleManager.loadVehiclesAsync()
+                } catch {
+                    print("Error updating vehicle: \(error.localizedDescription)")
+                }
             }
         } else {
             let newVehicle = Vehicle(
@@ -600,8 +683,12 @@ struct VehicleDetailView: View {
             )
             Task {
                 defer { isSaving = false }
-                try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
-                vehicleManager.loadVehicles()
+                do {
+                    try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
+                    await vehicleManager.loadVehiclesAsync()
+                } catch {
+                    print("Error inserting vehicle: \(error.localizedDescription)")
+                }
             }
         }
         
@@ -610,6 +697,38 @@ struct VehicleDetailView: View {
             isEditing = false
         } else {
             dismiss()
+        }
+    }
+
+    private func loadVehicleDetails() {
+        guard let vehicle = vehicle, vehicle.documents == nil else { return }
+        
+        isLoadingDetails = true
+        detailLoadError = nil
+        
+        Task {
+            do {
+                if let fullDetails = try await SupabaseDataController.shared.fetchVehicleDetails(vehicleId: vehicle.id) {
+                    await MainActor.run {
+                        // Only update the document data
+                        pollutionCertificate = fullDetails.documents?.pollutionCertificate
+                        rc = fullDetails.documents?.rc
+                        insurance = fullDetails.documents?.insurance
+                        
+                        isLoadingDetails = false
+                    }
+                } else {
+                    await MainActor.run {
+                        detailLoadError = "Could not find detailed vehicle information"
+                        isLoadingDetails = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    detailLoadError = error.localizedDescription
+                    isLoadingDetails = false
+                }
+            }
         }
     }
 }
@@ -905,9 +1024,13 @@ struct VehicleSaveView: View {
 
         Task {
             defer { isSaving = false }
-            try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
-            vehicleManager.loadVehicles()
-            dismiss()
+            do {
+                try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
+                await vehicleManager.loadVehiclesAsync()
+                dismiss()
+            } catch {
+                print("Error inserting vehicle: \(error.localizedDescription)")
+            }
         }
     }
 }
