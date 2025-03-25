@@ -206,13 +206,13 @@ struct VehicleDetailView: View {
     @State private var rc: Data?
     @State private var insurance: Data?
     
-    @State private var showingPollutionPicker = false
-    @State private var showingRCPicker = false
-    @State private var showingInsurancePicker = false
-    
-    @State private var selectedPollutionItem: PhotosPickerItem?
-    @State private var selectedRCItem: PhotosPickerItem?
-    @State private var selectedInsuranceItem: PhotosPickerItem?
+//    @State private var showingPollutionPicker = false
+//    @State private var showingRCPicker = false
+//    @State private var showingInsurancePicker = false
+//    
+//    @State private var selectedPollutionItem: PhotosPickerItem?
+//    @State private var selectedRCItem: PhotosPickerItem?
+//    @State private var selectedInsuranceItem: PhotosPickerItem?
     
     // MARK: - Field "Touched" States
     @State private var nameEdited = false
@@ -316,7 +316,7 @@ struct VehicleDetailView: View {
                 vehicleDetailsSection
                 
                 // Documents Section
-                documentSection
+//                documentSection
             } else {
                 // View mode sections
                 readOnlyBasicInfoSection
@@ -329,30 +329,30 @@ struct VehicleDetailView: View {
         .toolbar {
             toolbarItems
         }
-        .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
-        .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
-        .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
-        .onChange(of: selectedPollutionItem) { _, newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                    pollutionCertificate = data
-                }
-            }
-        }
-        .onChange(of: selectedRCItem) { _, newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                    rc = data
-                }
-            }
-        }
-        .onChange(of: selectedInsuranceItem) { _, newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                    insurance = data
-                }
-            }
-        }
+//        .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
+//        .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
+//        .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
+//        .onChange(of: selectedPollutionItem) { _, newItem in
+//            Task {
+//                if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                    pollutionCertificate = data
+//                }
+//            }
+//        }
+//        .onChange(of: selectedRCItem) { _, newItem in
+//            Task {
+//                if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                    rc = data
+//                }
+//            }
+//        }
+//        .onChange(of: selectedInsuranceItem) { _, newItem in
+//            Task {
+//                if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                    insurance = data
+//                }
+//            }
+//        }
 //        .onAppear {
 //            if let vehicle = vehicle {
 //                loadVehicleDetails()
@@ -404,18 +404,18 @@ struct VehicleDetailView: View {
         }
     }
     
-    private var documentSection: some View {
-        DocumentsSection(
-            pollutionCertificate: $pollutionCertificate,
-            rc: $rc,
-            insurance: $insurance,
-            pollutionExpiry: $pollutionExpiry,
-            insuranceExpiry: $insuranceExpiry,
-            showingPollutionPicker: $showingPollutionPicker,
-            showingRCPicker: $showingRCPicker,
-            showingInsurancePicker: $showingInsurancePicker
-        )
-    }
+//    private var documentSection: some View {
+//        DocumentsSection(
+//            pollutionCertificate: $pollutionCertificate,
+//            rc: $rc,
+//            insurance: $insurance,
+//            pollutionExpiry: $pollutionExpiry,
+//            insuranceExpiry: $insuranceExpiry,
+//            showingPollutionPicker: $showingPollutionPicker,
+//            showingRCPicker: $showingRCPicker,
+//            showingInsurancePicker: $showingInsurancePicker
+//        )
+//    }
     
     private var readOnlyBasicInfoSection: some View {
         Section("Basic Information") {
@@ -930,16 +930,16 @@ struct VehicleSaveView: View {
                 }
 
                 // Documents Section remains unchanged.
-                DocumentsSection(
-                    pollutionCertificate: $pollutionCertificate,
-                    rc: $rc,
-                    insurance: $insurance,
-                    pollutionExpiry: $pollutionExpiry,
-                    insuranceExpiry: $insuranceExpiry,
-                    showingPollutionPicker: $showingPollutionPicker,
-                    showingRCPicker: $showingRCPicker,
-                    showingInsurancePicker: $showingInsurancePicker
-                )
+//                DocumentsSection(
+//                    pollutionCertificate: $pollutionCertificate,
+//                    rc: $rc,
+//                    insurance: $insurance,
+//                    pollutionExpiry: $pollutionExpiry,
+//                    insuranceExpiry: $insuranceExpiry,
+//                    showingPollutionPicker: $showingPollutionPicker,
+//                    showingRCPicker: $showingRCPicker,
+//                    showingInsurancePicker: $showingInsurancePicker
+//                )
             }
             .navigationTitle("Add Vehicle")
             .navigationBarTitleDisplayMode(.inline)
