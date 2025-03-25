@@ -181,7 +181,7 @@ class TripDataController: ObservableObject {
                 self.upcomingTrips = upcoming
                 
                 // Convert completed trips to delivery details
-                let completedTrips = tripsWithVehicles.filter { $0.status == .completed }
+                let completedTrips = tripsWithVehicles.filter { $0.status == .delivered }
                 print("Found \(completedTrips.count) completed trips")
                 self.recentDeliveries = completedTrips.map { trip in
                     DeliveryDetails(
@@ -393,7 +393,7 @@ class TripDataController: ObservableObject {
             do {
                 print("Marking trip \(trip.id) as delivered...")
                 // Update trip status in Supabase
-                try await supabaseController.updateTrip(id: trip.id, status: TripStatus.completed.rawValue)
+                try await supabaseController.updateTrip(id: trip.id, status: TripStatus.delivered.rawValue)
                 
                 print("Successfully marked trip as delivered")
                 // Fetch updated data

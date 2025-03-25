@@ -221,7 +221,7 @@ struct TripStatusBadge: View {
         case .pending: return "Unassigned"
         case .assigned: return "Assigned"
         case .inProgress: return "In Progress"
-        case .completed: return "Completed"
+        case .delivered: return "Completed"
         }
     }
     
@@ -230,7 +230,7 @@ struct TripStatusBadge: View {
         case .pending: return Color(.systemGray5)
         case .assigned: return Color.blue.opacity(0.2)
         case .inProgress: return Color.orange.opacity(0.2)
-        case .completed: return Color.green.opacity(0.2)
+        case .delivered: return Color.green.opacity(0.2)
         }
     }
     
@@ -239,7 +239,7 @@ struct TripStatusBadge: View {
         case .pending: return Color(.darkGray)
         case .assigned: return Color.blue
         case .inProgress: return Color.orange
-        case .completed: return Color.green
+        case .delivered: return Color.green
         default: return Color.gray
         }
     }

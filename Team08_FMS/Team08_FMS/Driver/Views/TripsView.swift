@@ -83,7 +83,7 @@ struct TripsView: View {
                     address: delivery.location,
                     eta: "",
                     distance: "",
-                    status: .completed,
+                    status: .delivered,
                     vehicleDetails: Vehicle(
                         name: "Tesla",
                         year: 2023,
@@ -168,7 +168,7 @@ struct TripCard: View {
             return "In Progress"
         case .pending:
             return "Pending"
-        case .completed:
+        case .delivered:
             return "Completed"
         case .assigned:
             return "Assigned"
@@ -181,7 +181,7 @@ struct TripCard: View {
             return .blue
         case .pending:
             return .green
-        case .completed:
+        case .delivered:
             return .gray
         case .assigned:
             return .yellow

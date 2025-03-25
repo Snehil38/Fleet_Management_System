@@ -714,7 +714,7 @@ struct DriverTabView: View {
             
             // Clear current trip if no more trips
             if tripQueue.isEmpty && upcomingTrips.isEmpty {
-                currentTrip.status = .completed
+                currentTrip.status = .delivered
             }
         }
     }
