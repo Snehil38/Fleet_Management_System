@@ -138,6 +138,25 @@ struct Vehicle: Identifiable, Codable, Equatable {
                lhs.status == rhs.status &&
                lhs.driverId == rhs.driverId
     }
+    
+    static func mockVehicle(licensePlate: String = "Unknown") -> Vehicle {
+        Vehicle(
+            name: "Mock Vehicle",
+            year: 2024,
+            make: "Generic",
+            model: "Model",
+            vin: "12345678901234567",
+            licensePlate: licensePlate,
+            vehicleType: .truck,
+            color: "White",
+            bodyType: .cargo,
+            bodySubtype: "Standard",
+            msrp: 50000.0,
+            pollutionExpiry: Date().addingTimeInterval(365*24*60*60),
+            insuranceExpiry: Date().addingTimeInterval(365*24*60*60),
+            status: .available
+        )
+    }
 }
 
 // MARK: - Supporting Data Models

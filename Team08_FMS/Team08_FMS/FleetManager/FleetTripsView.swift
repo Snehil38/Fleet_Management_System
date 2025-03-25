@@ -1,18 +1,54 @@
 import SwiftUI
+import CoreLocation
 
 struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
     @State private var showingError = false
     @State private var selectedFilter = 0
     
+    var currentTrips: [Trip] {
+        if let currentTrip = tripController.currentTrip {
+            return [currentTrip]
+        }
+        return []
+    }
+    
+    var upcomingTrips: [Trip] {
+        return tripController.upcomingTrips
+    }
+    
+    var completedTrips: [Trip] {
+        return tripController.recentDeliveries.compactMap { delivery in
+            // Convert DeliveryDetails back to Trip format
+            Trip(
+                id: delivery.id,
+                name: delivery.notes.components(separatedBy: "\n").first?.replacingOccurrences(of: "Trip: ", with: "") ?? "Unknown",
+                destination: delivery.location,
+                address: delivery.location,
+                eta: "",
+                distance: "",
+                status: .delivered,
+                hasCompletedPreTrip: true,
+                hasCompletedPostTrip: true,
+                vehicleDetails: Vehicle.mockVehicle(licensePlate: delivery.vehicle),
+                sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                startingPoint: "",
+                notes: delivery.notes,
+                startTime: nil,
+                endTime: nil
+            )
+        }
+    }
+    
     var filteredTrips: [Trip] {
         switch selectedFilter {
         case 0: // Current
-            return tripController.upcomingTrips.filter { $0.status == .inProgress }
+            return currentTrips
         case 1: // Upcoming
-            return tripController.upcomingTrips.filter { $0.status == .pending || $0.status == .assigned }
+            return upcomingTrips
         case 2: // Completed
-            return tripController.upcomingTrips.filter { $0.status == .delivered }
+            return completedTrips
         default:
             return []
         }
@@ -30,9 +66,34 @@ struct FleetTripsView: View {
                 .pickerStyle(.segmented)
                 .padding()
                 
+                // Trip counts
+                HStack(spacing: 16) {
+                    ForEach(0..<3) { index in
+                        let count = getTripCount(for: index)
+                        let label = ["Current", "Upcoming", "Completed"][index]
+                        
+                        VStack {
+                            Text("\(count)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            Text(label)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(selectedFilter == index ? Color.blue.opacity(0.1) : Color.clear)
+                        .cornerRadius(8)
+                        .onTapGesture {
+                            selectedFilter = index
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                
                 // Simple header section
                 HStack {
-                    Text("All Trips")
+                    Text(getHeaderTitle())
                         .font(.headline)
                     
                     Spacer()
@@ -48,7 +109,7 @@ struct FleetTripsView: View {
                 
                 // Trip list
                 if filteredTrips.isEmpty {
-                    EmptyTripsView()
+                    EmptyTripsView(filterType: selectedFilter)
                         .onAppear {
                             print("No trips to display for selected filter")
                         }
@@ -60,15 +121,9 @@ struct FleetTripsView: View {
                                     TripCardView(trip: trip)
                                 }
                                 .buttonStyle(PlainButtonStyle())
-                                .onAppear {
-                                    print("Rendering trip: \(trip.name)")
-                                }
                             }
                         }
                         .padding()
-                        .onAppear {
-                            print("Displaying \(filteredTrips.count) trips")
-                        }
                     }
                 }
             }
@@ -93,24 +148,64 @@ struct FleetTripsView: View {
             }
             .onAppear {
                 print("FleetTripsView appeared")
-                print("Current trips count: \(tripController.upcomingTrips.count)")
                 Task {
                     await tripController.refreshTrips()
                 }
             }
         }
     }
+    
+    private func getTripCount(for filterIndex: Int) -> Int {
+        switch filterIndex {
+        case 0: // Current
+            return currentTrips.count
+        case 1: // Upcoming
+            return upcomingTrips.count
+        case 2: // Completed
+            return completedTrips.count
+        default:
+            return 0
+        }
+    }
+    
+    private func getHeaderTitle() -> String {
+        switch selectedFilter {
+        case 0:
+            return "Current Trips"
+        case 1:
+            return "Upcoming Trips"
+        case 2:
+            return "Completed Trips"
+        default:
+            return "All Trips"
+        }
+    }
 }
 
-// Empty state view
+// Update EmptyTripsView to show different messages based on filter
 struct EmptyTripsView: View {
+    let filterType: Int
+    
+    var emptyMessage: String {
+        switch filterType {
+        case 0:
+            return "No trips currently in progress"
+        case 1:
+            return "No upcoming trips scheduled"
+        case 2:
+            return "No completed trips"
+        default:
+            return "No trips available"
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "shippingbox")
                 .font(.system(size: 64))
                 .foregroundColor(Color(.systemGray4))
             
-            Text("No Trips")
+            Text(emptyMessage)
                 .font(.headline)
                 .multilineTextAlignment(.center)
             
