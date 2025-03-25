@@ -398,23 +398,43 @@ class TripDataController: ObservableObject {
         }
     }
     
-    // Add a function to start a trip (update from upcoming to current)
+    // Update startTrip to handle the transition from upcoming to current status
     @MainActor
     func startTrip(trip: Trip) async throws {
         print("Starting trip \(trip.id)")
         
+        // Check if there's already a trip in progress
+        if let currentTrip = self.currentTrip {
+            throw TripError.updateError("Cannot start a new trip while another trip is in progress")
+        }
+        
         do {
-            // Update trip status in Supabase to current
+            // First update the trip status
             try await supabaseController.updateTrip(id: trip.id, status: "current")
             print("Updated trip status to 'current'")
             
-            // Update start time in Supabase
+            // Then update the start time in a separate call
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+            let formattedDate = dateFormatter.string(from: Date())
+            
             let response = try await supabaseController.databaseFrom("trips")
-                .update(["start_time": Date()])
+                .update([
+                    "start_time": formattedDate,
+                    "trip_status": "current"
+                ])
                 .eq("id", value: trip.id)
                 .execute()
             
             print("Updated trip start_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Update local state
+            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
+                var updatedTrip = upcomingTrips[index]
+                updatedTrip.status = .inProgress
+                self.currentTrip = updatedTrip
+                upcomingTrips.remove(at: index)
+            }
             
             // Refresh trips to ensure everything is in sync with server
             try await fetchTrips()

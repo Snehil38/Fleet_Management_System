@@ -27,6 +27,7 @@ struct Trip: Identifiable, Equatable {
     let sourceCoordinate: CLLocationCoordinate2D
     let destinationCoordinate: CLLocationCoordinate2D
     let startingPoint: String
+    let pickup: String?
     
     static func == (lhs: Trip, rhs: Trip) -> Bool {
         return lhs.id == rhs.id &&
@@ -46,10 +47,11 @@ struct Trip: Identifiable, Equatable {
                lhs.sourceCoordinate.longitude == rhs.sourceCoordinate.longitude &&
                lhs.destinationCoordinate.latitude == rhs.destinationCoordinate.latitude &&
                lhs.destinationCoordinate.longitude == rhs.destinationCoordinate.longitude &&
-               lhs.startingPoint == rhs.startingPoint
+               lhs.startingPoint == rhs.startingPoint &&
+               lhs.pickup == rhs.pickup
     }
     
-    init(id: UUID = UUID(), name: String, destination: String, address: String, eta: String, distance: String, status: TripStatus, hasCompletedPreTrip: Bool = false, hasCompletedPostTrip: Bool = false, vehicleDetails: Vehicle, sourceCoordinate: CLLocationCoordinate2D, destinationCoordinate: CLLocationCoordinate2D, startingPoint: String, notes: String? = nil, startTime: Date? = nil, endTime: Date? = nil) {
+    init(id: UUID = UUID(), name: String, destination: String, address: String, eta: String, distance: String, status: TripStatus, hasCompletedPreTrip: Bool = false, hasCompletedPostTrip: Bool = false, vehicleDetails: Vehicle, sourceCoordinate: CLLocationCoordinate2D, destinationCoordinate: CLLocationCoordinate2D, startingPoint: String, notes: String? = nil, startTime: Date? = nil, endTime: Date? = nil, pickup: String? = nil) {
         self.id = id
         self.name = name
         self.destination = destination
@@ -66,6 +68,7 @@ struct Trip: Identifiable, Equatable {
         self.notes = notes
         self.startTime = startTime
         self.endTime = endTime
+        self.pickup = pickup
     }
     
     static func mockCurrentTrip() -> Trip {
@@ -78,12 +81,6 @@ struct Trip: Identifiable, Equatable {
             distance: "8.5 km",
             status: .inProgress,
             vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
-//                VehicleDetails(
-//                number: "TRK-001",
-//                type: "Heavy Truck",
-//                licensePlate: "MH-01-AB-1234",
-//                capacity: "40 tons"
-//            ),
             sourceCoordinate: CLLocationCoordinate2D(
                 latitude: 19.0178,  // Mumbai region
                 longitude: 72.8478
@@ -92,7 +89,8 @@ struct Trip: Identifiable, Equatable {
                 latitude: 18.9490,  // JNPT coordinates
                 longitude: 72.9492
             ),
-            startingPoint: "Mumbai"
+            startingPoint: "Mumbai",
+            pickup: "Mumbai Central"
         )
     }
     
@@ -132,6 +130,7 @@ struct Trip: Identifiable, Equatable {
         self.notes = supabaseTrip.notes
         self.startTime = supabaseTrip.start_time
         self.endTime = supabaseTrip.end_time
+        self.pickup = supabaseTrip.pickup
         
         // Extract distance and ETA from notes
         if let notes = supabaseTrip.notes,

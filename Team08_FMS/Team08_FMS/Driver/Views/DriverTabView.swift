@@ -61,6 +61,7 @@ struct DriverTabView: View {
             }
             .tag(1)
         }
+        .environmentObject(tripController)
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
         .onChange(of: tripController.currentTrip) { newTrip in
             currentTrip = newTrip
@@ -679,25 +680,8 @@ struct DriverTabView: View {
     private var upcomingTripsList: some View {
         VStack(spacing: 0) {
             ForEach(upcomingTrips) { trip in
-                UpcomingTripRow(
-                    trip: trip,
-                    onAccept: {
-                        if availabilityManager.isAvailable {
-                            tripQueue.append(trip)
-                            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
-                                upcomingTrips.remove(at: index)
-                            }
-                        } else {
-                            alertMessage = "You must be available to accept new trips"
-                            showingAlert = true
-                        }
-                    },
-                    onDecline: {
-                        if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
-                            upcomingTrips.remove(at: index)
-                        }
-                    }
-                )
+                UpcomingTripRow(trip: trip)
+                    .environmentObject(tripController)
                 if trip.id != upcomingTrips.last?.id {
                     Divider()
                         .padding(.horizontal)
@@ -953,70 +937,55 @@ struct DeliveryRow: View {
 
 struct UpcomingTripRow: View {
     let trip: Trip
-    let onAccept: () -> Void
-    let onDecline: () -> Void
-    @State private var showingDeclineAlert = false
+    @EnvironmentObject var tripController: TripDataController
+    @State private var showingAlert = false
+    @State private var errorMessage = ""
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(trip.name)
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    Text(trip.destination)
-                        .font(.headline)
-                    Text(trip.address)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
+        VStack(alignment: .leading) {
+            HStack {
+                Text(trip.destination)
+                    .font(.headline)
                 Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(trip.eta)
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                    Text(trip.distance)
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                Button(action: {
+                    Task {
+                        do {
+                            try await tripController.startTrip(trip: trip)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                            showingAlert = true
+                        }
+                    }
+                }) {
+                    Text("Start Trip")
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .cornerRadius(8)
                 }
             }
             
-            HStack(spacing: 12) {
-                Button(action: onAccept) {
-                    HStack {
-                        Image(systemName: "checkmark")
-                        Text("Add to Queue")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.green.opacity(0.1))
-                    .foregroundColor(.green)
-                    .cornerRadius(8)
-                }
-                
-                Button(action: { showingDeclineAlert = true }) {
-                    HStack {
-                        Image(systemName: "xmark")
-                        Text("Decline")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.red.opacity(0.1))
-                    .foregroundColor(.red)
-                    .cornerRadius(8)
-                }
+            if let notes = trip.notes {
+                Text(notes)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+            
+            if let pickup = trip.pickup {
+                Text("Pickup: \(pickup)")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
             }
         }
         .padding()
-        .alert(isPresented: $showingDeclineAlert) {
-            Alert(
-                title: Text("Decline Trip"),
-                message: Text("Are you sure you want to decline trip \(trip.name)?"),
-                primaryButton: .destructive(Text("Decline")) {
-                    onDecline()
-                },
-                secondaryButton: .cancel()
-            )
+        .background(Color(.systemBackground))
+        .cornerRadius(10)
+        .shadow(radius: 2)
+        .alert("Error", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
         }
     }
 }
