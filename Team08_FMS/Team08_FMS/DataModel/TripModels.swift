@@ -4,7 +4,7 @@ import CoreLocation
 // Trip Status Enum
 enum TripStatus: String, Codable {
     case pending = "upcoming"
-    case inProgress = "in_progress"
+    case inProgress = "current"
     case completed = "completed"
     case assigned = "assigned"
 }
@@ -18,12 +18,34 @@ struct Trip: Identifiable {
     let eta: String
     let distance: String
     var status: TripStatus
-    var hasCompletedPreTrip: Bool = false
-    var hasCompletedPostTrip: Bool = false
+    var hasCompletedPreTrip: Bool
+    var hasCompletedPostTrip: Bool
     let vehicleDetails: Vehicle
     let sourceCoordinate: CLLocationCoordinate2D
     let destinationCoordinate: CLLocationCoordinate2D
     let startingPoint: String
+    let notes: String?
+    let startTime: Date?
+    let endTime: Date?
+    
+    init(id: UUID = UUID(), name: String, destination: String, address: String, eta: String, distance: String, status: TripStatus, hasCompletedPreTrip: Bool = false, hasCompletedPostTrip: Bool = false, vehicleDetails: Vehicle, sourceCoordinate: CLLocationCoordinate2D, destinationCoordinate: CLLocationCoordinate2D, startingPoint: String, notes: String? = nil, startTime: Date? = nil, endTime: Date? = nil) {
+        self.id = id
+        self.name = name
+        self.destination = destination
+        self.address = address
+        self.eta = eta
+        self.distance = distance
+        self.status = status
+        self.hasCompletedPreTrip = hasCompletedPreTrip
+        self.hasCompletedPostTrip = hasCompletedPostTrip
+        self.vehicleDetails = vehicleDetails
+        self.sourceCoordinate = sourceCoordinate
+        self.destinationCoordinate = destinationCoordinate
+        self.startingPoint = startingPoint
+        self.notes = notes
+        self.startTime = startTime
+        self.endTime = endTime
+    }
     
     static func mockCurrentTrip() -> Trip {
         Trip(
@@ -76,6 +98,49 @@ struct Trip: Identifiable {
             )
         ]
     }
+    
+    init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
+        self.id = supabaseTrip.id
+        self.name = supabaseTrip.pickup ?? "Trip-\(supabaseTrip.id.uuidString.prefix(8))"
+        self.destination = supabaseTrip.destination
+        self.address = supabaseTrip.pickup ?? "Unknown"
+        self.status = supabaseTrip.trip_status
+        self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
+        self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
+        self.vehicleDetails = vehicle
+        self.notes = supabaseTrip.notes
+        self.startTime = supabaseTrip.start_time
+        self.endTime = supabaseTrip.end_time
+        
+        // Extract distance and ETA from notes
+        if let notes = supabaseTrip.notes,
+           let distanceRange = notes.range(of: "Estimated Distance: "),
+           let endOfDistance = notes[distanceRange.upperBound...].firstIndex(of: " ") {
+            let distanceStr = notes[distanceRange.upperBound..<endOfDistance]
+            self.distance = "\(distanceStr) km"
+        } else {
+            self.distance = "Unknown"
+        }
+        
+        // Calculate ETA based on start and end time
+        if let start = supabaseTrip.start_time, let end = supabaseTrip.end_time {
+            let duration = end.timeIntervalSince(start)
+            self.eta = duration.etaString
+        } else {
+            self.eta = "Unknown"
+        }
+        
+        // Set coordinates from the trip data
+        self.sourceCoordinate = CLLocationCoordinate2D(
+            latitude: supabaseTrip.start_latitude ?? 0,
+            longitude: supabaseTrip.start_longitude ?? 0
+        )
+        self.destinationCoordinate = CLLocationCoordinate2D(
+            latitude: supabaseTrip.end_latitude ?? 0,
+            longitude: supabaseTrip.end_longitude ?? 0
+        )
+        self.startingPoint = supabaseTrip.pickup ?? "Unknown"
+    }
 }
 
 // Delivery Details Model
@@ -110,41 +175,55 @@ struct SupabaseTrip: Codable, Identifiable {
     let end_longitude: Double?
     let pickup: String?
     
-    enum CodingKeys: String, CodingKey {
-        case id, destination, trip_status, has_completed_pre_trip, has_completed_post_trip
-        case vehicle_id, driver_id, start_time, end_time, notes, created_at, updated_at
-        case is_deleted, start_latitude, start_longitude, end_latitude, end_longitude, pickup
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case destination
+        case trip_status = "trip_status"
+        case has_completed_pre_trip
+        case has_completed_post_trip
+        case vehicle_id
+        case driver_id
+        case start_time
+        case end_time
+        case notes
+        case created_at
+        case updated_at
+        case is_deleted
+        case start_latitude
+        case start_longitude
+        case end_latitude
+        case end_longitude
+        case pickup
     }
-}
-
-extension Trip {
-    init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
-        self.id = supabaseTrip.id
-        self.name = "TRP-\(supabaseTrip.id.uuidString.prefix(8))"
-        self.destination = supabaseTrip.destination
-        self.address = supabaseTrip.pickup ?? "Unknown"
-        self.eta = supabaseTrip.end_time?.timeIntervalSince(Date()).etaString ?? ""
-        self.distance = ""  // Would need to calculate this
-        self.status = supabaseTrip.trip_status
-        self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
-        self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
-        self.vehicleDetails = vehicle
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        if let startLat = supabaseTrip.start_latitude,
-           let startLong = supabaseTrip.start_longitude {
-            self.sourceCoordinate = CLLocationCoordinate2D(latitude: startLat, longitude: startLong)
-        } else {
-            self.sourceCoordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        id = try container.decode(UUID.self, forKey: .id)
+        destination = try container.decode(String.self, forKey: .destination)
+        
+        // Handle trip_status as a string that needs to be converted to TripStatus
+        let statusString = try container.decode(String.self, forKey: .trip_status)
+        guard let status = TripStatus(rawValue: statusString) else {
+            throw DecodingError.dataCorruptedError(forKey: .trip_status, in: container, debugDescription: "Invalid trip status: \(statusString)")
         }
+        trip_status = status
         
-        if let endLat = supabaseTrip.end_latitude,
-           let endLong = supabaseTrip.end_longitude {
-            self.destinationCoordinate = CLLocationCoordinate2D(latitude: endLat, longitude: endLong)
-        } else {
-            self.destinationCoordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
-        }
-        
-        self.startingPoint = supabaseTrip.pickup ?? "Unknown"
+        has_completed_pre_trip = try container.decode(Bool.self, forKey: .has_completed_pre_trip)
+        has_completed_post_trip = try container.decode(Bool.self, forKey: .has_completed_post_trip)
+        vehicle_id = try container.decode(UUID.self, forKey: .vehicle_id)
+        driver_id = try container.decodeIfPresent(UUID.self, forKey: .driver_id)
+        start_time = try container.decodeIfPresent(Date.self, forKey: .start_time)
+        end_time = try container.decodeIfPresent(Date.self, forKey: .end_time)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        created_at = try container.decode(Date.self, forKey: .created_at)
+        updated_at = try container.decodeIfPresent(Date.self, forKey: .updated_at)
+        is_deleted = try container.decode(Bool.self, forKey: .is_deleted)
+        start_latitude = try container.decodeIfPresent(Double.self, forKey: .start_latitude)
+        start_longitude = try container.decodeIfPresent(Double.self, forKey: .start_longitude)
+        end_latitude = try container.decodeIfPresent(Double.self, forKey: .end_latitude)
+        end_longitude = try container.decodeIfPresent(Double.self, forKey: .end_longitude)
+        pickup = try container.decodeIfPresent(String.self, forKey: .pickup)
     }
 }
 

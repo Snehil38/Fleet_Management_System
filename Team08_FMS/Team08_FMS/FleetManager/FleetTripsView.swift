@@ -16,6 +16,7 @@ struct FleetTripsView: View {
                     
                     Button(action: {
                         // Action for adding a new trip
+                        print("Add Trip button tapped")
                     }) {
                         Label("Add Trip", systemImage: "plus")
                     }
@@ -25,11 +26,14 @@ struct FleetTripsView: View {
                 
                 // Trip list
                 if tripController.upcomingTrips.isEmpty {
+                    print("No upcoming trips to display")
                     EmptyTripsView()
                 } else {
+                    print("Displaying \(tripController.upcomingTrips.count) trips")
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             ForEach(tripController.upcomingTrips) { trip in
+                                print("Rendering trip: \(trip.name)")
                                 NavigationLink(destination: TripDetailView(trip: trip)) {
                                     TripCardView(trip: trip)
                                 }
@@ -58,6 +62,13 @@ struct FleetTripsView: View {
             }
             .onChange(of: tripController.error) { error in
                 showingError = error != nil
+            }
+            .onAppear {
+                print("FleetTripsView appeared")
+                print("Current trips count: \(tripController.upcomingTrips.count)")
+                Task {
+                    try? await tripController.refreshTrips()
+                }
             }
         }
     }

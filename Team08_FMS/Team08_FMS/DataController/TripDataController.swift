@@ -61,40 +61,53 @@ class TripDataController: ObservableObject {
                 .order("created_at", ascending: false)
                 .execute()
             
-            print("Received trips response: \(String(data: response.data, encoding: .utf8) ?? "")")
+            print("Raw response data: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
             let decoder = JSONDecoder()
             
-            // Use ISO8601DateFormatter for more reliable PostgreSQL timestamp parsing
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime, .withFractionalSeconds]
+            // Configure date formatter for PostgreSQL timestamp format
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             
             decoder.dateDecodingStrategy = .custom { decoder in
                 let container = try decoder.singleValueContainer()
-                let dateString = try container.decode(String.self)
+                let dateStr = try container.decode(String.self)
                 
-                // Try parsing with fractional seconds first
-                if let date = formatter.date(from: dateString) {
+                // Try parsing with ISO8601DateFormatter first (handles fractional seconds)
+                let isoFormatter = ISO8601DateFormatter()
+                isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                
+                // First try ISO format with fractional seconds
+                if let date = isoFormatter.date(from: dateStr) {
                     return date
                 }
                 
-                // If that fails, try without fractional seconds
-                formatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
-                if let date = formatter.date(from: dateString) {
-                    return date
+                // If ISO parsing fails, try other formats
+                let formats = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    "yyyy-MM-dd HH:mm:ss"
+                ]
+                
+                for format in formats {
+                    dateFormatter.dateFormat = format
+                    if let date = dateFormatter.date(from: dateStr) {
+                        return date
+                    }
                 }
                 
-                // If both attempts fail, try parsing as a simple timestamp
-                let fallbackFormatter = DateFormatter()
-                fallbackFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-                fallbackFormatter.locale = Locale(identifier: "en_US_POSIX")
-                fallbackFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-                
-                if let date = fallbackFormatter.date(from: dateString) {
-                    return date
+                // If all parsing attempts fail, try removing fractional seconds
+                if let dotIndex = dateStr.firstIndex(of: ".") {
+                    let truncatedStr = String(dateStr[..<dotIndex])
+                    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                    if let date = dateFormatter.date(from: truncatedStr) {
+                        return date
+                    }
                 }
                 
-                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode timestamp: \(dateString)")
+                print("Failed to parse date string: \(dateStr)")
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateStr)")
             }
             
             // Decode trips
@@ -102,17 +115,40 @@ class TripDataController: ObservableObject {
             do {
                 supabaseTrips = try decoder.decode([SupabaseTrip].self, from: response.data)
                 print("Successfully decoded \(supabaseTrips.count) trips")
-            } catch {
-                print("Error decoding trips: \(error)")
-                throw TripError.decodingError("Failed to decode trips: \(error.localizedDescription)")
+                
+                // Print the first trip for debugging
+                if let firstTrip = supabaseTrips.first {
+                    print("First trip details:")
+                    print("ID: \(firstTrip.id)")
+                    print("Destination: \(firstTrip.destination)")
+                    print("Status: \(firstTrip.trip_status)")
+                    print("Vehicle ID: \(firstTrip.vehicle_id)")
+                }
+            } catch let decodingError as DecodingError {
+                switch decodingError {
+                case .dataCorrupted(let context):
+                    print("Data corrupted: \(context.debugDescription)")
+                case .keyNotFound(let key, let context):
+                    print("Key not found: \(key.stringValue) - \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    print("Type mismatch: expected \(type) - \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("Value not found: expected \(type) - \(context.debugDescription)")
+                @unknown default:
+                    print("Unknown decoding error: \(decodingError)")
+                }
+                throw TripError.decodingError("Failed to decode trips: \(decodingError.localizedDescription)")
             }
             
             // Fetch vehicles for all trips
             var tripsWithVehicles: [Trip] = []
             for supabaseTrip in supabaseTrips {
                 do {
+                    print("Fetching vehicle for trip \(supabaseTrip.id)")
                     if let vehicle = try await supabaseController.fetchVehicleDetails(vehicleId: supabaseTrip.vehicle_id) {
+                        print("Successfully fetched vehicle \(vehicle.id) for trip \(supabaseTrip.id)")
                         let trip = Trip(from: supabaseTrip, vehicle: vehicle)
+                        print("Created Trip object: name=\(trip.name), status=\(trip.status), destination=\(trip.destination)")
                         tripsWithVehicles.append(trip)
                     } else {
                         print("Warning: Could not find vehicle for trip \(supabaseTrip.id)")
@@ -126,16 +162,27 @@ class TripDataController: ObservableObject {
             
             // Update published properties
             await MainActor.run {
+                print("Updating UI with \(tripsWithVehicles.count) trips")
+                
                 // Find current trip (in progress)
                 if let currentTrip = tripsWithVehicles.first(where: { $0.status == .inProgress }) {
+                    print("Found current trip: \(currentTrip.name)")
                     self.currentTrip = currentTrip
+                } else {
+                    print("No current trip found")
                 }
                 
                 // Filter upcoming trips (pending or assigned)
-                self.upcomingTrips = tripsWithVehicles.filter { $0.status == .pending || $0.status == .assigned }
+                let upcoming = tripsWithVehicles.filter { $0.status == .pending || $0.status == .assigned }
+                print("Found \(upcoming.count) upcoming trips")
+                for trip in upcoming {
+                    print("Upcoming trip: name=\(trip.name), status=\(trip.status)")
+                }
+                self.upcomingTrips = upcoming
                 
                 // Convert completed trips to delivery details
                 let completedTrips = tripsWithVehicles.filter { $0.status == .completed }
+                print("Found \(completedTrips.count) completed trips")
                 self.recentDeliveries = completedTrips.map { trip in
                     DeliveryDetails(
                         location: trip.destination,
@@ -361,16 +408,9 @@ class TripDataController: ObservableObject {
     }
     
     // Add a function to manually refresh trips
-    func refreshTrips() async {
-        do {
-            try await fetchTrips()
-        } catch {
-            print("Error refreshing trips: \(error)")
-            if let tripError = error as? TripError {
-                await MainActor.run {
-                    self.error = tripError
-                }
-            }
-        }
+    @MainActor
+    func refreshTrips() async throws {
+        print("Manual refresh triggered")
+        try await fetchTrips()
     }
 } 
