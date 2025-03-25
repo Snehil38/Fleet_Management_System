@@ -4,20 +4,43 @@ import CoreLocation
 struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
     @State private var showingError = false
-    @State private var selectedFilter = 0
+    @State private var selectedFilter = 1 // Default to Upcoming
+    @State private var showingAddTripView = false
+    
+    // Define tab types
+    enum TabType: Int, CaseIterable {
+        case current = 0
+        case upcoming = 1
+        case completed = 2
+        
+        var title: String {
+            switch self {
+            case .current: return "Current"
+            case .upcoming: return "Upcoming"
+            case .completed: return "Completed"
+            }
+        }
+    }
     
     var currentTrips: [Trip] {
-        if let currentTrip = tripController.currentTrip {
-            return [currentTrip]
-        }
-        return []
+        // Get all trips with in-progress status
+        return tripController.getAllTrips().filter { $0.status == .inProgress }
     }
     
     var upcomingTrips: [Trip] {
-        return tripController.upcomingTrips
+        // Get all trips with pending or assigned status
+        return tripController.getAllTrips().filter { $0.status == .pending || $0.status == .assigned }
     }
     
     var completedTrips: [Trip] {
+        // Get all completed trips - either from recentDeliveries or directly from trips
+        let deliveredTrips = tripController.getAllTrips().filter { $0.status == .delivered }
+        
+        if !deliveredTrips.isEmpty {
+            return deliveredTrips
+        }
+        
+        // Fallback to recentDeliveries if needed
         return tripController.recentDeliveries.compactMap { delivery in
             // Convert DeliveryDetails back to Trip format
             Trip(
@@ -56,12 +79,12 @@ struct FleetTripsView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
-                // Filter control
+            VStack(spacing: 0) {
+                // Filter control - matches the UI in screenshot
                 Picker("Trip Filter", selection: $selectedFilter) {
-                    Text("Current").tag(0)
-                    Text("Upcoming").tag(1)
-                    Text("Completed").tag(2)
+                    ForEach(TabType.allCases.map { $0.rawValue }, id: \.self) { index in
+                        Text(TabType(rawValue: index)?.title ?? "")
+                    }
                 }
                 .pickerStyle(.segmented)
                 .padding()
@@ -99,9 +122,14 @@ struct FleetTripsView: View {
                     Spacer()
                     
                     Button(action: {
-                        // Action for adding a new trip
+                        showingAddTripView = true
                     }) {
-                        Label("Add Trip", systemImage: "plus")
+                        HStack {
+                            Image(systemName: "plus")
+                            Text("Add Trip")
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.blue)
                     }
                 }
                 .padding(.horizontal)
@@ -110,9 +138,6 @@ struct FleetTripsView: View {
                 // Trip list
                 if filteredTrips.isEmpty {
                     EmptyTripsView(filterType: selectedFilter)
-                        .onAppear {
-                            print("No trips to display for selected filter")
-                        }
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
@@ -147,10 +172,14 @@ struct FleetTripsView: View {
                 showingError = error != nil
             }
             .onAppear {
-                print("FleetTripsView appeared")
                 Task {
-                    await tripController.refreshTrips()
+                    await tripController.refreshAllTrips()
                 }
+            }
+            .sheet(isPresented: $showingAddTripView) {
+                // Add Trip View would go here
+                Text("Add Trip View")
+                    .presentationDetents([.medium, .large])
             }
         }
     }
@@ -229,7 +258,7 @@ struct TripCardView: View {
             // Trip header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(trip.name)
+                    Text(trip.destination)
                         .font(.headline)
                     
                     if !trip.eta.isEmpty {
@@ -241,7 +270,19 @@ struct TripCardView: View {
                 
                 Spacer()
                 
-                TripStatusBadge(status: trip.status)
+                // Assignment badge
+                if trip.driverId == nil && trip.status != .delivered {
+                    Text("Unassigned")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGray5))
+                        .foregroundColor(.black)
+                        .cornerRadius(8)
+                } else {
+                    TripStatusBadge(status: trip.status)
+                }
             }
             .padding()
             
@@ -259,7 +300,7 @@ struct TripCardView: View {
                         Text("Pickup")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text(trip.address)
+                        Text(trip.startingPoint.isEmpty ? trip.address : trip.startingPoint)
                             .font(.subheadline)
                     }
                     
@@ -301,35 +342,16 @@ struct TripCardView: View {
                 Divider()
                 
                 VStack(spacing: 12) {
-                    // Vehicle Info if available
-                    if trip.status != .pending {
-                        let vehicleInfo = "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model) (\(trip.vehicleDetails.licensePlate))"
-                        HStack(spacing: 24) {
-                            HStack {
-                                Image(systemName: "car.fill")
-                                    .foregroundColor(.blue)
-                                Text(vehicleInfo)
-                                    .font(.subheadline)
-                            }
-                            
-                            Spacer()
-                        }
-                    }
-                    
                     // Driver Assignment Button or Driver Info
                     if trip.driverId == nil {
-                        Button(action: {
-                            showingAssignSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "person.badge.plus")
-                                Text("Assign Driver")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundColor(.blue)
-                            .cornerRadius(8)
+                        HStack {
+                            Image(systemName: "person.badge.plus")
+                                .foregroundColor(.blue)
+                            Text("Driver Unassigned")
+                                .foregroundColor(.blue)
+                                .fontWeight(.medium)
+                            
+                            Spacer()
                         }
                     } else {
                         HStack {
@@ -338,6 +360,8 @@ struct TripCardView: View {
                             Text("Driver Assigned")
                                 .font(.subheadline)
                                 .foregroundColor(.green)
+                            
+                            Spacer()
                         }
                     }
                 }
@@ -347,6 +371,13 @@ struct TripCardView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5)
+        .onTapGesture {
+            // Navigate to trip detail on tap
+            if trip.driverId == nil {
+                // For unassigned trips, open assignment sheet
+                showingAssignSheet = true
+            }
+        }
         .sheet(isPresented: $showingAssignSheet) {
             AssignDriverView(trip: trip)
         }
