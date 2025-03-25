@@ -753,11 +753,10 @@ struct AddTripView: View {
             
             do {
                 let success = try await supabaseDataController.createTrip(
-                    name: tripName,
+                    name: pickupLocation,
                     destination: dropoffLocation,
-                    address: dropoffLocation, // Using dropoff location as address
                     vehicleId: vehicle.id,
-                    driverId: nil, // Driver will be assigned later
+                    driverId: nil,
                     startTime: startDate,
                     endTime: deliveryDate,
                     startLat: pickupCoordinate?.latitude,

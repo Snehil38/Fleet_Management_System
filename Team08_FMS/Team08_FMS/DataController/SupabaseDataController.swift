@@ -1125,9 +1125,7 @@ class SupabaseDataController: ObservableObject {
     // MARK: - Trip Management
     
     struct TripPayload: Codable {
-        let name: String
         let destination: String
-        let address: String
         let vehicle_id: UUID
         let driver_id: UUID?
         let start_time: Date?
@@ -1137,13 +1135,12 @@ class SupabaseDataController: ObservableObject {
         let end_latitude: Double?
         let end_longitude: Double?
         let notes: String?
+        let pickup: String?
     }
     
-    func createTrip(name: String, destination: String, address: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?) async throws -> Bool {
+    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?) async throws -> Bool {
         let payload = TripPayload(
-            name: name,
             destination: destination,
-            address: address,
             vehicle_id: vehicleId,
             driver_id: driverId,
             start_time: startTime,
@@ -1152,7 +1149,8 @@ class SupabaseDataController: ObservableObject {
             start_longitude: startLong,
             end_latitude: endLat,
             end_longitude: endLong,
-            notes: notes
+            notes: notes,
+            pickup: name
         )
         
         do {
