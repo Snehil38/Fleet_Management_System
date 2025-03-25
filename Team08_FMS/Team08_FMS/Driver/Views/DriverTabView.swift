@@ -199,7 +199,12 @@ struct DriverTabView: View {
                     if var updatedTrip = currentTrip {
                         updatedTrip.hasCompletedPostTrip = true
                         currentTrip = updatedTrip
-                        markCurrentTripDelivered()
+                        // Use Task to properly handle the async call
+                        Task {
+                            await MainActor.run {
+                                markCurrentTripDelivered()
+                            }
+                        }
                     }
                 } else {
                     // If not successful, display alert but don't mark as completed
@@ -546,7 +551,12 @@ struct DriverTabView: View {
                         showingAlert = true
                     } else if trip.hasCompletedPostTrip {
                         // Already completed post-trip
-                        markCurrentTripDelivered()
+                        // Use Task to handle the async call
+                        Task {
+                            await MainActor.run {
+                                markCurrentTripDelivered()
+                            }
+                        }
                     } else {
                         showingPostTripInspection = true
                     }
@@ -744,19 +754,35 @@ struct DriverTabView: View {
     
     private func markCurrentTripDelivered() {
         if let trip = currentTrip, trip.hasCompletedPostTrip {
-            // Use the TripDataController to mark the trip as delivered
-            tripController.markTripAsDelivered(trip: trip)
-            
-            // Update local state to match the controller
-            currentTrip = tripController.currentTrip
-            recentDeliveries = tripController.recentDeliveries
-            
-            // Clear current trip if no more trips
-            if tripQueue.isEmpty && upcomingTrips.isEmpty {
-                var updatedTrip = trip
-                updatedTrip.status = .delivered
-                currentTrip = updatedTrip
+            // Create a Task to handle the async operation
+            Task {
+                do {
+                    // First mark the trip as delivered in Supabase
+                    try await tripController.markTripAsDelivered(trip: trip)
+                    print("Trip marked as delivered successfully")
+                    
+                    // Update local state to match the controller
+                    await MainActor.run {
+                        currentTrip = tripController.currentTrip
+                        recentDeliveries = tripController.recentDeliveries
+                        
+                        // Clear current trip if no more trips
+                        if tripQueue.isEmpty && upcomingTrips.isEmpty {
+                            var updatedTrip = trip
+                            updatedTrip.status = .delivered
+                            currentTrip = updatedTrip
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        alertMessage = "Failed to mark trip as delivered: \(error.localizedDescription)"
+                        showingAlert = true
+                    }
+                    print("Error marking trip as delivered: \(error)")
+                }
             }
+        } else {
+            print("Cannot mark as delivered: trip is nil or post-trip inspection not completed")
         }
     }
     

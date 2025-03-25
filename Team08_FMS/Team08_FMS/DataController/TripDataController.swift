@@ -260,29 +260,26 @@ class TripDataController: ObservableObject {
         return recentDeliveries
     }
     
-    // Add a function to mark a trip as delivered
+    // Update markTripAsDelivered to throw errors
     @MainActor
-    func markTripAsDelivered(trip: Trip) {
-        Task {
-            do {
-                // Update trip status in Supabase
-                try await supabaseController.updateTrip(id: trip.id, status: "delivered")
-                
-                // Update end time
-                let response = try await supabaseController.databaseFrom("trips")
-                    .update(["end_time": Date()])
-                    .eq("id", value: trip.id)
-                    .execute()
-                
-                print("Marked trip as delivered: \(String(data: response.data, encoding: .utf8) ?? "nil")")
-                
-                // Refresh trips to update UI
-                try await fetchTrips()
-            } catch {
-                print("Error marking trip as delivered: \(error)")
-                self.error = TripError.updateError("Failed to mark trip as delivered: \(error.localizedDescription)")
-            }
-        }
+    func markTripAsDelivered(trip: Trip) async throws {
+        print("Attempting to mark trip \(trip.id) as delivered")
+        
+        // Update trip status in Supabase
+        try await supabaseController.updateTrip(id: trip.id, status: "delivered")
+        print("Updated trip status to 'delivered'")
+        
+        // Update end time
+        let response = try await supabaseController.databaseFrom("trips")
+            .update(["end_time": Date()])
+            .eq("id", value: trip.id)
+            .execute()
+        
+        print("Updated trip end_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+        
+        // Refresh trips to update UI
+        try await fetchTrips()
+        print("Trips refreshed after marking as delivered")
     }
     
     // Update refreshTrips to handle loading state
@@ -304,16 +301,21 @@ class TripDataController: ObservableObject {
     func updateTripInspectionStatus(tripId: UUID, isPreTrip: Bool, completed: Bool) async throws {
         do {
             let field = isPreTrip ? "has_completed_pre_trip" : "has_completed_post_trip"
+            print("Updating trip \(tripId) with \(field)=\(completed)")
+            
             let response = try await supabaseController.databaseFrom("trips")
                 .update([field: completed])
                 .eq("id", value: tripId)
                 .execute()
             
-            print("Updated trip inspection status: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            print("Update success response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
             // Refresh trips to update UI
             try await fetchTrips()
+            
+            print("Trips refreshed after inspection update")
         } catch {
+            print("Error updating trip inspection status: \(error)")
             throw TripError.updateError("Failed to update trip inspection status: \(error.localizedDescription)")
         }
     }

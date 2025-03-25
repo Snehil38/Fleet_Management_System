@@ -1,21 +1,28 @@
 .sheet(isPresented: $showingPreTripInspection) {
     VehicleInspectionView(isPreTrip: true) { success in
         if success {
-            Task {
-                do {
-                    try await tripController.updateTripInspectionStatus(
-                        tripId: currentTrip.id,
-                        isPreTrip: true,
-                        completed: true
-                    )
-                    // Only update local state after successful Supabase update
-                    currentTrip.hasCompletedPreTrip = true
-                } catch {
-                    alertMessage = "Failed to update pre-trip inspection status: \(error.localizedDescription)"
-                    showingAlert = true
+            // Only mark as completed if successful
+            if let updatedTrip = currentTrip {
+                Task {
+                    do {
+                        try await tripController.updateTripInspectionStatus(
+                            tripId: updatedTrip.id,
+                            isPreTrip: true,
+                            completed: true
+                        )
+                        // Update local state after Supabase is updated
+                        if var trip = currentTrip {
+                            trip.hasCompletedPreTrip = true
+                            currentTrip = trip
+                        }
+                    } catch {
+                        alertMessage = "Failed to update pre-trip inspection status: \(error.localizedDescription)"
+                        showingAlert = true
+                    }
                 }
             }
         } else {
+            // If not successful, display alert but don't mark as completed
             alertMessage = "Please resolve all issues before starting the trip"
             showingAlert = true
         }
@@ -24,22 +31,34 @@
 .sheet(isPresented: $showingPostTripInspection) {
     VehicleInspectionView(isPreTrip: false) { success in
         if success {
-            Task {
-                do {
-                    try await tripController.updateTripInspectionStatus(
-                        tripId: currentTrip.id,
-                        isPreTrip: false,
-                        completed: true
-                    )
-                    // Only update local state after successful Supabase update
-                    currentTrip.hasCompletedPostTrip = true
-                    markCurrentTripDelivered()
-                } catch {
-                    alertMessage = "Failed to update post-trip inspection status: \(error.localizedDescription)"
-                    showingAlert = true
+            // Only mark as completed and mark delivered if successful
+            if var updatedTrip = currentTrip {
+                Task {
+                    do {
+                        try await tripController.updateTripInspectionStatus(
+                            tripId: updatedTrip.id,
+                            isPreTrip: false,
+                            completed: true
+                        )
+                        // Update local state after Supabase is updated
+                        if var trip = currentTrip {
+                            trip.hasCompletedPostTrip = true
+                            currentTrip = trip
+                            // Use Task to call the async method
+                            Task {
+                                await MainActor.run {
+                                    markCurrentTripDelivered()
+                                }
+                            }
+                        }
+                    } catch {
+                        alertMessage = "Failed to update post-trip inspection status: \(error.localizedDescription)"
+                        showingAlert = true
+                    }
                 }
             }
         } else {
+            // If not successful, display alert but don't mark as completed
             alertMessage = "Please resolve all issues before completing delivery"
             showingAlert = true
         }
@@ -49,12 +68,26 @@
 // ... existing code ...
 
 private func markCurrentTripDelivered() {
-    if currentTrip.hasCompletedPostTrip {
-        // Use the TripDataController to mark the trip as delivered
-        tripController.markTripAsDelivered(trip: currentTrip)
-        
-        // The UI will be updated automatically when fetchTrips() completes
-        // in the markTripAsDelivered method
+    if let trip = currentTrip, trip.hasCompletedPostTrip {
+        // Create a Task to handle the async operation
+        Task {
+            do {
+                // First mark the trip as delivered in Supabase
+                try await tripController.markTripAsDelivered(trip: trip)
+                print("Trip marked as delivered successfully")
+                
+                // The data will be updated in the controller automatically
+                // when the refresh is completed in markTripAsDelivered
+            } catch {
+                await MainActor.run {
+                    alertMessage = "Failed to mark trip as delivered: \(error.localizedDescription)"
+                    showingAlert = true
+                }
+                print("Error marking trip as delivered: \(error)")
+            }
+        }
+    } else {
+        print("Cannot mark as delivered: trip is nil or post-trip inspection not completed")
     }
 }
 
@@ -107,6 +140,26 @@ struct DriverTabView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 24) {
                         // ... existing content ...
+                        ActionButton(
+                            title: "Mark Delivered",
+                            icon: "checkmark.circle.fill",
+                            color: .green
+                        ) {
+                            if !trip.hasCompletedPreTrip {
+                                alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                                showingAlert = true
+                            } else if trip.hasCompletedPostTrip {
+                                // Already completed post-trip
+                                // Use Task to handle the async call
+                                Task {
+                                    await MainActor.run {
+                                        markCurrentTripDelivered()
+                                    }
+                                }
+                            } else {
+                                showingPostTripInspection = true
+                            }
+                        }
                     }
                     .padding(.top, 8)
                 }
