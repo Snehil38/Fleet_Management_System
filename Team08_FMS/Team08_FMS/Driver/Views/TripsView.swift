@@ -78,8 +78,7 @@ struct TripsView: View {
                         msrp: 55000.0,
                         pollutionExpiry: Date(),
                         insuranceExpiry: Date(),
-                        status: .available,
-                        documents: VehicleDocuments()
+                        status: .available
                     ),
                     sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
                     destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),

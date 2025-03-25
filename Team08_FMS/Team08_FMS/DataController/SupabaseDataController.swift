@@ -997,9 +997,9 @@ class SupabaseDataController: ObservableObject {
         let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
 
         // 3. Convert document `Data` fields to Base64 strings (if they exist)
-        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
-        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
-        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+//        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+//        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+//        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
 
         // 5. Create an instance of the payload
         let payload = VehiclePayload(
@@ -1018,10 +1018,10 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId,
-            pollution_certificate: pollutionCertBase64,
-            rc: rcBase64,
-            insurance: insuranceBase64
+            driver_id: vehicle.driverId
+//            pollution_certificate: pollutionCertBase64,
+//            rc: rcBase64,
+//            insurance: insuranceBase64
         )
 
         do {
@@ -1049,9 +1049,9 @@ class SupabaseDataController: ObservableObject {
         let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
 
         // 3. Convert document `Data` fields to Base64 strings (if they exist)
-        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
-        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
-        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+//        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+//        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+//        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
 
         // 5. Create an instance of the update payload with current vehicle details.
         let payload = VehiclePayload(
@@ -1070,10 +1070,7 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId,
-            pollution_certificate: pollutionCertBase64,
-            rc: rcBase64,
-            insurance: insuranceBase64
+            driver_id: vehicle.driverId
         )
 
         do {

@@ -300,9 +300,9 @@ struct VehicleDetailView: View {
             _pollutionExpiry = State(initialValue: vehicle.pollutionExpiry)
             _insuranceExpiry = State(initialValue: vehicle.insuranceExpiry)
             
-            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
-            _rc = State(initialValue: vehicle.documents?.rc)
-            _insurance = State(initialValue: vehicle.documents?.insurance)
+//            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
+//            _rc = State(initialValue: vehicle.documents?.rc)
+//            _insurance = State(initialValue: vehicle.documents?.insurance)
         }
     }
     
@@ -517,12 +517,6 @@ struct VehicleDetailView: View {
         // Prevent duplicate taps.
         guard !isSaving else { return }
         isSaving = true
-
-        let documents = VehicleDocuments(
-            pollutionCertificate: pollutionCertificate ?? Data(),
-            rc: rc ?? Data(),
-            insurance: insurance ?? Data()
-        )
         
         if let originalVehicle = vehicle {
             // Build an updated Vehicle using current state values.
@@ -542,8 +536,7 @@ struct VehicleDetailView: View {
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
                 status: originalVehicle.status,
-                driverId: originalVehicle.driverId,
-                documents: documents
+                driverId: originalVehicle.driverId
             )
             
             Task {
@@ -566,8 +559,7 @@ struct VehicleDetailView: View {
                 msrp: Double(msrp) ?? 0,
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
-                status: .available,
-                documents: documents
+                status: .available
             )
             Task {
                 defer { isSaving = false }
@@ -870,8 +862,7 @@ struct VehicleSaveView: View {
             msrp: Double(msrp) ?? 0,
             pollutionExpiry: pollutionExpiry,
             insuranceExpiry: insuranceExpiry,
-            status: .available,
-            documents: documents
+            status: .available
         )
 
         Task {
