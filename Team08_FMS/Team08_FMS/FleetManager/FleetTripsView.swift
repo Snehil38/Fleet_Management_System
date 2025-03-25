@@ -634,14 +634,11 @@ struct AssignDriverView: View {
         Task {
             do {
                 if trip.status == .pending {
-                    // If trip is pending, update both driver and status in a single operation
-                    try await SupabaseDataController.shared.databaseFrom("trips")
-                        .update([
-                            "driver_id": driverId,
-                            "trip_status": "assigned"
-                        ])
-                        .eq("id", value: trip.id)
-                        .execute()
+                    // If trip is pending, we need to update the status to assigned
+                    // In the database, use the raw enum value "assigned" for the trip_status field
+                    try await SupabaseDataController.shared.updateTrip(id: trip.id, status: "assigned")
+                    // And separately update the driver assignment
+                    try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
                 } else {
                     // Otherwise, just update the driver
                     try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
