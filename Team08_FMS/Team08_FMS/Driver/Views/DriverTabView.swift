@@ -66,7 +66,7 @@ struct DriverTabView: View {
         .onChange(of: tripController.currentTrips) { newTrips in
             currentTrip = newTrips.first
         }
-        .onChange(of: tripController.upcomingTrips) { newTrips in
+        .onChange(of: tripController.upcomingTrips) { newTrips,  _ in
             upcomingTrips = newTrips
         }
         .onChange(of: tripController.deliveredTrips) { newTrips in

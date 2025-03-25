@@ -88,7 +88,6 @@ class TripDataController: ObservableObject {
             
             // Fetch all non-deleted trips, ordered by created_at
             let response = try await supabaseController.supabase
-                .database
                 .from("trips")
                 .select("""
                     id,

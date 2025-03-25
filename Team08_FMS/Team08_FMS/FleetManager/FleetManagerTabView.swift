@@ -43,6 +43,10 @@ struct FleetManagerTabView: View {
                     Text("Crew")
                 }
         }
+        .task {
+            vehicleManager.loadVehicles()
+            CrewDataController.shared.update()
+        }
     }
 }
 

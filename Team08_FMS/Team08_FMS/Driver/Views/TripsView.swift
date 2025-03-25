@@ -49,7 +49,7 @@ struct TripsView: View {
                 }
             }
         }
-        .onChange(of: tripController.error) { error in
+        .onChange(of: tripController.error) { error, _ in
             showingError = error != nil
         }
     }
@@ -77,7 +77,37 @@ struct TripsView: View {
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
-            return tripController.deliveredTrips
+            // Convert recent deliveries to Trip objects
+            return tripController.recentDeliveries.map { delivery in
+                
+                Trip(
+                    name: delivery.vehicle,
+                    destination: delivery.location,
+                    address: delivery.location,
+                    eta: "",
+                    distance: "",
+                    status: .delivered,
+                    vehicleDetails: Vehicle(
+                        name: "Tesla",
+                        year: 2023,
+                        make: "Tesla",
+                        model: "Model Y",
+                        vin: "5YJYGDEE3MF123456",
+                        licensePlate: "TESLA88",
+                        vehicleType: .car,
+                        color: "White",
+                        bodyType: .suv,
+                        bodySubtype: "Electric",
+                        msrp: 55000.0,
+                        pollutionExpiry: Date(),
+                        insuranceExpiry: Date(),
+                        status: .available
+                    ),
+                    sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                    destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                    startingPoint: delivery.location
+                )
+            }
         }
     }
     
@@ -127,8 +157,7 @@ struct TripsView: View {
                 msrp: 0.0,
                 pollutionExpiry: Date(),
                 insuranceExpiry: Date(),
-                status: .available,
-                documents: VehicleDocuments()
+                status: .available
             ),
             sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
             destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),

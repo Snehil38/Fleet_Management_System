@@ -81,11 +81,6 @@ struct VehiclePayload: Codable {
     let insurance_expiry: String
     let status: VehicleStatus
     let driver_id: UUID?
-    
-    // Document fields as Base64-encoded strings
-    let pollution_certificate: String?
-    let rc: String?
-    let insurance: String?
 }
 
 struct Vehicle: Identifiable, Codable, Equatable {
@@ -105,7 +100,6 @@ struct Vehicle: Identifiable, Codable, Equatable {
     var insuranceExpiry: Date
     var status: VehicleStatus
     var driverId: UUID?
-    var documents: VehicleDocuments?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -124,7 +118,6 @@ struct Vehicle: Identifiable, Codable, Equatable {
         case insuranceExpiry = "insurance_expiry"
         case status
         case driverId = "driver_id"
-        case documents
     }
     
     static func == (lhs: Vehicle, rhs: Vehicle) -> Bool {
@@ -143,8 +136,7 @@ struct Vehicle: Identifiable, Codable, Equatable {
                lhs.pollutionExpiry == rhs.pollutionExpiry &&
                lhs.insuranceExpiry == rhs.insuranceExpiry &&
                lhs.status == rhs.status &&
-               lhs.driverId == rhs.driverId &&
-               lhs.documents == rhs.documents
+               lhs.driverId == rhs.driverId
     }
 }
 

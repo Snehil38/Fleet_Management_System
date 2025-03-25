@@ -80,7 +80,7 @@ struct Trip: Identifiable, Equatable {
             eta: "25 mins",
             distance: "8.5 km",
             status: .inProgress,
-            vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
+            vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available),
             sourceCoordinate: CLLocationCoordinate2D(
                 latitude: 19.0178,  // Mumbai region
                 longitude: 72.8478
@@ -104,7 +104,7 @@ struct Trip: Identifiable, Equatable {
                 eta: "1.5 hours",
                 distance: "22 km",
                 status: .pending,
-                vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available, documents: VehicleDocuments()),
+                vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available),
                 sourceCoordinate: CLLocationCoordinate2D(
                     latitude: 28.5244,  // Delhi coordinates
                     longitude: 77.2877
