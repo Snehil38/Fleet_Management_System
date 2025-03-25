@@ -14,10 +14,6 @@ struct FleetCrewManagementView: View {
     @State private var showingAddMaintenanceSheet = false
     @State private var searchText = ""
     @State private var selectedStatus: Status?  // Updated to use our new Status enum
-    
-    init() {
-        CrewDataController.shared.update()
-    }
 
     // We now filter on any crew member conforming to CrewMemberProtocol.
     var filteredCrew: [any CrewMemberProtocol] {
