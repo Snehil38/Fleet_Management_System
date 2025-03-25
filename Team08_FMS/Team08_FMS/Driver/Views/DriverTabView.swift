@@ -9,6 +9,11 @@ import SwiftUI
 struct DriverTabView: View {
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
+    let driverId: UUID
+
+    init(driverId: UUID) {
+        self.driverId = driverId
+    }
 
     @State private var showingChatBot = false
     @State private var showingPreTripInspection = false
@@ -51,7 +56,8 @@ struct DriverTabView: View {
         .environmentObject(tripController)
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
         .task {
-            // Initial data load
+            // Set the driver ID and load trips
+            await tripController.setDriverId(driverId)
             await tripController.refreshTrips()
         }
     }
@@ -1273,6 +1279,6 @@ struct MapPolyline: View {
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        DriverTabView()
+        DriverTabView(driverId: UUID())
     }
 } 

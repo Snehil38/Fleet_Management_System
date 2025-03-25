@@ -27,6 +27,7 @@ class TripDataController: ObservableObject {
     @Published var recentDeliveries: [DeliveryDetails] = []
     @Published var error: TripError?
     @Published var isLoading = false
+    private var driverId: UUID?
     
     private let supabaseController = SupabaseDataController.shared
     
@@ -37,11 +38,17 @@ class TripDataController: ObservableObject {
         }
     }
     
+    func setDriverId(_ id: UUID) {
+        self.driverId = id
+        Task {
+            await refreshTrips()
+        }
+    }
+    
     @MainActor
     private func fetchTrips() async throws {
         print("Fetching trips...")
         do {
-            
             // Create a decoder with custom date decoding strategy
             let decoder = JSONDecoder()
             let dateFormatter = DateFormatter()
@@ -83,8 +90,8 @@ class TripDataController: ObservableObject {
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
             }
             
-            // Fetch trips with vehicle details in a single query
-            let response = try await supabaseController.supabase
+            // Start building the query
+            var query = supabaseController.supabase
                 .from("trips")
                 .select("""
                     id,
@@ -124,7 +131,14 @@ class TripDataController: ObservableObject {
                     )
                 """)
                 .eq("is_deleted", value: false)
-                .execute()
+            
+            // Add driver filter if driverId is set
+            if let driverId = driverId {
+                query = query.eq("driver_id", value: driverId)
+            }
+            
+            // Execute the query
+            let response = try await query.execute()
             
             // Print raw response for debugging
             print("Raw response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
