@@ -157,6 +157,25 @@ class TripDataController: ObservableObject {
                 let end_longitude: Double?
                 let pickup: String?
                 let vehicles: Vehicle
+                
+                // Add computed properties to parse distance and fuel cost
+                var parsedDistance: String {
+                    guard let notes = notes,
+                          let distanceRange = notes.range(of: "Distance: "),
+                          let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
+                        return "N/A"
+                    }
+                    return String(notes[distanceRange.upperBound..<endRange.lowerBound])
+                }
+                
+                var parsedFuelCost: String {
+                    guard let notes = notes,
+                          let fuelRange = notes.range(of: "Estimated Fuel Cost: "),
+                          let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
+                        return "N/A"
+                    }
+                    return String(notes[fuelRange.upperBound..<endRange.lowerBound])
+                }
             }
             
             let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
@@ -195,21 +214,74 @@ class TripDataController: ObservableObject {
                     self.currentTrip = currentTrip
                 }
                 
-                // Filter upcoming trips (pending or assigned)
-                self.upcomingTrips = tripsWithVehicles.filter { $0.status == .pending || $0.status == .assigned }
+                // Filter upcoming trips (only pending or assigned, explicitly exclude delivered)
+                self.upcomingTrips = tripsWithVehicles.filter { trip in
+                    (trip.status == .pending || trip.status == .assigned) && 
+                    trip.status != .delivered
+                }
                 
-                // Convert completed trips to delivery details
-                let completedTrips = tripsWithVehicles.filter { $0.status == .delivered }
+                // Convert completed/delivered trips to delivery details
+                let completedTrips = tripsWithVehicles.filter { 
+                    $0.status == .delivered 
+                }
+                
                 self.recentDeliveries = completedTrips.compactMap { trip in
                     guard let joinedData = joinedData.first(where: { $0.id == trip.id }) else { return nil }
+                    
+                    // Extract additional details from notes if available
+                    var cargoType = "General Cargo"
+                    if let notes = trip.notes,
+                       let cargoRange = notes.range(of: "Cargo Type: ") {
+                        let noteText = notes[cargoRange.upperBound...]
+                        if let endOfCargo = noteText.firstIndex(of: "\n") {
+                            cargoType = String(noteText[..<endOfCargo])
+                        } else {
+                            cargoType = String(noteText)
+                        }
+                    }
+                    
+                    // Include distance and fuel cost in the notes
+                    let distance = joinedData.parsedDistance
+                    let fuelCost = joinedData.parsedFuelCost
+                    
                     return DeliveryDetails(
+                        id: trip.id,
                         location: trip.destination,
                         date: formatDate(trip.endTime ?? joinedData.created_at),
                         status: "Delivered",
                         driver: "Current Driver",
                         vehicle: trip.vehicleDetails.licensePlate,
-                        notes: trip.notes ?? "Trip completed successfully"
+                        notes: """
+                               Trip: \(trip.name)
+                               Cargo: \(cargoType)
+                               Distance: \(distance)
+                               Estimated Fuel Cost: \(fuelCost)
+                               From: \(trip.startingPoint)
+                               \(trip.notes ?? "")
+                               """
                     )
+                }
+                
+                // Sort recent deliveries by date (newest first)
+                self.recentDeliveries.sort { lhs, rhs in
+                    // Extract dates from formatted strings (basic parsing)
+                    let lhsIsToday = lhs.date.contains("Today")
+                    let rhsIsToday = rhs.date.contains("Today")
+                    let lhsIsYesterday = lhs.date.contains("Yesterday")
+                    let rhsIsYesterday = rhs.date.contains("Yesterday")
+                    
+                    if lhsIsToday && !rhsIsToday {
+                        return true
+                    } else if !lhsIsToday && rhsIsToday {
+                        return false
+                    } else if lhsIsYesterday && !rhsIsToday && !rhsIsYesterday {
+                        return true
+                    } else if !lhsIsYesterday && !lhsIsToday && (rhsIsToday || rhsIsYesterday) {
+                        return false
+                    }
+                    
+                    // If both are from the same period, compare the actual times
+                    return lhs.date > rhs.date
                 }
                 
                 self.error = nil
@@ -265,21 +337,64 @@ class TripDataController: ObservableObject {
     func markTripAsDelivered(trip: Trip) async throws {
         print("Attempting to mark trip \(trip.id) as delivered")
         
-        // Update trip status in Supabase
-        try await supabaseController.updateTrip(id: trip.id, status: "delivered")
-        print("Updated trip status to 'delivered'")
-        
-        // Update end time
-        let response = try await supabaseController.databaseFrom("trips")
-            .update(["end_time": Date()])
-            .eq("id", value: trip.id)
-            .execute()
-        
-        print("Updated trip end_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
-        
-        // Refresh trips to update UI
-        try await fetchTrips()
-        print("Trips refreshed after marking as delivered")
+        do {
+            // First ensure both pre-trip and post-trip inspections are marked as completed in Supabase
+            if !trip.hasCompletedPreTrip {
+                print("Ensuring pre-trip inspection is marked as completed")
+                try await updateTripInspectionStatus(tripId: trip.id, isPreTrip: true, completed: true)
+            }
+            
+            if !trip.hasCompletedPostTrip {
+                print("Ensuring post-trip inspection is marked as completed")
+                try await updateTripInspectionStatus(tripId: trip.id, isPreTrip: false, completed: true)
+            }
+            
+            // Update trip status in Supabase to completed
+            try await supabaseController.updateTrip(id: trip.id, status: "completed")
+            print("Updated trip status to 'completed'")
+            
+            // Update end time in Supabase
+            let response = try await supabaseController.databaseFrom("trips")
+                .update(["end_time": Date()])
+                .eq("id", value: trip.id)
+                .execute()
+            
+            print("Updated trip end_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Update local state - remove from current trip
+            if let currentTrip = self.currentTrip, currentTrip.id == trip.id {
+                self.currentTrip = nil
+                print("Removed trip from current trip")
+            }
+            
+            // Create a DeliveryDetails from the trip and add to recent deliveries
+            let newDelivery = DeliveryDetails(
+                id: trip.id, // Keep the same ID for consistency
+                location: trip.destination,
+                date: formatDate(trip.endTime ?? Date()),
+                status: "Delivered",
+                driver: "Current Driver",
+                vehicle: trip.vehicleDetails.licensePlate,
+                notes: """
+                       Trip: \(trip.name)
+                       Cargo: General Cargo
+                       Distance: \(trip.distance)
+                       From: \(trip.startingPoint)
+                       \(trip.notes ?? "")
+                       """
+            )
+            
+            // Add to recent deliveries - insert at the beginning for newest first
+            self.recentDeliveries.insert(newDelivery, at: 0)
+            print("Added trip to recent deliveries")
+            
+            // Refresh trips to ensure everything is in sync with server
+            try await fetchTrips()
+            print("Trips refreshed after marking as delivered")
+        } catch {
+            print("Error marking trip as delivered: \(error)")
+            throw TripError.updateError("Failed to mark trip as delivered: \(error.localizedDescription)")
+        }
     }
     
     // Update refreshTrips to handle loading state
@@ -303,6 +418,7 @@ class TripDataController: ObservableObject {
             let field = isPreTrip ? "has_completed_pre_trip" : "has_completed_post_trip"
             print("Updating trip \(tripId) with \(field)=\(completed)")
             
+            // First update the database
             let response = try await supabaseController.databaseFrom("trips")
                 .update([field: completed])
                 .eq("id", value: tripId)
@@ -310,7 +426,35 @@ class TripDataController: ObservableObject {
             
             print("Update success response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
-            // Refresh trips to update UI
+            // Then update our local model to reflect changes immediately
+            if let currentTrip = self.currentTrip, currentTrip.id == tripId {
+                var updatedTrip = currentTrip
+                if isPreTrip {
+                    updatedTrip.hasCompletedPreTrip = completed
+                } else {
+                    updatedTrip.hasCompletedPostTrip = completed
+                }
+                self.currentTrip = updatedTrip
+                print("Updated local trip model with \(field)=\(completed)")
+            } else {
+                print("Warning: Current trip is nil or doesn't match the updated trip ID")
+                // Trip might be in upcoming trips
+                let index = upcomingTrips.firstIndex(where: { $0.id == tripId })
+                if let index = index {
+                    var updatedTrip = upcomingTrips[index]
+                    if isPreTrip {
+                        updatedTrip.hasCompletedPreTrip = completed
+                    } else {
+                        updatedTrip.hasCompletedPostTrip = completed
+                    }
+                    upcomingTrips[index] = updatedTrip
+                    print("Updated trip in upcoming trips with \(field)=\(completed)")
+                }
+            }
+            
+            // Optional: Refresh trips to ensure UI is up-to-date with server state
+            // Only do this if you're experiencing synchronization issues
+            // Otherwise, the local model update above should be sufficient
             try await fetchTrips()
             
             print("Trips refreshed after inspection update")

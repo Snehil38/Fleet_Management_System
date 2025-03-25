@@ -166,13 +166,23 @@ struct Trip: Identifiable, Equatable {
 
 // Delivery Details Model
 struct DeliveryDetails: Identifiable, Equatable {
-    let id = UUID()
+    let id: UUID
     let location: String
     let date: String
     let status: String
     let driver: String
     let vehicle: String
     let notes: String
+    
+    init(id: UUID = UUID(), location: String, date: String, status: String, driver: String, vehicle: String, notes: String) {
+        self.id = id
+        self.location = location
+        self.date = date
+        self.status = status
+        self.driver = driver
+        self.vehicle = vehicle
+        self.notes = notes
+    }
     
     static func == (lhs: DeliveryDetails, rhs: DeliveryDetails) -> Bool {
         return lhs.id == rhs.id &&

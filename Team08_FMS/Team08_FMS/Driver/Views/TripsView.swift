@@ -78,28 +78,50 @@ struct TripsView: View {
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
-            // Filter recent deliveries to show only delivered trips
+            // Map recent deliveries to Trip objects
             return tripController.recentDeliveries.map { delivery in
-                Trip(
-                    id: UUID(),
-                    name: delivery.vehicle,
+                // Extract information from delivery notes
+                let deliveryNotes = delivery.notes
+                var cargoType = "General Cargo"
+                var tripName = "Trip-\(delivery.id.uuidString.prefix(4))"
+                var distance = ""
+                var startingPoint = ""
+                
+                // Parse notes to extract structured data
+                let lines = deliveryNotes.split(separator: "\n")
+                for line in lines {
+                    if line.hasPrefix("Trip:") {
+                        tripName = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
+                    } else if line.hasPrefix("Cargo:") {
+                        cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
+                    } else if line.hasPrefix("Distance:") {
+                        distance = String(line.dropFirst(9).trimmingCharacters(in: .whitespaces))
+                    } else if line.hasPrefix("From:") {
+                        startingPoint = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
+                    }
+                }
+                
+                // Create a Trip object with the delivery information
+                return Trip(
+                    id: delivery.id, // Use the original trip ID
+                    name: tripName,
                     destination: delivery.location,
                     address: delivery.location,
                     eta: "",
-                    distance: "",
+                    distance: distance,
                     status: .delivered,
                     vehicleDetails: Vehicle(
-                        name: "Tesla",
+                        name: "Vehicle",
                         year: 2023,
-                        make: "Tesla",
-                        model: "Model Y",
-                        vin: "5YJYGDEE3MF123456",
-                        licensePlate: "TESLA88",
-                        vehicleType: .car,
-                        color: "White",
-                        bodyType: .suv,
-                        bodySubtype: "Electric",
-                        msrp: 55000.0,
+                        make: "Unknown",
+                        model: "Unknown",
+                        vin: "Unknown",
+                        licensePlate: delivery.vehicle,
+                        vehicleType: .truck,
+                        color: "Unknown",
+                        bodyType: .cargo,
+                        bodySubtype: "Unknown",
+                        msrp: 0.0,
                         pollutionExpiry: Date(),
                         insuranceExpiry: Date(),
                         status: .available,
@@ -107,7 +129,8 @@ struct TripsView: View {
                     ),
                     sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
                     destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                    startingPoint: delivery.location
+                    startingPoint: startingPoint.isEmpty ? delivery.location : startingPoint,
+                    notes: deliveryNotes
                 )
             }
         }

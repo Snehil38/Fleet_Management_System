@@ -181,9 +181,30 @@ struct DriverTabView: View {
             VehicleInspectionView(isPreTrip: true) { success in
                 if success {
                     // Only mark as completed if successful
-                    if var updatedTrip = currentTrip {
-                        updatedTrip.hasCompletedPreTrip = true
-                        currentTrip = updatedTrip
+                    if let updatedTrip = currentTrip {
+                        Task {
+                            do {
+                                // Update the inspection status in Supabase
+                                try await tripController.updateTripInspectionStatus(
+                                    tripId: updatedTrip.id,
+                                    isPreTrip: true,
+                                    completed: true
+                                )
+                                
+                                // After successful Supabase update, update local state
+                                await MainActor.run {
+                                    if var trip = currentTrip {
+                                        trip.hasCompletedPreTrip = true
+                                        currentTrip = trip
+                                    }
+                                }
+                            } catch {
+                                await MainActor.run {
+                                    alertMessage = "Failed to update pre-trip inspection status: \(error.localizedDescription)"
+                                    showingAlert = true
+                                }
+                            }
+                        }
                     }
                 } else {
                     // If not successful, display alert but don't mark as completed
@@ -196,13 +217,31 @@ struct DriverTabView: View {
             VehicleInspectionView(isPreTrip: false) { success in
                 if success {
                     // Only mark as completed and mark delivered if successful
-                    if var updatedTrip = currentTrip {
-                        updatedTrip.hasCompletedPostTrip = true
-                        currentTrip = updatedTrip
-                        // Use Task to properly handle the async call
+                    if let updatedTrip = currentTrip {
                         Task {
-                            await MainActor.run {
-                                markCurrentTripDelivered()
+                            do {
+                                // Update the inspection status in Supabase
+                                try await tripController.updateTripInspectionStatus(
+                                    tripId: updatedTrip.id,
+                                    isPreTrip: false,
+                                    completed: true
+                                )
+                                
+                                // After successful Supabase update, update local state and proceed to mark as delivered
+                                await MainActor.run {
+                                    if var trip = currentTrip {
+                                        trip.hasCompletedPostTrip = true
+                                        currentTrip = trip
+                                        
+                                        // After updating local state, proceed to mark as delivered
+                                        markCurrentTripDelivered()
+                                    }
+                                }
+                            } catch {
+                                await MainActor.run {
+                                    alertMessage = "Failed to update post-trip inspection status: \(error.localizedDescription)"
+                                    showingAlert = true
+                                }
                             }
                         }
                     }
@@ -673,9 +712,23 @@ struct DriverTabView: View {
     
     private var recentDeliveriesSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Recent Deliveries")
-                .font(.system(size: 24, weight: .bold))
-                .padding(.horizontal)
+            HStack {
+                Text("Recent Deliveries")
+                    .font(.system(size: 24, weight: .bold))
+                
+                if !recentDeliveries.isEmpty {
+                    Text("\(recentDeliveries.count)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.green)
+                        .cornerRadius(12)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal)
             
             if recentDeliveries.isEmpty {
                 emptyRecentDeliveriesView
@@ -757,20 +810,46 @@ struct DriverTabView: View {
             // Create a Task to handle the async operation
             Task {
                 do {
-                    // First mark the trip as delivered in Supabase
+                    // First update the trip inspection status in Supabase if needed
+                    if !trip.hasCompletedPreTrip {
+                        try await tripController.updateTripInspectionStatus(
+                            tripId: trip.id,
+                            isPreTrip: true,
+                            completed: true
+                        )
+                    }
+                    
+                    if !trip.hasCompletedPostTrip {
+                        try await tripController.updateTripInspectionStatus(
+                            tripId: trip.id,
+                            isPreTrip: false,
+                            completed: true
+                        )
+                    }
+                    
+                    // Then mark the trip as delivered in Supabase
                     try await tripController.markTripAsDelivered(trip: trip)
                     print("Trip marked as delivered successfully")
+                    
+                    // Explicitly refresh trips to ensure data is updated
+                    await tripController.refreshTrips()
                     
                     // Update local state to match the controller
                     await MainActor.run {
                         currentTrip = tripController.currentTrip
                         recentDeliveries = tripController.recentDeliveries
                         
-                        // Clear current trip if no more trips
-                        if tripQueue.isEmpty && upcomingTrips.isEmpty {
-                            var updatedTrip = trip
-                            updatedTrip.status = .delivered
-                            currentTrip = updatedTrip
+                        // If there are no more trips, move to the next one
+                        if currentTrip == nil {
+                            if !tripQueue.isEmpty {
+                                // Take the next trip from the queue
+                                let nextTrip = tripQueue.removeFirst()
+                                currentTrip = nextTrip
+                            } else if !upcomingTrips.isEmpty {
+                                // Or from upcoming trips
+                                let nextTrip = upcomingTrips.removeFirst()
+                                currentTrip = nextTrip
+                            }
                         }
                     }
                 } catch {
@@ -782,7 +861,17 @@ struct DriverTabView: View {
                 }
             }
         } else {
-            print("Cannot mark as delivered: trip is nil or post-trip inspection not completed")
+            // If pre-trip not completed, show alert
+            if let trip = currentTrip, !trip.hasCompletedPreTrip {
+                alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                showingAlert = true
+            }
+            // If post-trip not completed, show post-trip inspection
+            else if let trip = currentTrip, !trip.hasCompletedPostTrip {
+                showingPostTripInspection = true
+            } else {
+                print("Cannot mark as delivered: trip is nil")
+            }
         }
     }
     
@@ -802,33 +891,63 @@ struct DeliveryRow: View {
     let delivery: DeliveryDetails
     
     var body: some View {
-        HStack {
-            Circle()
-                .fill(Color.green)
-                .frame(width: 8, height: 8)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(delivery.location)
-                    .font(.headline)
-                Text(delivery.date)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(delivery.location)
+                        .font(.headline)
+                    Text(delivery.date)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                Text(delivery.status)
                     .font(.caption)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.green.opacity(0.1))
+                    .foregroundColor(.green)
+                    .cornerRadius(12)
+                
+                Image(systemName: "chevron.right")
                     .foregroundColor(.gray)
             }
             
-            Spacer()
+            // Get first line of notes for display as preview
+            if let firstLine = delivery.notes.split(separator: "\n").first {
+                HStack(spacing: 6) {
+                    Image(systemName: "shippingbox.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    
+                    Text(String(firstLine).replacingOccurrences(of: "Trip: ", with: ""))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                }
+                .padding(.leading, 16)
+            }
             
-            Text(delivery.status)
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.green.opacity(0.1))
-                .foregroundColor(.green)
-                .cornerRadius(12)
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(.gray)
+            // Display the vehicle info
+            HStack(spacing: 6) {
+                Image(systemName: "car.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(.blue)
+                
+                Text(delivery.vehicle)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.leading, 16)
         }
-        .padding()
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
     }
 }
 
@@ -1011,27 +1130,74 @@ struct DeliveryDetailsView: View {
     @Environment(\.presentationMode) var presentationMode
     let delivery: DeliveryDetails
     
+    // Parse notes to get structured information
+    private var parsedNotes: [String: String] {
+        var result = [String: String]()
+        let lines = delivery.notes.split(separator: "\n")
+        
+        for line in lines where line.contains(":") {
+            let parts = line.split(separator: ":", maxSplits: 1)
+            if parts.count == 2 {
+                let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+                let value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                result[key] = value
+            }
+        }
+        
+        return result
+    }
+    
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Delivery Information")) {
-                    DetailRow(icon: "mappin.circle.fill", title: "Location", value: delivery.location)
-                    DetailRow(icon: "calendar", title: "Date", value: delivery.date)
+                // Trip Info Section
+                Section(header: Text("Trip Information")) {
+                    if let tripName = parsedNotes["Trip"] {
+                        DetailRow(icon: "shippingbox.fill", title: "Trip ID", value: tripName)
+                    }
+                    DetailRow(icon: "mappin.circle.fill", title: "Destination", value: delivery.location)
+                    DetailRow(icon: "calendar", title: "Delivery Date", value: delivery.date)
                     DetailRow(icon: "checkmark.circle.fill", title: "Status", value: delivery.status)
                 }
                 
+                // Route Details Section
+                Section(header: Text("Route Details")) {
+                    if let startPoint = parsedNotes["From"] {
+                        DetailRow(icon: "arrow.up.circle.fill", title: "Starting Point", value: startPoint)
+                    }
+                    if let distance = parsedNotes["Distance"] {
+                        DetailRow(icon: "arrow.left.and.right", title: "Distance", value: distance)
+                    }
+                }
+                
+                // Cargo Section
+                Section(header: Text("Cargo Information")) {
+                    if let cargo = parsedNotes["Cargo"] {
+                        DetailRow(icon: "box.truck.fill", title: "Cargo Type", value: cargo)
+                    }
+                }
+                
+                // Vehicle & Driver Info Section
                 Section(header: Text("Driver & Vehicle")) {
                     DetailRow(icon: "person.fill", title: "Driver", value: delivery.driver)
                     DetailRow(icon: "truck.box.fill", title: "Vehicle", value: delivery.vehicle)
                 }
                 
-                Section(header: Text("Notes")) {
-                    Text(delivery.notes)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .padding(.vertical, 8)
+                // Additional Notes Section (original notes minus structured info)
+                let filteredNotes = delivery.notes.split(separator: "\n")
+                    .filter { !$0.contains("Trip:") && !$0.contains("Cargo:") && !$0.contains("Distance:") && !$0.contains("From:") }
+                    .joined(separator: "\n")
+                
+                if !filteredNotes.isEmpty {
+                    Section(header: Text("Additional Notes")) {
+                        Text(filteredNotes)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .padding(.vertical, 8)
+                    }
                 }
                 
+                // Proof of Delivery Section
                 Section(header: Text("Proof of Delivery")) {
                     HStack {
                         Image(systemName: "doc.fill")
