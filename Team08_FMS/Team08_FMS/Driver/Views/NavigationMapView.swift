@@ -36,27 +36,33 @@ struct NavigationMapView: UIViewRepresentable {
         mapView.showsUserLocation = true
         mapView.userTrackingMode = followsUserLocation ? .followWithHeading : .none
         
-        // Enhanced map settings for better visibility
+        // Enhanced map settings for modern look
         mapView.mapType = .mutedStandard
         mapView.showsBuildings = true
         mapView.showsTraffic = true
         mapView.showsCompass = true
         mapView.showsScale = true
         
-        // Camera settings for smooth tracking
-        mapView.camera.altitude = 300 // Lower altitude for better detail
-        mapView.camera.pitch = 45 // Less aggressive tilt for better readability
+        // Apply custom map styling
+        mapView.preferredConfiguration = MKStandardMapConfiguration()
         
-        // Add destination annotation
+        // Camera settings for immersive experience
+        mapView.camera.altitude = 500
+        mapView.camera.pitch = 60
+        
+        // Add destination annotation with animation
         let destinationAnnotation = MapAnnotation(
             coordinate: destination,
             title: "Destination",
             subtitle: "Your delivery point",
             type: .destination
         )
-        mapView.addAnnotation(destinationAnnotation)
         
-        // For simulator testing - add gesture recognizers
+        UIView.animate(withDuration: 0.5, delay: 0.2, options: .curveEaseInOut) {
+            mapView.addAnnotation(destinationAnnotation)
+        }
+        
+        // For simulator testing
         #if targetEnvironment(simulator)
         let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
         mapView.addGestureRecognizer(panGesture)
@@ -154,7 +160,10 @@ struct NavigationMapView: UIViewRepresentable {
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if annotation is MKUserLocation {
-                return nil
+                let annotationView = MKAnnotationView(annotation: annotation, reuseIdentifier: "UserLocation")
+                annotationView.image = UIImage(systemName: "car.fill")
+                annotationView.canShowCallout = true
+                return annotationView
             }
             
             guard let mapAnnotation = annotation as? MapAnnotation else { return nil }
@@ -166,32 +175,52 @@ struct NavigationMapView: UIViewRepresentable {
                 annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
                 annotationView?.canShowCallout = true
                 
-                // Add right callout accessory for more info
+                // Add custom callout with more info
+                let detailLabel = UILabel()
+                detailLabel.numberOfLines = 2
+                detailLabel.font = .systemFont(ofSize: 12)
+                annotationView?.detailCalloutAccessoryView = detailLabel
+                
+                // Add right callout accessory
                 let infoButton = UIButton(type: .detailDisclosure)
+                infoButton.tintColor = .systemBlue
                 annotationView?.rightCalloutAccessoryView = infoButton
             }
             
             annotationView?.annotation = annotation
             
-            // Customize the annotation based on type
+            // Enhanced annotation styling
             switch mapAnnotation.type {
             case .source:
                 annotationView?.markerTintColor = .systemBlue
                 annotationView?.glyphImage = UIImage(systemName: "location.fill")
                 annotationView?.animatesWhenAdded = true
                 
-                // Add subtle pulse animation
-                UIView.animate(withDuration: 1.0, delay: 0, options: [.autoreverse, .repeat]) {
-                    annotationView?.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
-                }
+                // Add pulse animation
+                let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
+                pulseAnimation.duration = 1.0
+                pulseAnimation.fromValue = 1.0
+                pulseAnimation.toValue = 1.2
+                pulseAnimation.autoreverses = true
+                pulseAnimation.repeatCount = .infinity
+                annotationView?.layer.add(pulseAnimation, forKey: "pulse")
+                
             case .destination:
                 annotationView?.markerTintColor = .systemRed
                 annotationView?.glyphImage = UIImage(systemName: "flag.fill")
-                // Add subtle bounce animation
-                UIView.animate(withDuration: 0.5) {
-                    annotationView?.transform = CGAffineTransform(translationX: 0, y: -5)
+                annotationView?.displayPriority = .required
+                
+                // Add bounce animation
+                UIView.animate(withDuration: 0.6, delay: 0, options: [.autoreverse, .repeat]) {
+                    annotationView?.transform = CGAffineTransform(translationX: 0, y: -8)
                 }
             }
+            
+            // Add shadow for depth
+            annotationView?.layer.shadowColor = UIColor.black.cgColor
+            annotationView?.layer.shadowOpacity = 0.3
+            annotationView?.layer.shadowOffset = CGSize(width: 0, height: 2)
+            annotationView?.layer.shadowRadius = 4
             
             return annotationView
         }
