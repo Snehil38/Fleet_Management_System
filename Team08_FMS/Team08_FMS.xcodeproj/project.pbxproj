@@ -282,6 +282,9 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Team08_FMS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to set pickup points for trips and calculate routes.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to set pickup points for trips and calculate routes.";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "We need your location to set pickup points for trips and calculate routes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -310,6 +313,9 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Team08_FMS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to set pickup points for trips and calculate routes.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to set pickup points for trips and calculate routes.";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "We need your location to set pickup points for trips and calculate routes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

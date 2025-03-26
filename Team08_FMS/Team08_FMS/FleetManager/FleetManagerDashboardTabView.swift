@@ -590,6 +590,11 @@ struct AddTripView: View {
                             }
                         }
                         
+                        // Location Debug View
+                        if !locationManager.debugLog.isEmpty {
+                            locationDebugView
+                        }
+                        
                         // Bottom spacing to prevent button overlap
                         Color.clear.frame(height: 100)
                     }
@@ -862,6 +867,22 @@ struct AddTripView: View {
                 showingAlert = true
             }
         }
+    }
+    
+    private var locationDebugView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Location Debug Log")
+                .font(.headline)
+            ScrollView {
+                Text(locationManager.debugLog)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.gray)
+            }
+            .frame(maxHeight: 200)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
     }
 }
 
@@ -1211,31 +1232,154 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var location: CLLocation?
     @Published var error: Error?
     @Published var authorizationStatus: CLAuthorizationStatus?
+    @Published var debugLog: String = ""
     
     override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        addDebugLog("LocationManager initialized")
+        checkLocationAuthorization()
+    }
+    
+    private func addDebugLog(_ message: String) {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        debugLog += "[\(timestamp)] \(message)\n"
+        print("Location Debug: [\(timestamp)] \(message)")
     }
     
     func requestLocation() {
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.requestLocation()
+        addDebugLog("Location request initiated")
+        let status = locationManager.authorizationStatus
+        addDebugLog("Current authorization status: \(status.rawValue)")
+        
+        switch status {
+        case .notDetermined:
+            addDebugLog("Authorization status not determined, requesting authorization")
+            locationManager.requestWhenInUseAuthorization()
+        case .restricted:
+            addDebugLog("Location access is restricted")
+            self.error = NSError(
+                domain: "LocationError",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Location access is restricted. Please check your device settings."]
+            )
+        case .denied:
+            addDebugLog("Location access is denied")
+            self.error = NSError(
+                domain: "LocationError",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Location access is denied. Please enable location services in Settings."]
+            )
+        case .authorizedWhenInUse, .authorizedAlways:
+            addDebugLog("Location authorized, requesting location update")
+            locationManager.requestLocation()
+        @unknown default:
+            addDebugLog("Unknown authorization status: \(status.rawValue)")
+            self.error = NSError(
+                domain: "LocationError",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unknown location authorization status."]
+            )
+        }
+    }
+    
+    private func checkLocationAuthorization() {
+        let status = locationManager.authorizationStatus
+        self.authorizationStatus = status
+        addDebugLog("Checking location authorization: \(status.rawValue)")
+        
+        switch status {
+        case .notDetermined:
+            addDebugLog("Authorization not determined, requesting authorization")
+            locationManager.requestWhenInUseAuthorization()
+        case .restricted, .denied:
+            let message = status == .denied ?
+                "Location access is denied. Please enable location services in Settings." :
+                "Location access is restricted. Please check your device settings."
+            addDebugLog("Location access restricted/denied: \(message)")
+            error = NSError(
+                domain: "LocationError",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: message]
+            )
+        case .authorizedWhenInUse, .authorizedAlways:
+            addDebugLog("Location access authorized")
+            break
+        @unknown default:
+            addDebugLog("Unknown authorization status encountered")
+            error = NSError(
+                domain: "LocationError",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unknown location authorization status."]
+            )
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
+        guard let location = locations.last else {
+            addDebugLog("Location update received but no location data")
+            return
+        }
+        addDebugLog("Location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
         self.location = location
+        self.error = nil
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        self.error = error
+        addDebugLog("Location manager failed with error: \(error.localizedDescription)")
+        
+        if let clError = error as? CLError {
+            switch clError.code {
+            case .denied:
+                addDebugLog("Location access denied by user")
+                self.error = NSError(
+                    domain: "LocationError",
+                    code: Int(CLError.denied.rawValue),
+                    userInfo: [NSLocalizedDescriptionKey: "Location access denied. Please enable location services in Settings."]
+                )
+            case .locationUnknown:
+                addDebugLog("Location unknown error")
+                self.error = NSError(
+                    domain: "LocationError",
+                    code: Int(CLError.locationUnknown.rawValue),
+                    userInfo: [NSLocalizedDescriptionKey: "Unable to determine location. Please try again."]
+                )
+            default:
+                addDebugLog("Other location error: \(clError.code.rawValue)")
+                self.error = error
+            }
+        } else {
+            addDebugLog("Non-CLError received: \(error)")
+            self.error = error
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         self.authorizationStatus = status
-        if status == .authorizedWhenInUse {
+        addDebugLog("Authorization status changed to: \(status.rawValue)")
+        
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            addDebugLog("Location authorized, requesting location")
             locationManager.requestLocation()
+        case .denied:
+            addDebugLog("Location access denied")
+            self.error = NSError(
+                domain: "LocationError",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Location access denied. Please enable location services in Settings."]
+            )
+        case .restricted:
+            addDebugLog("Location access restricted")
+            self.error = NSError(
+                domain: "LocationError",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Location access is restricted. Please check your device settings."]
+            )
+        default:
+            addDebugLog("Other authorization status: \(status.rawValue)")
+            break
         }
     }
 }
