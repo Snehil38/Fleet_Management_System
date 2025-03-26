@@ -590,11 +590,7 @@ struct AddTripView: View {
                             }
                         }
                         
-                        // Location Debug View
-                        if !locationManager.debugLog.isEmpty {
-                            locationDebugView
-                        }
-                        
+                        // Remove the debug log view display
                         // Bottom spacing to prevent button overlap
                         Color.clear.frame(height: 100)
                     }
@@ -867,22 +863,6 @@ struct AddTripView: View {
                 showingAlert = true
             }
         }
-    }
-    
-    private var locationDebugView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Location Debug Log")
-                .font(.headline)
-            ScrollView {
-                Text(locationManager.debugLog)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.gray)
-            }
-            .frame(maxHeight: 200)
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
     }
 }
 
