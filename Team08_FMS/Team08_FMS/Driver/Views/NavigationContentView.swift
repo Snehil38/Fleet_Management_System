@@ -25,6 +25,9 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let updateThreshold: TimeInterval = 0.5 // Update every half second for smoother tracking
     private let locationHistoryLimit = 5 // Keep last 5 locations for smooth animation
     
+    private var hasStartedNavigation = false
+    private var hasReachedDestination = false
+    
     // Vehicle specifications
     enum VehicleType {
         case truck(height: Double, weight: Double, length: Double)
@@ -81,40 +84,96 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: - CLLocationManagerDelegate
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        print("🔐 Location authorization status: \(manager.authorizationStatus.rawValue)")
+        
         switch manager.authorizationStatus {
         case .authorizedAlways:
-            // Enable background updates if we get always authorization
+            print("✅ Authorized Always")
             manager.allowsBackgroundLocationUpdates = true
             manager.showsBackgroundLocationIndicator = true
         case .authorizedWhenInUse:
-            // Disable background updates if we only have when in use authorization
+            print("✅ Authorized When In Use")
             manager.allowsBackgroundLocationUpdates = false
-        default:
-            break
+        case .denied:
+            print("❌ Location access denied")
+        case .restricted:
+            print("❌ Location access restricted")
+        case .notDetermined:
+            print("⚠️ Location authorization not determined")
+            manager.requestWhenInUseAuthorization()
+        @unknown default:
+            print("❓ Unknown authorization status")
         }
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last,
-              Date().timeIntervalSince(lastLocationUpdate) >= updateThreshold else { return }
+        guard let location = locations.last else { return }
         
-        lastLocationUpdate = Date()
-        lastLocation = location
-        userLocation = location.coordinate
-        
-        // Add to recent locations and maintain history limit
-        recentLocations.append(location)
-        if recentLocations.count > locationHistoryLimit {
-            recentLocations.removeFirst()
+        // Filter out low accuracy updates
+        if location.horizontalAccuracy > 20 {
+            return
         }
         
-        // Update route if needed
-        updateRoute(from: location)
+        // Only process first location update when starting navigation
+        if !hasStartedNavigation {
+            hasStartedNavigation = true
+            processLocationUpdate(location)
+            return
+        }
         
-        // Calculate speed and update ETA
-        if recentLocations.count >= 2 {
-            let speed = calculateCurrentSpeed()
-            updateETABasedOnSpeed(speed)
+        // Check for minimum movement threshold (10 meters)
+        if let lastLoc = lastLocation {
+            let distance = location.distance(from: lastLoc)
+            if distance < 10 {
+                return
+            }
+            
+            // Calculate distance to destination
+            let destinationLocation = CLLocation(latitude: _destination.latitude, longitude: _destination.longitude)
+            let distanceToDestination = location.distance(from: destinationLocation)
+            
+            // Check if we've reached the destination (within 20 meters)
+            if distanceToDestination < 20 && !hasReachedDestination {
+                hasReachedDestination = true
+                DispatchQueue.main.async {
+                    self.route = nil // Clear the route
+                    // You might want to trigger some completion UI/notification here
+                }
+                return
+            }
+        }
+        
+        processLocationUpdate(location)
+    }
+    
+    private func processLocationUpdate(_ location: CLLocation) {
+        lastLocationUpdate = Date()
+        lastLocation = location
+        
+        DispatchQueue.main.async {
+            self.userLocation = location.coordinate
+            
+            // Add to recent locations and maintain history limit
+            var updatedLocations = self.recentLocations
+            updatedLocations.append(location)
+            if updatedLocations.count > self.locationHistoryLimit {
+                updatedLocations.removeFirst()
+            }
+            self.recentLocations = updatedLocations
+            
+            // Only update route and ETA if we haven't reached the destination
+            if !self.hasReachedDestination {
+                // Calculate speed and update ETA
+                if self.recentLocations.count >= 2 {
+                    let speed = self.calculateCurrentSpeed()
+                    if speed > 0.5 { // Only update if moving faster than 0.5 m/s
+                        self.updateETABasedOnSpeed(speed)
+                    }
+                }
+                
+                // Update route if needed
+                self.updateRoute(from: location)
+            }
         }
     }
     
@@ -123,7 +182,20 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("Location manager failed with error: \(error.localizedDescription)")
+        print("❌ Location manager error: \(error.localizedDescription)")
+        
+        if let clError = error as? CLError {
+            switch clError.code {
+            case .denied:
+                print("🚫 Location access denied")
+            case .locationUnknown:
+                print("❓ Location unknown")
+            case .network:
+                print("🌐 Network error")
+            default:
+                print("⚠️ Other location error: \(clError.code)")
+            }
+        }
     }
     
     // MARK: - Route Updates
@@ -132,7 +204,6 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Only update route if we don't have one yet or if we've moved significantly
         if route == nil || lastLocation == nil || 
            (lastLocation != nil && location.distance(from: lastLocation!) > 200) {
-            lastLocation = location
             
             let request = MKDirections.Request()
             
@@ -141,34 +212,30 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             request.source = MKMapItem(placemark: MKPlacemark(coordinate: sourceCoordinate))
             request.destination = MKMapItem(placemark: MKPlacemark(coordinate: _destination))
             request.transportType = vehicleType.routingPreference
-            
-            // Limit to just one route (primary) for better performance
             request.requestsAlternateRoutes = false
-            
-            // Add simplified route-specific preferences
             request.tollPreference = .avoid
             
             let directions = MKDirections(request: request)
             directions.calculate { [weak self] response, error in
                 guard let self = self,
-                      let response = response else {
+                      let response = response,
+                      let primaryRoute = response.routes.first else {
                     print("Error calculating route: \(error?.localizedDescription ?? "Unknown error")")
                     return
                 }
                 
-                if let primaryRoute = response.routes.first {
+                DispatchQueue.main.async {
                     // Only replace route if we don't have one, or if it's significantly different
                     if self.route == nil || 
                        abs(self.route!.expectedTravelTime - primaryRoute.expectedTravelTime) > 60 ||
                        abs(self.route!.distance - primaryRoute.distance) > 1000 {
+                        
                         self.route = primaryRoute
                         
                         // Set default values for current step
                         if !primaryRoute.steps.isEmpty {
                             self.currentStep = primaryRoute.steps[0]
                             self.nextStepDistance = 0
-                            
-                            // Calculate estimated time and distance
                             self.remainingDistance = primaryRoute.distance
                             self.remainingTime = primaryRoute.expectedTravelTime
                         }
@@ -265,10 +332,9 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func startNavigation() {
-        // Request the highest level of authorization available
+        hasStartedNavigation = false
+        hasReachedDestination = false
         locationManager.requestWhenInUseAuthorization()
-        
-        // Start updates
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
     }
@@ -276,6 +342,8 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func stopNavigation() {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
+        hasStartedNavigation = false
+        hasReachedDestination = false
     }
     
     func updateNavigation(from location: CLLocation) {
@@ -287,15 +355,18 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             let userLocation = location.coordinate
             let destinationLocation = destination
             
-            // Approximate the remaining distance
+            // Calculate values first
             let directDistance = calculateDistance(from: userLocation, to: destinationLocation)
-            remainingDistance = route.distance > directDistance ? route.distance : directDistance
+            let newRemainingDistance = route.distance > directDistance ? route.distance : directDistance
             
             // Estimate remaining time based on average speed
             let averageSpeed = 40.0 // km/h (this can be calculated based on previous speeds)
-            remainingTime = remainingDistance / (averageSpeed * 1000 / 3600)
+            let newRemainingTime = newRemainingDistance / (averageSpeed * 1000 / 3600)
             
             // Find the current step
+            var newCurrentStep: MKRoute.Step?
+            var newNextStepDistance: CLLocationDistance = 0
+            
             if !route.steps.isEmpty {
                 let steps = route.steps
                 // Find the closest step based on user location
@@ -306,19 +377,27 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                         let distanceToNextStep = calculateDistance(from: userLocation, to: nextStepCoord)
                         
                         if distanceToNextStep < 500 { // If within 500m of the next maneuver
-                            currentStep = nextStep
-                            nextStepDistance = distanceToNextStep
+                            newCurrentStep = nextStep
+                            newNextStepDistance = distanceToNextStep
                             break
                         } else if index == 0 {
-                            currentStep = step
-                            nextStepDistance = distanceToNextStep
+                            newCurrentStep = step
+                            newNextStepDistance = distanceToNextStep
                         }
                     } else {
                         // Last step
-                        currentStep = step
-                        nextStepDistance = calculateDistance(from: userLocation, to: destinationLocation)
+                        newCurrentStep = step
+                        newNextStepDistance = calculateDistance(from: userLocation, to: destinationLocation)
                     }
                 }
+            }
+            
+            // Update all state at once on the main thread
+            DispatchQueue.main.async {
+                self.remainingDistance = newRemainingDistance
+                self.remainingTime = newRemainingTime
+                self.currentStep = newCurrentStep
+                self.nextStepDistance = newNextStepDistance
             }
         }
     }
