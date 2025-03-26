@@ -34,21 +34,20 @@ struct NavigationMapView: UIViewRepresentable {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
-        mapView.userTrackingMode = followsUserLocation ? .followWithHeading : .none
         
-        // Enhanced map settings for better street-level view
-        mapView.mapType = .standard
+        // Set initial tracking mode to follow with heading
+        mapView.setUserTrackingMode(.followWithHeading, animated: true)
+        
+        // Enhanced map settings for better visualization
+        mapView.mapType = .mutedStandard
         mapView.pointOfInterestFilter = .includingAll
         mapView.showsBuildings = true
         mapView.showsTraffic = true
         mapView.showsCompass = true
         mapView.showsScale = true
         
-        // Set initial camera pitch and altitude for street-level view
-        let camera = MKMapCamera()
-        camera.pitch = 70 // More tilted angle for better street view
-        camera.altitude = 150 // Lower altitude for street-level perspective
-        mapView.camera = camera
+        // Show more map details
+        mapView.showsPointsOfInterest = true
         
         // Add destination annotation
         let destinationAnnotation = MapAnnotation(
@@ -58,12 +57,6 @@ struct NavigationMapView: UIViewRepresentable {
             type: .destination
         )
         mapView.addAnnotation(destinationAnnotation)
-        
-        // For simulator testing - add gesture recognizers
-        #if targetEnvironment(simulator)
-        let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
-        mapView.addGestureRecognizer(panGesture)
-        #endif
         
         return mapView
     }
@@ -91,9 +84,11 @@ struct NavigationMapView: UIViewRepresentable {
             context.coordinator.currentRouteId = nil
         }
         
-        // Only update tracking mode if it's changed
-        if mapView.userTrackingMode != (followsUserLocation ? .followWithHeading : .none) {
-            mapView.setUserTrackingMode(followsUserLocation ? .followWithHeading : .none, animated: true)
+        // Always ensure we're in the correct tracking mode
+        if followsUserLocation && mapView.userTrackingMode != .followWithHeading {
+            mapView.setUserTrackingMode(.followWithHeading, animated: true)
+        } else if !followsUserLocation && mapView.userTrackingMode != .none {
+            mapView.setUserTrackingMode(.none, animated: true)
         }
     }
     
@@ -115,6 +110,9 @@ struct NavigationMapView: UIViewRepresentable {
         private let accuracyThreshold: CLLocationAccuracy = 20.0 // 20 meters accuracy threshold
         private var lastCameraUpdate = Date()
         private let cameraUpdateThreshold: TimeInterval = 1.0 // Minimum time between camera updates
+        private var lastRecalculationTime = Date()
+        private let recalculationThreshold: TimeInterval = 30.0 // Recalculate route every 30 seconds if off route
+        private let offRouteThreshold: CLLocationDistance = 50.0 // Distance in meters to consider off route
         
         init(_ parent: NavigationMapView) {
             self.parent = parent
@@ -250,6 +248,30 @@ struct NavigationMapView: UIViewRepresentable {
                 return
             }
             
+            // Always update user location immediately
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.parent.userLocation = userLocation.coordinate
+                if let heading = userLocation.heading {
+                    self.parent.userHeading = heading.trueHeading
+                }
+            }
+            
+            // Check if we need to recalculate route
+            if let route = parent.route {
+                let polyline = route.polyline
+                let closest = closestPointOnRoute(to: location.coordinate, route: polyline)
+                let distanceFromRoute = distance(from: location.coordinate, to: closest)
+                
+                let now = Date()
+                if distanceFromRoute > offRouteThreshold && 
+                   now.timeIntervalSince(lastRecalculationTime) >= recalculationThreshold {
+                    // We're off route - recalculate
+                    recalculateRoute(from: location.coordinate, to: parent.destination)
+                    lastRecalculationTime = now
+                }
+            }
+            
             // Check for significant movement
             if let lastLoc = lastLocation {
                 let distance = location.distance(from: lastLoc)
@@ -271,29 +293,64 @@ struct NavigationMapView: UIViewRepresentable {
                 }
             }
             
-            // Update camera only if enough time has passed and we're following the user
-            let now = Date()
-            if parent.followsUserLocation && now.timeIntervalSince(lastCameraUpdate) >= cameraUpdateThreshold {
+            // Update camera with user's movement
+            if parent.followsUserLocation {
                 let camera = MKMapCamera(
                     lookingAtCenter: location.coordinate,
-                    fromDistance: 200, // Fixed altitude for stability
-                    pitch: 60, // Fixed pitch for stability
+                    fromDistance: 150, // Lower altitude for better street view
+                    pitch: 70, // More tilted angle for better perspective
                     heading: parent.userHeading
                 )
                 mapView.setCamera(camera, animated: true)
-                lastCameraUpdate = now
             }
             
             lastLocation = location
+            parent.onLocationUpdate?(location)
+        }
+        
+        private func recalculateRoute(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) {
+            let request = MKDirections.Request()
+            request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
+            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+            request.transportType = .automobile
             
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.parent.userLocation = userLocation.coordinate
-                if let heading = userLocation.heading {
-                    self.parent.userHeading = heading.trueHeading
+            let directions = MKDirections(request: request)
+            directions.calculate { [weak self] response, error in
+                guard let self = self,
+                      let route = response?.routes.first else { return }
+                
+                DispatchQueue.main.async {
+                    self.parent.route = route
                 }
-                self.parent.onLocationUpdate?(location)
             }
+        }
+        
+        private func closestPointOnRoute(to point: CLLocationCoordinate2D, route: MKPolyline) -> CLLocationCoordinate2D {
+            var closest = route.coordinate
+            var minDistance = Double.infinity
+            
+            // Convert polyline to array of coordinates
+            let pointCount = route.pointCount
+            let coordinates = UnsafeMutablePointer<CLLocationCoordinate2D>.allocate(capacity: pointCount)
+            route.getCoordinates(coordinates, range: NSRange(location: 0, length: pointCount))
+            
+            // Find closest point
+            for i in 0..<pointCount {
+                let distance = self.distance(from: point, to: coordinates[i])
+                if distance < minDistance {
+                    minDistance = distance
+                    closest = coordinates[i]
+                }
+            }
+            
+            coordinates.deallocate()
+            return closest
+        }
+        
+        private func distance(from point1: CLLocationCoordinate2D, to point2: CLLocationCoordinate2D) -> CLLocationDistance {
+            let location1 = CLLocation(latitude: point1.latitude, longitude: point1.longitude)
+            let location2 = CLLocation(latitude: point2.latitude, longitude: point2.longitude)
+            return location1.distance(from: location2)
         }
         
         func mapView(_ mapView: MKMapView, didFailToLocateUserWithError error: Error) {
@@ -308,8 +365,14 @@ struct NavigationMapView: UIViewRepresentable {
             print("🔴 MapView did stop locating user")
         }
         
+        // Handle when user tracking mode changes
         func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
-            // Don't log tracking mode changes
+            if parent.followsUserLocation && mode != .followWithHeading {
+                // If we should be following but aren't, reset the mode
+                DispatchQueue.main.async {
+                    mapView.setUserTrackingMode(.followWithHeading, animated: true)
+                }
+            }
         }
         
         func updateSourceAnnotation(at coordinate: CLLocationCoordinate2D, on mapView: MKMapView, heading: Double) {
