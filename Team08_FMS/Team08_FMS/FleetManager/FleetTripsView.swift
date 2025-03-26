@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import MapKit
 
 struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
@@ -226,9 +227,15 @@ struct EmptyTripsView: View {
 }
 
 // Trip card view
+enum ActiveSheet: Identifiable {
+    case assign, detail
+    
+    var id: Int { hashValue }
+}
+
 struct TripCardView: View {
     let trip: Trip
-    @State private var showingAssignSheet = false
+    @State private var activeSheet: ActiveSheet? = nil
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -341,17 +348,26 @@ struct TripCardView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5)
+        .contentShape(Rectangle()) // Ensures the entire card is tappable
         .onTapGesture {
+            // If driver is unassigned, show assign sheet; otherwise, show detail sheet
             if trip.driverId == nil {
-                // Open assignment sheet for unassigned trips
-                showingAssignSheet = true
+                activeSheet = .assign
+            } else {
+                activeSheet = .detail
             }
         }
-        .sheet(isPresented: $showingAssignSheet) {
-            AssignDriverView(trip: trip)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .assign:
+                AssignDriverView(trip: trip)
+            case .detail:
+                TripDetailView(trip: trip)
+            }
         }
     }
 }
+
 
 // Trip status badge
 struct TripStatusBadge: View {
@@ -398,110 +414,120 @@ struct TripStatusBadge: View {
 
 // Trip detail view
 struct TripDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var showingAssignSheet = false
-    
     let trip: Trip
-    
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Trip Status Card
-                VStack {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Trip Status")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Trip Status Card
+                    VStack {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text("Trip Status")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                
+                                TripStatusBadge(status: trip.status)
+                            }
                             
-                            TripStatusBadge(status: trip.status)
-                        }
-                        
-                        Spacer()
-                        
-                        if !trip.eta.isEmpty {
-                            Text(trip.eta)
-                                .font(.subheadline)
-                        }
-                    }
-                    .padding()
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(0.1), radius: 5)
-                .padding(.horizontal)
-                
-                // Route Information Card
-                VStack(alignment: .leading) {
-                    Text("Trip Information")
-                        .font(.headline)
-                        .padding(.horizontal)
-                        .padding(.top)
-                    
-                    HStack {
-                        VStack(alignment: .leading, spacing: 8) {
-                            LabeledContent(label: "Trip Name", value: trip.name)
+                            Spacer()
                             
-                            Divider()
-                            
-                            LabeledContent(label: "Pickup", value: trip.address)
-                            
-                            Divider()
-                            
-                            LabeledContent(label: "Destination", value: trip.destination)
-                            
-                            if trip.status != .pending {
-                                Divider()
-                                let vehicleDisplayInfo = "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model) (\(trip.vehicleDetails.licensePlate))"
-                                LabeledContent(label: "Vehicle", value: vehicleDisplayInfo)
+                            if !trip.eta.isEmpty {
+                                Text(trip.eta)
+                                    .font(.subheadline)
                             }
                         }
                         .padding()
                     }
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(12)
-                .shadow(color: Color.black.opacity(0.1), radius: 5)
-                .padding(.horizontal)
-                
-                // Map Placeholder
-                MapPlaceholder()
-                    .frame(height: 200)
+                    .background(Color(.systemBackground))
                     .cornerRadius(12)
                     .shadow(color: Color.black.opacity(0.1), radius: 5)
                     .padding(.horizontal)
-                
-                // Action Button
-                if trip.status == .pending {
-                    Button(action: {
-                        showingAssignSheet = true
-                    }) {
+                    
+                    // Route Information Card
+                    VStack(alignment: .leading) {
+                        Text("Trip Information")
+                            .font(.headline)
+                            .padding(.horizontal)
+                            .padding(.top)
+                        
                         HStack {
-                            Image(systemName: "person.badge.plus")
-                            Text("Assign Driver & Vehicle")
+                            VStack(alignment: .leading, spacing: 8) {
+                                LabeledContent(label: "Trip Name", value: trip.name)
+                                
+                                Divider()
+                                
+                                LabeledContent(label: "Pickup", value: trip.address)
+                                
+                                Divider()
+                                
+                                LabeledContent(label: "Destination", value: trip.destination)
+                                
+                                if trip.status != .pending {
+                                    Divider()
+                                    let vehicleDisplayInfo = "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model) (\(trip.vehicleDetails.licensePlate))"
+                                    LabeledContent(label: "Vehicle", value: vehicleDisplayInfo)
+                                }
+                            }
+                            .padding()
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
+                        .background(Color(.systemGray6))
                         .cornerRadius(12)
-                        .shadow(color: Color.black.opacity(0.1), radius: 3)
+                        .padding(.horizontal)
                     }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.1), radius: 5)
                     .padding(.horizontal)
+                    
+                    // Map Placeholder
+                    MapPlaceholder()
+                        .frame(height: 200)
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5)
+                        .padding(.horizontal)
+                    
+                    // Action Button
+                    if trip.status == .pending {
+                        Button(action: {
+                            showingAssignSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "person.badge.plus")
+                                Text("Assign Driver & Vehicle")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.1), radius: 3)
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.vertical)
+            }
+            .navigationTitle(trip.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                // "Back" button similar to "Cancel" in AssignDriverView
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Back") {
+                        dismiss()
+                    }
                 }
             }
-            .padding(.vertical)
-        }
-        .navigationTitle(trip.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingAssignSheet) {
-            // Show assign sheet here
-            Text("Assign Trip")
+            .sheet(isPresented: $showingAssignSheet) {
+                AssignDriverView(trip: trip)
+            }
         }
     }
 }
+
 
 // Map Placeholder
 struct MapPlaceholder: View {
