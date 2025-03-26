@@ -495,8 +495,3 @@ struct TripDetailRow: View {
     }
 }
 
-#Preview {
-    NavigationView {
-        TripsView()
-    }
-} 
