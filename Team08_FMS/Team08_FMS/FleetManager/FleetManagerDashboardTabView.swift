@@ -349,7 +349,7 @@ struct AddTripView: View {
                                     LocationInputField(
                                         icon: "mappin.circle.fill",
                                         iconColor: Color(red: 0.2, green: 0.5, blue: 1.0),
-                                        placeholder: "Enter pickup location",
+                                        placeholder: "Enter pickup location (address, landmark, etc.)",
                                         text: $pickupLocation,
                                         onClear: {
                                             pickupLocation = ""
@@ -358,7 +358,7 @@ struct AddTripView: View {
                                         },
                                         onChange: { newValue in
                                             if newValue.count > 2 {
-                                                searchCompleter.queryFragment = newValue + ", India"
+                                                searchCompleter.queryFragment = newValue
                                                 activeTextField = .pickup
                                             } else {
                                                 searchResults = []
@@ -370,7 +370,7 @@ struct AddTripView: View {
                                     LocationInputField(
                                         icon: "mappin.and.ellipse",
                                         iconColor: Color(red: 0.9, green: 0.3, blue: 0.3),
-                                        placeholder: "Enter dropoff location",
+                                        placeholder: "Enter dropoff location (address, landmark, etc.)",
                                         text: $dropoffLocation,
                                         onClear: {
                                             dropoffLocation = ""
@@ -379,7 +379,7 @@ struct AddTripView: View {
                                         },
                                         onChange: { newValue in
                                             if newValue.count > 2 {
-                                                searchCompleter.queryFragment = newValue + ", India"
+                                                searchCompleter.queryFragment = newValue
                                                 activeTextField = .dropoff
                                             } else {
                                                 searchResults = []
@@ -594,7 +594,7 @@ struct AddTripView: View {
     }
     
     private func setupSearchCompleter() {
-        searchCompleter.resultTypes = .address
+        searchCompleter.resultTypes = [.pointOfInterest, .address]
         searchCompleter.region = MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
             span: MKCoordinateSpan(latitudeDelta: 20, longitudeDelta: 20)
@@ -623,22 +623,28 @@ struct AddTripView: View {
             span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 30)
         )
         
+        // Include more result types for detailed locations
+        searchRequest.resultTypes = [.pointOfInterest, .address]
+        
         let search = MKLocalSearch(request: searchRequest)
         search.start { response, error in
-            guard let mapItem = response?.mapItems.first, error == nil else {
+            guard let response = response, error == nil else {
                 return
             }
             
-            if isPickup {
-                self.pickupLocation = mapItem.name ?? query
-                self.pickupCoordinate = mapItem.placemark.coordinate
-            } else {
-                self.dropoffLocation = mapItem.name ?? query
-                self.dropoffCoordinate = mapItem.placemark.coordinate
+            // Get the first result if available
+            if let mapItem = response.mapItems.first {
+                if isPickup {
+                    self.pickupLocation = mapItem.name ?? query
+                    self.pickupCoordinate = mapItem.placemark.coordinate
+                } else {
+                    self.dropoffLocation = mapItem.name ?? query
+                    self.dropoffCoordinate = mapItem.placemark.coordinate
+                }
+                
+                self.hideSearchResults()
+                self.updateMapRegion()
             }
-            
-            self.hideSearchResults()
-            self.updateMapRegion()
         }
     }
     
@@ -848,6 +854,13 @@ struct MapView: UIViewRepresentable {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.region = region
+        
+        // Show detailed map with all points of interest
+        mapView.mapType = .standard
+        mapView.pointOfInterestFilter = .includingAll
+        mapView.showsBuildings = true
+        mapView.showsTraffic = true
+        
         return mapView
     }
     
