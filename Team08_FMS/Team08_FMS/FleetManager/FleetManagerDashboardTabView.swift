@@ -594,15 +594,19 @@ struct AddTripView: View {
     }
     
     private func setupSearchCompleter() {
-        searchCompleter.resultTypes = [.pointOfInterest, .address]
+        // Enable all result types to get the most detailed location results
+        searchCompleter.resultTypes = [.pointOfInterest, .address, .query]
+        
+        // Set a smaller region for more precise results
         searchCompleter.region = MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
-            span: MKCoordinateSpan(latitudeDelta: 20, longitudeDelta: 20)
+            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10) // Smaller span for more detailed results
         )
         
         // Set up the delegate
         let delegate = SearchCompleterDelegate { results in
-            self.searchResults = results
+            // Limit to top 10 results for better performance
+            self.searchResults = Array(results.prefix(10))
         }
         searchCompleter.delegate = delegate
         
@@ -655,22 +659,22 @@ struct AddTripView: View {
             let centerLon = (pickup.longitude + dropoff.longitude) / 2
             
             // Calculate span to fit both points with padding
-            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.8 // Increased padding
-            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.8 // Increased padding
+            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.5 // Reduced padding for more detail
+            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.5 // Reduced padding for more detail
             
             region = MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
-                span: MKCoordinateSpan(latitudeDelta: max(latDelta, 0.05), longitudeDelta: max(lonDelta, 0.05))
+                span: MKCoordinateSpan(latitudeDelta: max(latDelta, 0.02), longitudeDelta: max(lonDelta, 0.02))
             )
         } else if let pickup = pickupCoordinate {
             region = MKCoordinateRegion(
                 center: pickup,
-                span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // Increased zoom level
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02) // More detailed zoom level
             )
         } else if let dropoff = dropoffCoordinate {
             region = MKCoordinateRegion(
                 center: dropoff,
-                span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5) // Increased zoom level
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02) // More detailed zoom level
             )
         }
     }
@@ -812,17 +816,35 @@ struct LocationSearchResults: View {
                     Button {
                         onSelect(result)
                     } label: {
-                        HStack {
-                            Image(systemName: "mappin.circle.fill")
-                                .foregroundColor(.red)
+                        HStack(alignment: .top, spacing: 12) {
+                            // Map pin icon with different colors for different types of locations
+                            Image(systemName: iconForResult(result))
+                                .foregroundColor(colorForResult(result))
                                 .font(.headline)
-                            VStack(alignment: .leading) {
+                            
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text(result.title)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
                                     .foregroundColor(.primary)
+                                    .lineLimit(1)
+                                
                                 if !result.subtitle.isEmpty {
                                     Text(result.subtitle)
                                         .font(.caption)
                                         .foregroundColor(.gray)
+                                        .lineLimit(2)
+                                }
+                                
+                                // Display the type of location
+                                if let locationType = getLocationType(result) {
+                                    Text(locationType)
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.blue.opacity(0.1))
+                                        .cornerRadius(4)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -839,7 +861,74 @@ struct LocationSearchResults: View {
         .background(Color(.systemBackground))
         .cornerRadius(10)
         .shadow(color: Color.black.opacity(0.1), radius: 5)
-        .frame(height: min(CGFloat(results.count * 60), 240))
+        .frame(height: min(CGFloat(results.count * 70), 280))
+    }
+    
+    // Helper function to determine icon based on result type
+    private func iconForResult(_ result: MKLocalSearchCompletion) -> String {
+        if result.subtitle.contains("Restaurant") || result.subtitle.contains("Café") || result.subtitle.contains("Food") {
+            return "fork.knife"
+        } else if result.subtitle.contains("Hotel") || result.subtitle.contains("Resort") {
+            return "bed.double.fill"
+        } else if result.subtitle.contains("Hospital") || result.subtitle.contains("Clinic") {
+            return "cross.fill"
+        } else if result.subtitle.contains("School") || result.subtitle.contains("College") || result.subtitle.contains("University") {
+            return "book.fill"
+        } else if result.subtitle.contains("Park") || result.subtitle.contains("Garden") {
+            return "leaf.fill"
+        } else if result.subtitle.contains("Mall") || result.subtitle.contains("Shop") || result.subtitle.contains("Store") {
+            return "bag.fill"
+        } else {
+            return "mappin.circle.fill"
+        }
+    }
+    
+    // Helper function to determine color based on result type
+    private func colorForResult(_ result: MKLocalSearchCompletion) -> Color {
+        if result.subtitle.contains("Restaurant") || result.subtitle.contains("Café") || result.subtitle.contains("Food") {
+            return .orange
+        } else if result.subtitle.contains("Hotel") || result.subtitle.contains("Resort") {
+            return .blue
+        } else if result.subtitle.contains("Hospital") || result.subtitle.contains("Clinic") {
+            return .red
+        } else if result.subtitle.contains("School") || result.subtitle.contains("College") || result.subtitle.contains("University") {
+            return .green
+        } else if result.subtitle.contains("Park") || result.subtitle.contains("Garden") {
+            return .green
+        } else if result.subtitle.contains("Mall") || result.subtitle.contains("Shop") || result.subtitle.contains("Store") {
+            return .purple
+        } else {
+            return .red
+        }
+    }
+    
+    // Helper function to get location type
+    private func getLocationType(_ result: MKLocalSearchCompletion) -> String? {
+        let subtitle = result.subtitle.lowercased()
+        
+        if subtitle.contains("restaurant") || subtitle.contains("café") || subtitle.contains("cafe") {
+            return "Restaurant"
+        } else if subtitle.contains("hotel") || subtitle.contains("resort") {
+            return "Hotel"
+        } else if subtitle.contains("hospital") || subtitle.contains("clinic") {
+            return "Healthcare"
+        } else if subtitle.contains("school") || subtitle.contains("college") || subtitle.contains("university") {
+            return "Education"
+        } else if subtitle.contains("park") || subtitle.contains("garden") {
+            return "Park"
+        } else if subtitle.contains("mall") || subtitle.contains("shop") || subtitle.contains("store") {
+            return "Shopping"
+        } else if subtitle.contains("airport") || subtitle.contains("station") {
+            return "Transport"
+        } else if subtitle.contains("street") || subtitle.contains("road") {
+            return "Street"
+        } else if subtitle.contains("city") || subtitle.contains("town") {
+            return "City"
+        } else if subtitle.contains("landmark") || subtitle.contains("monument") {
+            return "Landmark"
+        } else {
+            return nil
+        }
     }
 }
 
@@ -855,11 +944,14 @@ struct MapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         mapView.region = region
         
-        // Show detailed map with all points of interest
-        mapView.mapType = .standard
+        // Enhanced map with maximum detail
+        mapView.mapType = .mutedStandard // Using muted standard for a cleaner look with all details
         mapView.pointOfInterestFilter = .includingAll
         mapView.showsBuildings = true
         mapView.showsTraffic = true
+        mapView.showsPointsOfInterest = true
+        mapView.showsCompass = true
+        mapView.showsScale = true
         
         return mapView
     }
