@@ -1183,4 +1183,19 @@ class SupabaseDataController: ObservableObject {
             .eq("id", value: id)
             .execute()
     }
+    
+    public func updateTrip(id: UUID, driverId: UUID) async throws {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .update(["driver_id": driverId])
+                .eq("id", value: id)
+                .execute()
+            
+            print("Trip update success: \(response)")
+        } catch {
+            print("Error updating trip: \(error)")
+            throw error
+        }
+    }
 }

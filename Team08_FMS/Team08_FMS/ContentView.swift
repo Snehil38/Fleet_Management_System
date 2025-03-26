@@ -22,7 +22,9 @@ struct ContentView: View {
                     case "fleet_manager":
                         FleetManagerTabView()
                     case "driver":
-                        DriverTabView()
+                        if let userID = auth.userID {
+                            DriverTabView(driverId: userID)
+                        }
                     case "maintenance_personnel":
                         MaintenancePersonnelTabView()
                     default:
