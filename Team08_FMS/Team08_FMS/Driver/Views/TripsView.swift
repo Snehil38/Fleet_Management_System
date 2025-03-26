@@ -57,12 +57,19 @@ struct TripsView: View {
         } message: {
             if let error = tripController.error {
                 switch error {
-                case .fetchError(let message),
-                     .decodingError(let message),
-                     .vehicleError(let message),
-                     .updateError(let message):
+                case .fetchError(let message):
+                    Text(message)
+                case .decodingError(let message):
+                    Text(message)
+                case .vehicleError(let message):
+                    Text(message)
+                case .updateError(let message):
+                    Text(message)
+                case .locationError(let message):
                     Text(message)
                 }
+            } else {
+                Text("An unexpected error occurred.")
             }
         }
         .onChange(of: tripController.error) { error, _ in

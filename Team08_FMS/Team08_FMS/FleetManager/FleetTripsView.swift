@@ -7,7 +7,6 @@ struct FleetTripsView: View {
     @State private var selectedFilter = 1 // Default to Upcoming
     @State private var showingAddTripView = false
     
-    // Define tab types
     enum TabType: Int, CaseIterable {
         case current = 0
         case upcoming = 1
@@ -23,26 +22,16 @@ struct FleetTripsView: View {
     }
     
     var currentTrips: [Trip] {
-        // Get all trips with in-progress status
-        return tripController.getAllTrips().filter { $0.status == .inProgress }
+        tripController.getAllTrips().filter { $0.status == .inProgress }
     }
     
     var upcomingTrips: [Trip] {
-        // Get all trips with pending or assigned status
-        return tripController.getAllTrips().filter { $0.status == .pending || $0.status == .assigned }
+        tripController.getAllTrips().filter { $0.status == .pending || $0.status == .assigned }
     }
     
     var completedTrips: [Trip] {
-        // Get all completed trips - either from recentDeliveries or directly from trips
         let deliveredTrips = tripController.getAllTrips().filter { $0.status == .delivered }
-        
-        if !deliveredTrips.isEmpty {
-            return deliveredTrips
-        }
-        
-        // Fallback to recentDeliveries if needed
-        return tripController.recentDeliveries.compactMap { delivery in
-            // Convert DeliveryDetails back to Trip format
+        return !deliveredTrips.isEmpty ? deliveredTrips : tripController.recentDeliveries.compactMap { delivery in
             Trip(
                 id: delivery.id,
                 name: delivery.notes.components(separatedBy: "\n").first?.replacingOccurrences(of: "Trip: ", with: "") ?? "Unknown",
@@ -66,21 +55,16 @@ struct FleetTripsView: View {
     
     var filteredTrips: [Trip] {
         switch selectedFilter {
-        case 0: // Current
-            return currentTrips
-        case 1: // Upcoming
-            return upcomingTrips
-        case 2: // Completed
-            return completedTrips
-        default:
-            return []
+        case 0: return currentTrips
+        case 1: return upcomingTrips
+        case 2: return completedTrips
+        default: return []
         }
     }
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Filter control - matches the UI in screenshot
                 Picker("Trip Filter", selection: $selectedFilter) {
                     ForEach(TabType.allCases.map { $0.rawValue }, id: \.self) { index in
                         Text(TabType(rawValue: index)?.title ?? "")
@@ -89,7 +73,6 @@ struct FleetTripsView: View {
                 .pickerStyle(.segmented)
                 .padding()
                 
-                // Trip counts
                 HStack(spacing: 16) {
                     ForEach(0..<3) { index in
                         let count = getTripCount(for: index)
@@ -114,7 +97,6 @@ struct FleetTripsView: View {
                 }
                 .padding(.horizontal)
                 
-                // Simple header section
                 HStack {
                     Text(getHeaderTitle())
                         .font(.headline)
@@ -135,7 +117,6 @@ struct FleetTripsView: View {
                 .padding(.horizontal)
                 .padding(.top)
                 
-                // Trip list
                 if filteredTrips.isEmpty {
                     EmptyTripsView(filterType: selectedFilter)
                 } else {
@@ -154,22 +135,25 @@ struct FleetTripsView: View {
             }
             .navigationTitle("Trips")
             .alert("Error", isPresented: $showingError) {
-                Button("OK") {
-                    showingError = false
-                }
+                Button("OK") { showingError = false }
             } message: {
                 if let error = tripController.error {
                     switch error {
                     case .fetchError(let message),
                          .decodingError(let message),
                          .vehicleError(let message),
-                         .updateError(let message):
+                         .updateError(let message),
+                         .locationError(let message):
                         Text(message)
+                    @unknown default:
+                        Text("An unknown error occurred. Please try again later.")
                     }
+                } else {
+                    Text("An unexpected error occurred.")
                 }
             }
-            .onChange(of: tripController.error) { error, _ in
-                showingError = error != nil
+            .onChange(of: tripController.error) { newError, _ in
+                showingError = newError != nil
             }
             .onAppear {
                 Task {
@@ -177,8 +161,7 @@ struct FleetTripsView: View {
                 }
             }
             .sheet(isPresented: $showingAddTripView) {
-                // Add Trip View would go here
-                Text("Add Trip View")
+                AddTripView { showingAddTripView = false }
                     .presentationDetents([.medium, .large])
             }
         }
@@ -186,30 +169,24 @@ struct FleetTripsView: View {
     
     private func getTripCount(for filterIndex: Int) -> Int {
         switch filterIndex {
-        case 0: // Current
-            return currentTrips.count
-        case 1: // Upcoming
-            return upcomingTrips.count
-        case 2: // Completed
-            return completedTrips.count
-        default:
-            return 0
+        case 0: return currentTrips.count
+        case 1: return upcomingTrips.count
+        case 2: return completedTrips.count
+        default: return 0
         }
     }
     
     private func getHeaderTitle() -> String {
         switch selectedFilter {
-        case 0:
-            return "Current Trips"
-        case 1:
-            return "Upcoming Trips"
-        case 2:
-            return "Completed Trips"
-        default:
-            return "All Trips"
+        case 0: return "Current Trips"
+        case 1: return "Upcoming Trips"
+        case 2: return "Completed Trips"
+        default: return "All Trips"
         }
     }
 }
+
+
 
 // Update EmptyTripsView to show different messages based on filter
 struct EmptyTripsView: View {

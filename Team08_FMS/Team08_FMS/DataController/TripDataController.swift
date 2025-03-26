@@ -2,12 +2,14 @@ import SwiftUI
 import CoreLocation
 import Supabase
 import Combine
+import UserNotifications
 
 enum TripError: Error, Equatable {
     case fetchError(String)
     case decodingError(String)
     case vehicleError(String)
     case updateError(String)
+    case locationError(String)
     
     static func == (lhs: TripError, rhs: TripError) -> Bool {
         switch (lhs, rhs) {
@@ -15,12 +17,13 @@ enum TripError: Error, Equatable {
         case (.decodingError(let l), .decodingError(let r)): return l == r
         case (.vehicleError(let l), .vehicleError(let r)): return l == r
         case (.updateError(let l), .updateError(let r)): return l == r
+        case (.locationError(let l), .locationError(let r)): return l == r
         default: return false
         }
     }
 }
 
-class TripDataController: ObservableObject {
+class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = TripDataController()
     
     @Published var currentTrip: Trip?
@@ -30,15 +33,23 @@ class TripDataController: ObservableObject {
     @Published var isLoading = false
     @Published var isInSourceRegion = false
     @Published var isInDestinationRegion = false
+    @Published var canStartTrip = false
+    @Published var tripStartTime: Date?
+    @Published var estimatedArrivalTime: Date?
     
     private var locationManager = CLLocationManager()
     private let geofenceRadius: CLLocationDistance = 100.0 // 100 meters
     private var driverId: UUID?
     private var allTrips: [Trip] = []
+    private var tripTimer: Timer?
+    private let maxTripDuration: TimeInterval = 3600 // 1 hour in seconds
     
     private let supabaseController = SupabaseDataController.shared
     
-    private init() {
+    private override init() {
+        super.init()
+        setupLocationManager()
+        setupNotifications()
         // Start fetching data immediately
         Task {
             await refreshTrips()
@@ -46,52 +57,190 @@ class TripDataController: ObservableObject {
     }
     
     private func setupLocationManager() {
-        //        locationManager.delegate = self
-        locationManager.requestAlwaysAuthorization()
+        locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         locationManager.distanceFilter = 50 // Update only when moving 50m
         locationManager.pausesLocationUpdatesAutomatically = true
         locationManager.activityType = .automotiveNavigation
+        
+        // Request authorization first
+        locationManager.requestAlwaysAuthorization()
+        
+        // Only enable background updates after authorization is granted
+        if locationManager.authorizationStatus == .authorizedAlways {
+            locationManager.allowsBackgroundLocationUpdates = true
+            locationManager.showsBackgroundLocationIndicator = true
+        }
+    }
+    
+    private func setupNotifications() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if granted {
+                print("Notification permission granted")
+            } else if let error = error {
+                print("Error requesting notification permission: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func sendNotification(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
     }
     
     func startMonitoringRegions() {
         stopMonitoringRegions() // Clean up before starting new regions
-        guard let currentTrip = currentTrip else { return }
+        guard let currentTrip = currentTrip else {
+            print("DEBUG: Cannot start monitoring regions - no current trip")
+            return
+        }
         
         if CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) {
+            print("DEBUG: Geofencing is available on this device")
             
             let sourceRegion = CLCircularRegion(
                 center: currentTrip.sourceCoordinate,
                 radius: geofenceRadius,
                 identifier: "sourceRegion"
             )
+            sourceRegion.notifyOnEntry = true
+            sourceRegion.notifyOnExit = true
             
             let destinationRegion = CLCircularRegion(
                 center: currentTrip.destinationCoordinate,
                 radius: geofenceRadius,
                 identifier: "destinationRegion"
             )
+            destinationRegion.notifyOnEntry = true
+            destinationRegion.notifyOnExit = true
+            
+            print("DEBUG: Source region center: \(sourceRegion.center.latitude), \(sourceRegion.center.longitude)")
+            print("DEBUG: Destination region center: \(destinationRegion.center.latitude), \(destinationRegion.center.longitude)")
+            print("DEBUG: Geofence radius: \(geofenceRadius) meters")
             
             [sourceRegion, destinationRegion].forEach { region in
                 if !locationManager.monitoredRegions.contains(where: { $0.identifier == region.identifier }) {
                     locationManager.startMonitoring(for: region)
-                    print("Started monitoring: \(region.identifier)")
+                    print("DEBUG: Started monitoring region: \(region.identifier)")
+                } else {
+                    print("DEBUG: Region \(region.identifier) is already being monitored")
                 }
             }
             
             locationManager.startUpdatingLocation()
-        }
-        else {
-            print("Geofencing is not supported on this device.")
+            print("DEBUG: Started updating location")
+            
+            // Start trip timer
+            startTripTimer()
+        } else {
+            print("DEBUG: Geofencing is not supported on this device")
         }
     }
     
-    func stopMonitoringRegions() {
-        locationManager.monitoredRegions.forEach { region in
-            locationManager.stopMonitoring(for: region)
+    private func startTripTimer() {
+        tripTimer?.invalidate()
+        tripStartTime = Date()
+        
+        // Calculate estimated arrival time based on trip distance
+        if let currentTrip = currentTrip {
+            // Convert distance string (e.g., "8.5 km") to Double
+            let distanceString = currentTrip.distance.replacingOccurrences(of: " km", with: "")
+            if let distance = Double(distanceString) {
+                // Assume average speed of 40 km/h for estimation
+                let estimatedHours = distance / 40.0
+                estimatedArrivalTime = Date().addingTimeInterval(estimatedHours * 3600)
+            } else {
+                // Fallback to default 1 hour if distance parsing fails
+                estimatedArrivalTime = Date().addingTimeInterval(maxTripDuration)
+            }
+        } else {
+            estimatedArrivalTime = Date().addingTimeInterval(maxTripDuration)
         }
-        print("Stopped monitoring all regions.")
+        
+        tripTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.checkTripDuration()
+        }
     }
+    
+    private func checkTripDuration() {
+        guard let startTime = tripStartTime,
+              let estimatedArrival = estimatedArrivalTime else { return }
+        
+        let currentTime = Date()
+        let elapsedTime = currentTime.timeIntervalSince(startTime)
+        let timeUntilEstimatedArrival = estimatedArrival.timeIntervalSince(currentTime)
+        
+        // If trip has exceeded max duration
+        if elapsedTime > maxTripDuration {
+            sendNotification(
+                title: "Trip Duration Alert",
+                body: "Trip has exceeded the maximum allowed duration of 1 hour. Please check vehicle status."
+            )
+            // Notify fleet manager through Supabase
+            Task {
+                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.name ?? "Unknown")")
+            }
+        }
+        
+        // If approaching estimated arrival time (within 15 minutes)
+        if timeUntilEstimatedArrival <= 900 && timeUntilEstimatedArrival > 0 {
+            sendNotification(
+                title: "Approaching Destination",
+                body: "Vehicle should be arriving at destination soon. Current ETA: \(formatTimeRemaining(timeUntilEstimatedArrival))"
+            )
+        }
+        
+        // If past estimated arrival time
+        if timeUntilEstimatedArrival <= 0 {
+            sendNotification(
+                title: "Estimated Arrival Time Reached",
+                body: "Vehicle should have reached the destination by now. Please verify location."
+            )
+            // Notify fleet manager through Supabase
+            Task {
+                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.name ?? "Unknown")")
+            }
+        }
+    }
+    
+    private func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {
+        let minutes = Int(timeInterval / 60)
+        if minutes < 60 {
+            return "\(minutes) minutes"
+        } else {
+            let hours = minutes / 60
+            let remainingMinutes = minutes % 60
+            return "\(hours) hour\(hours == 1 ? "" : "s") \(remainingMinutes) minutes"
+        }
+    }
+    
+    private func notifyFleetManager(message: String) async {
+        do {
+            // Format the date as ISO8601 string
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+            let formattedDate = dateFormatter.string(from: Date())
+            
+            // Add notification to Supabase notifications table
+            try await supabaseController.databaseFrom("notifications")
+                .insert([
+                    "message": message,
+                    "type": "trip_alert",
+                    "created_at": formattedDate,
+                    "is_read": "false"  // Convert boolean to string
+                ])
+                .execute()
+        } catch {
+            print("Error sending fleet manager notification: \(error)")
+        }
+    }
+    
+    // MARK: - CLLocationManagerDelegate
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         switch manager.authorizationStatus {
@@ -108,6 +257,80 @@ class TripDataController: ObservableObject {
         }
     }
     
+    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
+        guard let circularRegion = region as? CLCircularRegion else {
+            print("DEBUG: Entered region is not a circular region")
+            return
+        }
+        
+        print("DEBUG: Entered region: \(circularRegion.identifier)")
+        print("DEBUG: Current location: \(manager.location?.coordinate.latitude ?? 0), \(manager.location?.coordinate.longitude ?? 0)")
+        print("DEBUG: Distance from region center: \(manager.location?.distance(from: CLLocation(latitude: circularRegion.center.latitude, longitude: circularRegion.center.longitude)) ?? 0) meters")
+        
+        switch circularRegion.identifier {
+        case "sourceRegion":
+            isInSourceRegion = true
+            print("DEBUG: Entered source region")
+            checkTripStartEligibility()
+            
+            if !upcomingTrips.isEmpty {
+                sendNotification(
+                    title: "Ready to Start Trip",
+                    body: "You are now in the pickup area. You can start your next trip when ready."
+                )
+            }
+            
+        case "destinationRegion":
+            isInDestinationRegion = true
+            print("DEBUG: Entered destination region")
+            tripTimer?.invalidate()
+            tripTimer = nil
+            
+            if let startTime = tripStartTime {
+                let duration = Date().timeIntervalSince(startTime)
+                let durationString = formatTimeRemaining(duration)
+                
+                Task {
+                    await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip?.name ?? "Unknown"). Trip duration: \(durationString)")
+                }
+            }
+            
+            if let trip = currentTrip {
+                Task {
+                    try? await markTripAsDelivered(trip: trip)
+                }
+            }
+            
+        default:
+            print("DEBUG: Entered unknown region: \(circularRegion.identifier)")
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
+        guard let circularRegion = region as? CLCircularRegion else {
+            print("DEBUG: Exited region is not a circular region")
+            return
+        }
+        
+        print("DEBUG: Exited region: \(circularRegion.identifier)")
+        print("DEBUG: Current location: \(manager.location?.coordinate.latitude ?? 0), \(manager.location?.coordinate.longitude ?? 0)")
+        print("DEBUG: Distance from region center: \(manager.location?.distance(from: CLLocation(latitude: circularRegion.center.latitude, longitude: circularRegion.center.longitude)) ?? 0) meters")
+        
+        switch circularRegion.identifier {
+        case "sourceRegion":
+            isInSourceRegion = false
+            print("DEBUG: Exited source region")
+            checkTripStartEligibility()
+            
+        case "destinationRegion":
+            isInDestinationRegion = false
+            print("DEBUG: Exited destination region")
+            
+        default:
+            print("DEBUG: Exited unknown region: \(circularRegion.identifier)")
+        }
+    }
+    
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("Location error: \(error.localizedDescription)")
         if (error as NSError).code == CLError.denied.rawValue {
@@ -115,19 +338,105 @@ class TripDataController: ObservableObject {
         }
     }
     
-    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        guard let circularRegion = region as? CLCircularRegion else { return }
-        switch circularRegion.identifier {
-        case "sourceRegion":
-            isInSourceRegion = true
-            print("Entered source region")
-            //        case "destinationRegion":
-            //            isInDestinationRegion = true
-            //            print("Entered destination region")
-            //            markTripAsDelivered(trip: currentTrip)
-        default:
-            print("Entered unknown region: \(circularRegion.identifier)")
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        // Handle location updates if needed
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
+        print("DEBUG: Successfully started monitoring region: \(region.identifier)")
+        if let circularRegion = region as? CLCircularRegion {
+            print("DEBUG: Region center: \(circularRegion.center.latitude), \(circularRegion.center.longitude)")
+            print("DEBUG: Region radius: \(circularRegion.radius) meters")
         }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didStopMonitoringFor region: CLRegion) {
+        print("Stopped monitoring region: \(region.identifier)")
+    }
+    
+    func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) {
+        print("DEBUG: Monitoring failed for region: \(region?.identifier ?? "unknown")")
+        print("DEBUG: Error: \(error.localizedDescription)")
+        if let clError = error as? CLError {
+            print("DEBUG: CoreLocation error code: \(clError.code.rawValue)")
+            print("DEBUG: CoreLocation error description: \(clError.localizedDescription)")
+        }
+    }
+    
+    private func checkTripStartEligibility() {
+        // Can only start trip if we're in the source region and there's no current trip
+        canStartTrip = isInSourceRegion && currentTrip == nil
+        
+        // If we're in the source region but can't start trip, notify the user
+        if isInSourceRegion && currentTrip != nil {
+            sendNotification(
+                title: "Trip Start Not Available",
+                body: "Cannot start new trip while another trip is in progress."
+            )
+        }
+    }
+    
+    // Update startTrip to check eligibility
+    @MainActor
+    func startTrip(trip: Trip) async throws {
+        print("Starting trip \(trip.id)")
+        
+        // Check if we can start the trip
+        guard isInSourceRegion else {
+            throw TripError.locationError("Cannot start trip: Vehicle must be in the source region")
+        }
+        
+        // Check if there's already a trip in progress
+        if let currentTrip = self.currentTrip {
+            throw TripError.updateError("Cannot start a new trip while another trip is in progress")
+        }
+        
+        do {
+            // First update the trip status
+            try await supabaseController.updateTrip(id: trip.id, status: "current")
+            print("Updated trip status to 'current'")
+            
+            // Then update the start time in a separate call
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+            let formattedDate = dateFormatter.string(from: Date())
+            
+            let response = try await supabaseController.databaseFrom("trips")
+                .update([
+                    "start_time": formattedDate,
+                    "trip_status": "current"
+                ])
+                .eq("id", value: trip.id)
+                .execute()
+            
+            print("Updated trip start_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Update local state
+            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
+                var updatedTrip = upcomingTrips[index]
+                updatedTrip.status = .inProgress
+                self.currentTrip = updatedTrip
+                upcomingTrips.remove(at: index)
+            }
+            
+            // Start monitoring regions for the new trip
+            startMonitoringRegions()
+            
+            // Refresh trips to ensure everything is in sync with server
+            try await fetchTrips()
+            print("Trips refreshed after starting trip")
+        } catch {
+            print("Error starting trip: \(error)")
+            throw TripError.updateError("Failed to start trip: \(error.localizedDescription)")
+        }
+    }
+    
+    func stopMonitoringRegions() {
+        locationManager.monitoredRegions.forEach { region in
+            locationManager.stopMonitoring(for: region)
+        }
+        print("Stopped monitoring all regions.")
     }
     
     func setDriverId(_ id: UUID) {
@@ -688,53 +997,6 @@ class TripDataController: ObservableObject {
         } catch {
             print("Error marking trip as delivered: \(error)")
             throw TripError.updateError("Failed to mark trip as delivered: \(error.localizedDescription)")
-        }
-    }
-    
-    // Update startTrip to handle the transition from upcoming to current status
-    @MainActor
-    func startTrip(trip: Trip) async throws {
-        print("Starting trip \(trip.id)")
-        
-        // Check if there's already a trip in progress
-        if let currentTrip = self.currentTrip {
-            throw TripError.updateError("Cannot start a new trip while another trip is in progress")
-        }
-        
-        do {
-            // First update the trip status
-            try await supabaseController.updateTrip(id: trip.id, status: "current")
-            print("Updated trip status to 'current'")
-            
-            // Then update the start time in a separate call
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-            let formattedDate = dateFormatter.string(from: Date())
-            
-            let response = try await supabaseController.databaseFrom("trips")
-                .update([
-                    "start_time": formattedDate,
-                    "trip_status": "current"
-                ])
-                .eq("id", value: trip.id)
-                .execute()
-            
-            print("Updated trip start_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
-            
-            // Update local state
-            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
-                var updatedTrip = upcomingTrips[index]
-                updatedTrip.status = .inProgress
-                self.currentTrip = updatedTrip
-                upcomingTrips.remove(at: index)
-            }
-            
-            // Refresh trips to ensure everything is in sync with server
-            try await fetchTrips()
-            print("Trips refreshed after starting trip")
-        } catch {
-            print("Error starting trip: \(error)")
-            throw TripError.updateError("Failed to start trip: \(error.localizedDescription)")
         }
     }
     
