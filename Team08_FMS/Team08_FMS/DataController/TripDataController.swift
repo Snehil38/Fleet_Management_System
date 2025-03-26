@@ -67,10 +67,10 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         locationManager.requestAlwaysAuthorization()
         
         // Only enable background updates after authorization is granted
-        if locationManager.authorizationStatus == .authorizedAlways {
-            locationManager.allowsBackgroundLocationUpdates = true
-            locationManager.showsBackgroundLocationIndicator = true
-        }
+//        if locationManager.authorizationStatus == .authorizedAlways {
+//            locationManager.allowsBackgroundLocationUpdates = true
+//            locationManager.showsBackgroundLocationIndicator = true
+//        }
     }
     
     private func setupNotifications() {
@@ -1067,3 +1067,26 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
 } 
+
+
+extension TripDataController {
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        switch status {
+        case .authorizedAlways:
+            // Enable background location updates now that we have the proper authorization.
+            manager.allowsBackgroundLocationUpdates = true
+            manager.showsBackgroundLocationIndicator = true
+            print("Background location updates enabled.")
+        case .authorizedWhenInUse:
+            // For authorizedWhenInUse, background updates are not enabled.
+            manager.allowsBackgroundLocationUpdates = false
+            print("Location updates allowed only in the foreground.")
+        default:
+            // Handle other cases (.denied, .restricted, etc.)
+            manager.allowsBackgroundLocationUpdates = false
+            print("Location updates are not permitted.")
+        }
+    }
+    
+    // You can also implement other delegate methods as needed.
+}
