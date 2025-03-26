@@ -95,53 +95,65 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     
     func startMonitoringRegions() {
         stopMonitoringRegions() // Clean up before starting new regions
-        guard let currentTrip = currentTrip else {
-            print("DEBUG: Cannot start monitoring regions - no current trip")
+        
+        // Filter out trips that are in progress from your data source (e.g., allTrips)
+        let inProgressTrips = allTrips.filter { $0.status == .inProgress }
+        
+        guard !inProgressTrips.isEmpty else {
+            print("DEBUG: No trips in progress for geofencing.")
             return
         }
         
         if CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) {
             print("DEBUG: Geofencing is available on this device")
             
-            let sourceRegion = CLCircularRegion(
-                center: currentTrip.sourceCoordinate,
-                radius: geofenceRadius,
-                identifier: "sourceRegion"
-            )
-            sourceRegion.notifyOnEntry = true
-            sourceRegion.notifyOnExit = true
-            
-            let destinationRegion = CLCircularRegion(
-                center: currentTrip.destinationCoordinate,
-                radius: geofenceRadius,
-                identifier: "destinationRegion"
-            )
-            destinationRegion.notifyOnEntry = true
-            destinationRegion.notifyOnExit = true
-            
-            print("DEBUG: Source region center: \(sourceRegion.center.latitude), \(sourceRegion.center.longitude)")
-            print("DEBUG: Destination region center: \(destinationRegion.center.latitude), \(destinationRegion.center.longitude)")
-            print("DEBUG: Geofence radius: \(geofenceRadius) meters")
-            
-            [sourceRegion, destinationRegion].forEach { region in
-                if !locationManager.monitoredRegions.contains(where: { $0.identifier == region.identifier }) {
-                    locationManager.startMonitoring(for: region)
-                    print("DEBUG: Started monitoring region: \(region.identifier)")
-                } else {
-                    print("DEBUG: Region \(region.identifier) is already being monitored")
+            for trip in inProgressTrips {
+                // Create unique identifiers for each trip's regions
+                let sourceIdentifier = "sourceRegion-\(trip.id)"
+                let destinationIdentifier = "destinationRegion-\(trip.id)"
+                
+                let sourceRegion = CLCircularRegion(
+                    center: trip.sourceCoordinate,
+                    radius: geofenceRadius,
+                    identifier: sourceIdentifier
+                )
+                sourceRegion.notifyOnEntry = true
+                sourceRegion.notifyOnExit = true
+                
+                let destinationRegion = CLCircularRegion(
+                    center: trip.destinationCoordinate,
+                    radius: geofenceRadius,
+                    identifier: destinationIdentifier
+                )
+                destinationRegion.notifyOnEntry = true
+                destinationRegion.notifyOnExit = true
+                
+                print("DEBUG: Setting up geofence for Trip \(trip.id)")
+                print("DEBUG: Source region center: \(sourceRegion.center.latitude), \(sourceRegion.center.longitude)")
+                print("DEBUG: Destination region center: \(destinationRegion.center.latitude), \(destinationRegion.center.longitude)")
+                
+                // Start monitoring for both regions if not already monitored
+                [sourceRegion, destinationRegion].forEach { region in
+                    if !locationManager.monitoredRegions.contains(where: { $0.identifier == region.identifier }) {
+                        locationManager.startMonitoring(for: region)
+                        print("DEBUG: Started monitoring region: \(region.identifier)")
+                    } else {
+                        print("DEBUG: Region \(region.identifier) is already being monitored")
+                    }
                 }
             }
             
+            // Ensure the location manager is actively updating location
             locationManager.startUpdatingLocation()
             print("DEBUG: Started updating location")
             
-            // Start trip timer
+            // Optionally, start a trip timer for each trip if needed
             startTripTimer()
         } else {
             print("DEBUG: Geofencing is not supported on this device")
         }
     }
-    
+
     private func startTripTimer() {
         tripTimer?.invalidate()
         tripStartTime = Date()
@@ -470,6 +482,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     @MainActor
     private func fetchAllTrips() async throws {
         print("Fetching all trips...")
+        startMonitoringRegions()
         do {
             // Create a decoder with custom date decoding strategy
             let decoder = JSONDecoder()
@@ -558,7 +571,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             let response = try await query.execute()
             
             // Print raw response for debugging
-            print("Raw response for all trips: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+//            print("Raw response for all trips: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
             // Define a nested struct to match the joined data structure
             struct JoinedTripData: Codable {
@@ -736,7 +749,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             let response = try await query.execute()
             
             // Print raw response for debugging
-            print("Raw response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+//            print("Raw response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
             
             // Define a nested struct to match the joined data structure
             struct JoinedTripData: Codable {
