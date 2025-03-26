@@ -26,7 +26,7 @@ struct ContentView: View {
                             DriverTabView(driverId: userID)
                         }
                     case "maintenance_personnel":
-                        MaintenancePersonnelTabView()
+                        MaintenancePersonnelDashboardView()
                     default:
                         RoleSelectionView()
                     }

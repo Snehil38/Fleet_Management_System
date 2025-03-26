@@ -175,7 +175,7 @@ private struct VehicleListView: View {
     var body: some View {
         LazyVStack(spacing: 16) {
             if vehicles.isEmpty {
-                EmptyStateView()
+                MaintenanceEmptyStateView()
             } else {
                 ForEach(vehicles) { vehicle in
                     NavigationLink(destination: VehicleDetailView(vehicle: vehicle, vehicleManager: vehicleManager)) {
@@ -440,7 +440,7 @@ private struct FilterChip: View {
     }
 }
 
-private struct EmptyStateView: View {
+private struct MaintenanceEmptyStateView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "car.fill")
