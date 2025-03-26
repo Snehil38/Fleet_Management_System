@@ -32,9 +32,11 @@ struct FleetManagerDashboardTabView: View {
     private var totalMonthlySalaries: Double {
         dataManager.totalSalaryExpenses
     }
-
+    private var totalFuelExpenses: Double {
+        dataManager.totalFuelExpenses
+    }
     private var totalExpenses: Double {
-        totalMonthlySalaries  // Now total expenses is just the salary expenses
+        totalMonthlySalaries + totalFuelExpenses  // Now total expenses is just the salary expenses
     }
 
     private var totalRevenue: Double {
@@ -792,7 +794,7 @@ struct AddTripView: View {
             let costPerKm = 5.0 // $5 per km as requested
             
             self.tripCost = self.distance * costPerKm
-            self.fuelCost = self.tripCost * fuelRatio
+            self.fuelCost = (self.distance * 0.8) + 50.0
             
             // Calculate estimated travel time and update delivery date
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
@@ -814,8 +816,8 @@ struct AddTripView: View {
         let fuelRatio = 0.2 // 20% of cost is fuel
         let costPerKm = 5.0 // $5 per km as requested
         
-        tripCost = distance * costPerKm
-        fuelCost = tripCost * fuelRatio
+        tripCost = (distance * 0.8) + 50.0
+        fuelCost = (distance * 0.8) + 50.0
         
         // Calculate estimated travel time and update delivery date
         let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
