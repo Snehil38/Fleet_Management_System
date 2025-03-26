@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import Combine
 
 struct FleetManagerDashboardTabView: View {
     @EnvironmentObject private var dataManager: CrewDataController
@@ -274,11 +275,89 @@ struct AlertCard: View {
     }
 }
 
-// Enhanced trip creation view with real MapKit search
+// Extract route information into a separate view
+struct RouteInformationView: View {
+    @Binding var pickupLocation: String
+    @Binding var dropoffLocation: String
+    let onPickupClear: () -> Void
+    let onDropoffClear: () -> Void
+    let onPickupChange: (String) -> Void
+    let onDropoffChange: (String) -> Void
+    let onLocationRequest: () -> Void
+    
+    var body: some View {
+        CardView(title: "ROUTE INFORMATION", systemImage: "map") {
+            VStack(spacing: 16) {
+                // Pickup Location
+                LocationInputField(
+                    icon: "mappin.circle.fill",
+                    iconColor: Color(red: 0.2, green: 0.5, blue: 1.0),
+                    placeholder: "Enter pickup location (address, landmark, etc.)",
+                    text: $pickupLocation,
+                    onClear: onPickupClear,
+                    onChange: onPickupChange,
+                    showLocationButton: true,
+                    onLocationRequest: onLocationRequest
+                )
+                
+                // Dropoff Location
+                LocationInputField(
+                    icon: "mappin.and.ellipse",
+                    iconColor: Color(red: 0.9, green: 0.3, blue: 0.3),
+                    placeholder: "Enter dropoff location (address, landmark, etc.)",
+                    text: $dropoffLocation,
+                    onClear: onDropoffClear,
+                    onChange: onDropoffChange
+                )
+            }
+        }
+    }
+}
+
+// Extract vehicle selection into a separate view
+struct VehicleSelectionView: View {
+    @Binding var selectedVehicle: Vehicle?
+    let availableVehicles: [Vehicle]
+    
+    var body: some View {
+        CardView(title: "VEHICLE SELECTION", systemImage: "car.fill") {
+            Menu {
+                ForEach(availableVehicles) { vehicle in
+                    Button("\(vehicle.name) (\(vehicle.licensePlate))") {
+                        selectedVehicle = vehicle
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(selectedVehicle == nil ? "Select Vehicle" : "\(selectedVehicle!.name) (\(selectedVehicle!.licensePlate))")
+                        .foregroundColor(selectedVehicle == nil ? .gray : .primary)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .foregroundColor(.gray)
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
+        }
+    }
+}
+
+// Update AddTripView to use the new components
 struct AddTripView: View {
+    // Make initializer public
+    public init(dismiss: @escaping () -> Void) {
+        self.dismiss = dismiss
+    }
+    
     let dismiss: () -> Void
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
+    
+    // Location Manager for current location
+    @StateObject private var locationManager = LocationManager()
+    @State private var isRequestingLocation = false
+    @State private var cancellables = Set<AnyCancellable>()
     
     // Map and location state
     @State private var pickupLocation = ""
@@ -317,8 +396,17 @@ struct AddTripView: View {
         case pickup, dropoff
     }
     
+    // Break down complex expressions
+    private var isLocationValid: Bool {
+        !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation
+    }
+    
+    private var isVehicleSelected: Bool {
+        selectedVehicle != nil
+    }
+    
     var isFormValid: Bool {
-        !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation && selectedVehicle != nil
+        isLocationValid && isVehicleSelected
     }
     
     var availableVehicles: [Vehicle] {
@@ -329,7 +417,7 @@ struct AddTripView: View {
         ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(spacing: 0) {
-                    // Map View - Full width at top
+                    // Map View
                     MapView(
                         pickupCoordinate: pickupCoordinate,
                         dropoffCoordinate: dropoffCoordinate,
@@ -340,198 +428,165 @@ struct AddTripView: View {
                     
                     // Content Section
                     VStack(spacing: 16) {
-                        // Primary Information Group
-                        Group {
-                            // Route Information Card
-                            CardView(title: "ROUTE INFORMATION", systemImage: "map") {
-                                VStack(spacing: 16) {
-                                    // Pickup Location
-                                    LocationInputField(
-                                        icon: "mappin.circle.fill",
-                                        iconColor: Color(red: 0.2, green: 0.5, blue: 1.0),
-                                        placeholder: "Enter pickup location (address, landmark, etc.)",
-                                        text: $pickupLocation,
-                                        onClear: {
-                                            pickupLocation = ""
-                                            pickupCoordinate = nil
-                                            updateMapRegion()
-                                        },
-                                        onChange: { newValue in
-                                            if newValue.count > 2 {
-                                                searchCompleter.queryFragment = newValue
-                                                activeTextField = .pickup
-                                            } else {
-                                                searchResults = []
-                                            }
-                                        }
-                                    )
-                                    
-                                    // Dropoff Location
-                                    LocationInputField(
-                                        icon: "mappin.and.ellipse",
-                                        iconColor: Color(red: 0.9, green: 0.3, blue: 0.3),
-                                        placeholder: "Enter dropoff location (address, landmark, etc.)",
-                                        text: $dropoffLocation,
-                                        onClear: {
-                                            dropoffLocation = ""
-                                            dropoffCoordinate = nil
-                                            updateMapRegion()
-                                        },
-                                        onChange: { newValue in
-                                            if newValue.count > 2 {
-                                                searchCompleter.queryFragment = newValue
-                                                activeTextField = .dropoff
-                                            } else {
-                                                searchResults = []
-                                            }
-                                        }
-                                    )
+                        // Route Information
+                        RouteInformationView(
+                            pickupLocation: $pickupLocation,
+                            dropoffLocation: $dropoffLocation,
+                            onPickupClear: {
+                                pickupLocation = ""
+                                pickupCoordinate = nil
+                                updateMapRegion()
+                            },
+                            onDropoffClear: {
+                                dropoffLocation = ""
+                                dropoffCoordinate = nil
+                                updateMapRegion()
+                            },
+                            onPickupChange: { newValue in
+                                if newValue.count > 2 {
+                                    searchCompleter.queryFragment = newValue
+                                    activeTextField = .pickup
+                                } else {
+                                    searchResults = []
                                 }
+                            },
+                            onDropoffChange: { newValue in
+                                if newValue.count > 2 {
+                                    searchCompleter.queryFragment = newValue
+                                    activeTextField = .dropoff
+                                } else {
+                                    searchResults = []
+                                }
+                            },
+                            onLocationRequest: {
+                                isRequestingLocation = true
+                                locationManager.requestLocation()
                             }
-                            
-                            // Search Results if any
-                            if !searchResults.isEmpty {
-                                LocationSearchResults(results: searchResults) { result in
-                                    if activeTextField == .pickup {
-                                        searchForLocation(result.title, isPickup: true)
-                                    } else {
-                                        searchForLocation(result.title, isPickup: false)
-                                    }
+                        )
+                        
+                        // Search Results if any
+                        if !searchResults.isEmpty {
+                            LocationSearchResults(results: searchResults) { result in
+                                if activeTextField == .pickup {
+                                    searchForLocation(result.title, isPickup: true)
+                                } else {
+                                    searchForLocation(result.title, isPickup: false)
                                 }
                             }
                         }
                         
-                        // Secondary Information Group
-                        Group {
-                            // Vehicle Selection Card
-                            CardView(title: "VEHICLE SELECTION", systemImage: "car.fill") {
-                                Menu {
-                                    ForEach(availableVehicles) { vehicle in
-                                        Button("\(vehicle.name) (\(vehicle.licensePlate))") {
-                                            selectedVehicle = vehicle
-                                        }
+                        // Vehicle Selection
+                        VehicleSelectionView(
+                            selectedVehicle: $selectedVehicle,
+                            availableVehicles: availableVehicles
+                        )
+                        
+                        // Cargo Details Card
+                        CardView(title: "CARGO DETAILS", systemImage: "shippingbox.fill") {
+                            Menu {
+                                ForEach(cargoTypes, id: \.self) { type in
+                                    Button(type) {
+                                        cargoType = type
                                     }
-                                } label: {
-                                    HStack {
-                                        Text(selectedVehicle == nil ? "Select Vehicle" : "\(selectedVehicle!.name) (\(selectedVehicle!.licensePlate))")
-                                            .foregroundColor(selectedVehicle == nil ? .gray : .primary)
-                                        Spacer()
-                                        Image(systemName: "chevron.down")
-                                            .foregroundColor(.gray)
-                                    }
-                                    .padding()
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
                                 }
-                            }
-                            
-                            // Cargo Details Card
-                            CardView(title: "CARGO DETAILS", systemImage: "shippingbox.fill") {
-                                Menu {
-                                    ForEach(cargoTypes, id: \.self) { type in
-                                        Button(type) {
-                                            cargoType = type
-                                        }
-                                    }
-                                } label: {
-                                    HStack {
-                                        Text(cargoType)
-                                            .foregroundColor(.primary)
-                                        Spacer()
-                                        Image(systemName: "chevron.down")
-                                            .foregroundColor(.gray)
-                                    }
-                                    .padding()
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
-                                }
-                            }
-                            
-                            // Schedule Card
-                            CardView(title: "SCHEDULE", systemImage: "calendar") {
-                                VStack(spacing: 16) {
-                                    // Start Date
-                                    DatePicker("Start Date", 
-                                        selection: $startDate,
-                                        in: Date()..., // This sets the minimum date to today
-                                        displayedComponents: [.date, .hourAndMinute]
-                                    )
-                                    .onChange(of: startDate) { newDate, _ in
-                                        if distance > 0 {
-                                            let estimatedHours = distance / 40.0
-                                            let timeInterval = estimatedHours * 3600
-                                            deliveryDate = newDate.addingTimeInterval(timeInterval)
-                                        }
-                                    }
-                                    .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
-                                    
-                                    if distance > 0 {
-                                        Divider()
-                                        
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Text("Estimated Delivery")
-                                                .font(.subheadline)
-                                                .foregroundColor(.gray)
-                                            
-                                            HStack {
-                                                Image(systemName: "calendar")
-                                                    .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
-                                                Text(deliveryDate, style: .date)
-                                                    .font(.headline)
-                                            }
-                                            
-                                            HStack {
-                                                Image(systemName: "clock")
-                                                    .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
-                                                Text(deliveryDate, style: .time)
-                                                    .font(.headline)
-                                            }
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
+                            } label: {
+                                HStack {
+                                    Text(cargoType)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .foregroundColor(.gray)
                                 }
                                 .padding()
                                 .background(Color(.systemGray6))
                                 .cornerRadius(10)
                             }
-                            
-                            // Trip Estimates Card (if available)
-                            if distance > 0 {
-                                CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
-                                    VStack(spacing: 16) {
-                                        // Distance and Time Row
-                                        HStack(spacing: 20) {
-                                            EstimateItem(
-                                                icon: "arrow.left.and.right",
-                                                title: "Total Distance",
-                                                value: String(format: "%.1f km", distance),
-                                                valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                            )
-                                            
-                                            Divider()
-                                            
-                                            EstimateItem(
-                                                icon: "clock.fill",
-                                                title: "Est. Travel Time",
-                                                value: String(format: "%.1f hours", distance / 40.0),
-                                                valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                            )
+                        }
+                        
+                        // Schedule Card
+                        CardView(title: "SCHEDULE", systemImage: "calendar") {
+                            VStack(spacing: 16) {
+                                // Start Date
+                                DatePicker("Start Date", 
+                                    selection: $startDate,
+                                    in: Date()..., // This sets the minimum date to today
+                                    displayedComponents: [.date, .hourAndMinute]
+                                )
+                                .onChange(of: startDate) { newDate, _ in
+                                    if distance > 0 {
+                                        let estimatedHours = distance / 40.0
+                                        let timeInterval = estimatedHours * 3600
+                                        deliveryDate = newDate.addingTimeInterval(timeInterval)
+                                    }
+                                }
+                                .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
+                                
+                                if distance > 0 {
+                                    Divider()
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Estimated Delivery")
+                                            .font(.subheadline)
+                                            .foregroundColor(.gray)
+                                        
+                                        HStack {
+                                            Image(systemName: "calendar")
+                                                .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
+                                            Text(deliveryDate, style: .date)
+                                                .font(.headline)
                                         }
+                                        
+                                        HStack {
+                                            Image(systemName: "clock")
+                                                .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
+                                            Text(deliveryDate, style: .time)
+                                                .font(.headline)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        }
+                        
+                        // Trip Estimates Card (if available)
+                        if distance > 0 {
+                            CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
+                                VStack(spacing: 16) {
+                                    // Distance and Time Row
+                                    HStack(spacing: 20) {
+                                        EstimateItem(
+                                            icon: "arrow.left.and.right",
+                                            title: "Total Distance",
+                                            value: String(format: "%.1f km", distance),
+                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                        )
                                         
                                         Divider()
                                         
-                                        // Fuel Cost Row
                                         EstimateItem(
-                                            icon: "fuelpump.fill",
-                                            title: "Est. Fuel Cost",
-                                            value: String(format: "$%.2f", fuelCost),
+                                            icon: "clock.fill",
+                                            title: "Est. Travel Time",
+                                            value: String(format: "%.1f hours", distance / 40.0),
                                             valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
                                         )
                                     }
-                                    .padding()
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
+                                    
+                                    Divider()
+                                    
+                                    // Fuel Cost Row
+                                    EstimateItem(
+                                        icon: "fuelpump.fill",
+                                        title: "Est. Fuel Cost",
+                                        value: String(format: "$%.2f", fuelCost),
+                                        valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                    )
                                 }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
                             }
                         }
                         
@@ -590,6 +645,30 @@ struct AddTripView: View {
         }
         .onAppear {
             setupSearchCompleter()
+            
+            // Observe location updates
+            locationManager.objectWillChange.sink { [weak locationManager] _ in
+                if let location = locationManager?.location {
+                    let geocoder = CLGeocoder()
+                    geocoder.reverseGeocodeLocation(location) { placemarks, error in
+                        if let placemark = placemarks?.first {
+                            let address = [
+                                placemark.name,
+                                placemark.thoroughfare,
+                                placemark.locality,
+                                placemark.administrativeArea
+                            ].compactMap { $0 }.joined(separator: ", ")
+                            
+                            if isRequestingLocation {
+                                pickupLocation = address
+                                pickupCoordinate = location.coordinate
+                                updateMapRegion()
+                                isRequestingLocation = false
+                            }
+                        }
+                    }
+                }
+            }.store(in: &cancellables)
         }
     }
     
@@ -1076,6 +1155,8 @@ struct LocationInputField: View {
     @Binding var text: String
     let onClear: () -> Void
     let onChange: (String) -> Void
+    var showLocationButton: Bool = false
+    var onLocationRequest: (() -> Void)? = nil
     
     var body: some View {
         HStack(spacing: 12) {
@@ -1091,6 +1172,16 @@ struct LocationInputField: View {
                 Button(action: onClear) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.gray)
+                }
+            }
+            
+            if showLocationButton {
+                Button(action: {
+                    onLocationRequest?()
+                }) {
+                    Image(systemName: "location.circle.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 24))
                 }
             }
         }
@@ -1111,6 +1202,40 @@ struct EstimateItem: View {
             Text(value)
                 .font(.headline)
                 .foregroundColor(valueColor)
+        }
+    }
+}
+
+class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+    private let locationManager = CLLocationManager()
+    @Published var location: CLLocation?
+    @Published var error: Error?
+    @Published var authorizationStatus: CLAuthorizationStatus?
+    
+    override init() {
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+    }
+    
+    func requestLocation() {
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.requestLocation()
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        self.location = location
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        self.error = error
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        self.authorizationStatus = status
+        if status == .authorizedWhenInUse {
+            locationManager.requestLocation()
         }
     }
 }
