@@ -932,22 +932,20 @@ struct UpcomingTripRow: View {
                 }
             }
             
+            // Trip details
             VStack(alignment: .leading, spacing: 8) {
-                // Cargo Type
-                if let notes = trip.notes,
-                   let cargoType = notes.components(separatedBy: "Cargo Type:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) {
+                if !trip.eta.isEmpty {
                     HStack(spacing: 4) {
-                        Image(systemName: "shippingbox")
-                            .foregroundColor(.orange)
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.blue)
                             .font(.system(size: 14))
-                        Text("Cargo Type:")
+                        Text("ETA:")
                             .foregroundColor(.gray)
-                        Text(cargoType)
+                        Text(trip.eta)
                     }
                     .font(.subheadline)
                 }
                 
-                // Distance
                 if !trip.distance.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.left.and.right")
@@ -959,39 +957,22 @@ struct UpcomingTripRow: View {
                     }
                     .font(.subheadline)
                 }
-                
-                // Pickup
-                if let pickup = trip.pickup {
-                    HStack(spacing: 4) {
-                        Image(systemName: "location.fill")
-                            .foregroundColor(.red)
-                            .font(.system(size: 14))
-                        Text("Pickup:")
-                            .foregroundColor(.gray)
-                        Text(pickup)
-                    }
-                    .font(.subheadline)
-                }
-            }
-            
-            // View Details button
-            Button(action: { showingDetails = true }) {
-                Text("View Details")
-                    .font(.subheadline)
-                    .foregroundColor(.blue)
             }
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .onTapGesture {
+            showingDetails = true
+        }
+        .sheet(isPresented: $showingDetails) {
+            TripDetailsView(trip: trip)
+        }
         .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
-        }
-        .sheet(isPresented: $showingDetails) {
-            TripDetailsView(trip: trip)
         }
     }
 }
