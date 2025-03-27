@@ -1,5 +1,6 @@
 import SwiftUICore
 import SwiftUI
+
 struct ExpensesSummaryCard: View {
     @StateObject private var calculator = FinanceCalculator.shared
     

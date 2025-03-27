@@ -634,33 +634,37 @@ struct LabeledContent: View {
 // Driver Assignment View
 struct AssignDriverView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var crewController = CrewDataController.shared
+    // Remove or keep crewController if needed for other purposes.
     @StateObject private var tripController = TripDataController.shared
     let trip: Trip
+    
     @State private var selectedDriverId: UUID?
     @State private var selectedSecondDriverId: UUID?
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var showingError = false
     
+    // Fetched available drivers for the trip duration.
+    @State private var fetchedAvailableDrivers: [Driver] = []
+    
+    // If the trip distance is greater than 500, it's considered a long trip.
     private var isLongTrip: Bool {
         // Extract numeric value from distance string
         let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
             .joined()
-        
         if let distance = Double(numericDistance) {
             return distance > 500
         }
         return false
     }
     
+    // Use the fetched drivers instead of the crewController drivers.
     private var availableDrivers: [Driver] {
-        // Filter out drivers who are not available
-        return crewController.drivers.filter { $0.status == .available }
+        return fetchedAvailableDrivers
     }
     
+    // Exclude the driver already selected as primary.
     private var availableSecondDrivers: [Driver] {
-        // Filter out the first selected driver from the list of available drivers
         if let firstDriverId = selectedDriverId {
             return availableDrivers.filter { $0.userID != firstDriverId }
         }
@@ -717,7 +721,7 @@ struct AssignDriverView: View {
                 }
             }
             .onAppear {
-                crewController.update()
+                fetchAvailableDrivers()
             }
             .overlay {
                 if isLoading {
@@ -742,6 +746,23 @@ struct AssignDriverView: View {
             return selectedDriverId != nil && selectedSecondDriverId != nil
         }
         return selectedDriverId != nil
+    }
+    
+    private func fetchAvailableDrivers() {
+        // Use trip.startTime and trip.endTime if available.
+        Task {
+            do {
+                let drivers = try await SupabaseDataController.shared.fetchAvailableDrivers(
+                    startDate: trip.startTime!,
+                    endDate: trip.endTime!
+                )
+                await MainActor.run {
+                    self.fetchedAvailableDrivers = drivers
+                }
+            } catch {
+                print("Error fetching available drivers: \(error)")
+            }
+        }
     }
     
     private func assignDriver() {
@@ -787,6 +808,7 @@ struct AssignDriverView: View {
         }
     }
 }
+
 
 struct DriverRow: View {
     let driver: Driver

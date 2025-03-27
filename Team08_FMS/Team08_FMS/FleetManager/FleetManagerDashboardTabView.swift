@@ -428,13 +428,16 @@ struct AddTripView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     
+    // Fetched available vehicles after route calculation.
+    @State private var fetchedAvailableVehicles: [Vehicle] = []
+    
     let cargoTypes = ["General Goods", "Perishable", "Hazardous", "Heavy Machinery", "Liquids", "Livestock"]
     
     enum LocationField {
         case pickup, dropoff
     }
     
-    // Break down complex expressions
+    // Validation for location and vehicle selection
     private var isLocationValid: Bool {
         !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation
     }
@@ -444,11 +447,16 @@ struct AddTripView: View {
     }
     
     var isFormValid: Bool {
-        isLocationValid && isVehicleSelected
+        isLocationValid
     }
     
+    // Compute available vehicles from the environment and fall back to fetched ones if available.
     var availableVehicles: [Vehicle] {
         vehicleManager.vehicles.filter { $0.status == .available && $0.status != .inService }
+    }
+    
+    var displayedVehicles: [Vehicle] {
+        return fetchedAvailableVehicles
     }
     
     var body: some View {
@@ -502,7 +510,6 @@ struct AddTripView: View {
                             }
                         )
                         
-                        // Search Results if any
                         if !searchResults.isEmpty {
                             LocationSearchResults(results: searchResults) { result in
                                 if activeTextField == .pickup {
@@ -513,19 +520,11 @@ struct AddTripView: View {
                             }
                         }
                         
-                        // Vehicle Selection
-                        VehicleSelectionView(
-                            selectedVehicle: $selectedVehicle,
-                            availableVehicles: availableVehicles
-                        )
-                        
                         // Cargo Details Card
                         CardView(title: "CARGO DETAILS", systemImage: "shippingbox.fill") {
                             Menu {
                                 ForEach(cargoTypes, id: \.self) { type in
-                                    Button(type) {
-                                        cargoType = type
-                                    }
+                                    Button(type) { cargoType = type }
                                 }
                             } label: {
                                 HStack {
@@ -544,17 +543,15 @@ struct AddTripView: View {
                         // Schedule Card
                         CardView(title: "SCHEDULE", systemImage: "calendar") {
                             VStack(spacing: 16) {
-                                // Start Date
-                                DatePicker("Start Date", 
-                                    selection: $startDate,
-                                    in: Date()..., // This sets the minimum date to today
-                                    displayedComponents: [.date, .hourAndMinute]
+                                DatePicker("Start Date",
+                                           selection: $startDate,
+                                           in: Date()...,
+                                           displayedComponents: [.date, .hourAndMinute]
                                 )
                                 .onChange(of: startDate) { newDate, _ in
                                     if distance > 0 {
                                         let estimatedHours = distance / 40.0
-                                        let timeInterval = estimatedHours * 3600
-                                        deliveryDate = newDate.addingTimeInterval(timeInterval)
+                                        deliveryDate = newDate.addingTimeInterval(estimatedHours * 3600)
                                     }
                                 }
                                 .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
@@ -589,11 +586,10 @@ struct AddTripView: View {
                             .cornerRadius(10)
                         }
                         
-                        // Trip Estimates Card (if available)
+                        // Trip Estimates Card
                         if distance > 0 {
                             CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
                                 VStack(spacing: 16) {
-                                    // Distance and Time Row
                                     HStack(spacing: 20) {
                                         EstimateItem(
                                             icon: "arrow.left.and.right",
@@ -614,7 +610,6 @@ struct AddTripView: View {
                                     
                                     Divider()
                                     
-                                    // Fuel Cost Row
                                     EstimateItem(
                                         icon: "fuelpump.fill",
                                         title: "Est. Fuel Cost",
@@ -628,8 +623,22 @@ struct AddTripView: View {
                             }
                         }
                         
-                        // Remove the debug log view display
-                        // Bottom spacing to prevent button overlap
+                        // Vehicle Selection is displayed only after route calculation.
+                        if distance > 0 {
+                            if displayedVehicles.isEmpty {
+                                Text("No vehicles available for the selected time range.")
+                                    .foregroundColor(.gray)
+                                    .padding()
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(10)
+                            } else {
+                                VehicleSelectionView(
+                                    selectedVehicle: $selectedVehicle,
+                                    availableVehicles: displayedVehicles
+                                )
+                            }
+                        }
+                        
                         Color.clear.frame(height: 100)
                     }
                     .padding(.horizontal, 16)
@@ -638,7 +647,6 @@ struct AddTripView: View {
             }
             .background(Color(.systemGroupedBackground))
             
-            // Fixed Bottom Button
             VStack(spacing: 0) {
                 Button(action: distance > 0 ? saveTrip : calculateRoute) {
                     HStack {
@@ -656,7 +664,7 @@ struct AddTripView: View {
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(!isFormValid || isCalculating)
+                .disabled(distance > 0 ? !isVehicleSelected : (!isFormValid || isCalculating))
                 .padding(16)
                 .background(
                     Rectangle()
@@ -664,23 +672,20 @@ struct AddTripView: View {
                         .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
                 )
             }
+
         }
         .edgesIgnoringSafeArea(.bottom)
         .navigationTitle("Add New Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") {
-                    dismiss()
-                }
+                Button("Cancel") { dismiss() }
             }
         }
         .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Trip Creation"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+            Alert(title: Text("Trip Creation"),
+                  message: Text(alertMessage),
+                  dismissButton: .default(Text("OK")))
         }
         .onAppear {
             setupSearchCompleter()
@@ -689,7 +694,7 @@ struct AddTripView: View {
             locationManager.objectWillChange.sink { [weak locationManager] _ in
                 if let location = locationManager?.location {
                     let geocoder = CLGeocoder()
-                    geocoder.reverseGeocodeLocation(location) { placemarks, error in
+                    geocoder.reverseGeocodeLocation(location) { placemarks, _ in
                         if let placemark = placemarks?.first {
                             let address = [
                                 placemark.name,
@@ -712,23 +717,15 @@ struct AddTripView: View {
     }
     
     private func setupSearchCompleter() {
-        // Enable all result types to get the most detailed location results
         searchCompleter.resultTypes = [.pointOfInterest, .address, .query]
-        
-        // Set a smaller region for more precise results
         searchCompleter.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
-            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10) // Smaller span for more detailed results
+            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
+            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
         )
-        
-        // Set up the delegate
         let delegate = SearchCompleterDelegate { results in
-            // Limit to top 10 results for better performance
             self.searchResults = Array(results.prefix(10))
         }
         searchCompleter.delegate = delegate
-        
-        // Store the delegate to prevent it from being deallocated
         searchCompleterDelegate = delegate
     }
     
@@ -741,45 +738,32 @@ struct AddTripView: View {
         let searchRequest = MKLocalSearch.Request()
         searchRequest.naturalLanguageQuery = query
         searchRequest.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
+            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
             span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 30)
         )
-        
-        // Include more result types for detailed locations
         searchRequest.resultTypes = [.pointOfInterest, .address]
         
-        let search = MKLocalSearch(request: searchRequest)
-        search.start { response, error in
-            guard let response = response, error == nil else {
-                return
+        MKLocalSearch(request: searchRequest).start { response, error in
+            guard let response = response, error == nil,
+                  let mapItem = response.mapItems.first else { return }
+            if isPickup {
+                self.pickupLocation = mapItem.name ?? query
+                self.pickupCoordinate = mapItem.placemark.coordinate
+            } else {
+                self.dropoffLocation = mapItem.name ?? query
+                self.dropoffCoordinate = mapItem.placemark.coordinate
             }
-            
-            // Get the first result if available
-            if let mapItem = response.mapItems.first {
-                if isPickup {
-                    self.pickupLocation = mapItem.name ?? query
-                    self.pickupCoordinate = mapItem.placemark.coordinate
-                } else {
-                    self.dropoffLocation = mapItem.name ?? query
-                    self.dropoffCoordinate = mapItem.placemark.coordinate
-                }
-                
-                self.hideSearchResults()
-                self.updateMapRegion()
-            }
+            self.hideSearchResults()
+            self.updateMapRegion()
         }
     }
     
     private func updateMapRegion() {
-        // If we have both coordinates, center the map to show both
         if let pickup = pickupCoordinate, let dropoff = dropoffCoordinate {
             let centerLat = (pickup.latitude + dropoff.latitude) / 2
             let centerLon = (pickup.longitude + dropoff.longitude) / 2
-            
-            // Calculate span to fit both points with padding
-            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.5 // Reduced padding for more detail
-            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.5 // Reduced padding for more detail
-            
+            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.5
+            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.5
             region = MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
                 span: MKCoordinateSpan(latitudeDelta: max(latDelta, 0.02), longitudeDelta: max(lonDelta, 0.02))
@@ -787,21 +771,18 @@ struct AddTripView: View {
         } else if let pickup = pickupCoordinate {
             region = MKCoordinateRegion(
                 center: pickup,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02) // More detailed zoom level
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
             )
         } else if let dropoff = dropoffCoordinate {
             region = MKCoordinateRegion(
                 center: dropoff,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02) // More detailed zoom level
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
             )
         }
     }
     
     private func calculateRoute() {
-        guard let pickup = pickupCoordinate, let dropoff = dropoffCoordinate else {
-            return
-        }
-        
+        guard let pickup = pickupCoordinate, let dropoff = dropoffCoordinate else { return }
         isCalculating = true
         
         let request = MKDirections.Request()
@@ -809,35 +790,35 @@ struct AddTripView: View {
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: dropoff))
         request.transportType = .automobile
         
-        let directions = MKDirections(request: request)
-        directions.calculate { response, error in
+        MKDirections(request: request).calculate { response, error in
             self.isCalculating = false
             
             guard let route = response?.routes.first, error == nil else {
-                // Fallback to straight-line distance if route calculation fails
                 self.calculateStraightLineDistance(from: pickup, to: dropoff)
                 return
             }
             
-            // Get the route polyline
             self.routePolyline = route.polyline
-            
-            // Get distance in kilometers
             self.distance = route.distance / 1000
             
-            // Calculate costs with $5 per km
-            let fuelRatio = 0.2 // 20% of cost is fuel
-            let costPerKm = 5.0 // $5 per km as requested
-            
+            let fuelRatio = 0.2
+            let costPerKm = 5.0
             self.tripCost = self.distance * costPerKm
             self.fuelCost = self.tripCost * fuelRatio
             
-            // Calculate estimated travel time and update delivery date
-            let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
-            let timeInterval = estimatedHours * 3600 // Convert hours to seconds
-            self.deliveryDate = self.startDate.addingTimeInterval(timeInterval)
-            
+            let estimatedHours = self.distance / 40.0
+            self.deliveryDate = self.startDate.addingTimeInterval(estimatedHours * 3600)
             self.updateMapRegion()
+            
+            // Fetch available vehicles for the calculated time range.
+            Task {
+                do {
+                    let vehicles = try await supabaseDataController.fetchAvailableVehicles(startDate: self.startDate, endDate: self.deliveryDate)
+                    await MainActor.run { self.fetchedAvailableVehicles = vehicles }
+                } catch {
+                    print("Error fetching available vehicles: \(error)")
+                }
+            }
         }
     }
     
@@ -845,22 +826,15 @@ struct AddTripView: View {
         let locationA = CLLocation(latitude: source.latitude, longitude: source.longitude)
         let locationB = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
         
-        // Get distance in kilometers
         distance = locationA.distance(from: locationB) / 1000
-        
-        // Calculate costs with $5 per km
-        let fuelRatio = 0.2 // 20% of cost is fuel
-        let costPerKm = 5.0 // $5 per km as requested
-        
+        let fuelRatio = 0.2
+        let costPerKm = 5.0
         tripCost = distance * costPerKm
         fuelCost = tripCost * fuelRatio
         
-        // Calculate estimated travel time and update delivery date
-        let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
-        let timeInterval = estimatedHours * 3600 // Convert hours to seconds
-        deliveryDate = startDate.addingTimeInterval(timeInterval)
+        let estimatedHours = distance / 40.0
+        deliveryDate = startDate.addingTimeInterval(estimatedHours * 3600)
         
-        // Create a simple polyline between points for visualization
         let points = [source, destination]
         routePolyline = MKPolyline(coordinates: points, count: points.count)
     }
@@ -868,7 +842,6 @@ struct AddTripView: View {
     private func saveTrip() {
         Task {
             guard let vehicle = selectedVehicle else { return }
-            
             let estimatedHours = distance / 40.0
             
             do {
@@ -890,7 +863,7 @@ struct AddTripView: View {
                 )
                 
                 if success {
-                    await supabaseDataController.updateVehichleStatus(newStatus: .inService, vehicleID: vehicle.id)
+                    try await TripDataController.shared.fetchAllTrips()
                     dismiss()
                 } else {
                     alertMessage = "Failed to create trip. Please try again."

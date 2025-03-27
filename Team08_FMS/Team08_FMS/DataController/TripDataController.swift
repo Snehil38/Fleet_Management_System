@@ -37,10 +37,11 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published var tripStartTime: Date?
     @Published var estimatedArrivalTime: Date?
     
+    @Published var allTrips: [Trip] = []
+    
     private var locationManager = CLLocationManager()
     private let geofenceRadius: CLLocationDistance = 50.0 // 100 meters
     private var driverId: UUID?
-    private var allTrips: [Trip] = []
     private var tripTimer: Timer?
     private let maxTripDuration: TimeInterval = 3600 // 1 hour in seconds
     
@@ -51,9 +52,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         setupLocationManager()
         setupNotifications()
         // Start fetching data immediately
-        Task {
-            await refreshTrips()
-        }
+//        Task {
+//            await refreshTrips()
+//        }
     }
     
     private func setupLocationManager() {
@@ -396,54 +397,6 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
-    // Update startTrip to check eligibility
-    @MainActor
-    func startTrip(trip: Trip) async throws {
-        print("Starting trip \(trip.id)")
-        
-        // Check if there's already a trip in progress
-        if let currentTrip = self.currentTrip {
-            throw TripError.updateError("Cannot start a new trip while another trip is in progress")
-        }
-        
-        do {
-            // First update the trip status
-            try await supabaseController.updateTrip(id: trip.id, status: "current")
-            print("Updated trip status to 'current'")
-            
-            // Then update the start time in a separate call
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-            let formattedDate = dateFormatter.string(from: Date())
-            
-            let response = try await supabaseController.databaseFrom("trips")
-                .update([
-                    "start_time": formattedDate,
-                    "trip_status": "current"
-                ])
-                .eq("id", value: trip.id)
-                .execute()
-            
-            print("Updated trip start_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
-            
-            // Update local state
-            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
-                var updatedTrip = upcomingTrips[index]
-                updatedTrip.status = .inProgress
-                self.currentTrip = updatedTrip
-                upcomingTrips.remove(at: index)
-            }
-            
-            // Refresh trips to ensure everything is in sync with server
-            try await fetchTrips()
-            startMonitoringRegions()
-            print("Trips refreshed after starting trip")
-        } catch {
-            print("Error starting trip: \(error)")
-            throw TripError.updateError("Failed to start trip: \(error.localizedDescription)")
-        }
-    }
-    
     func stopMonitoringRegions() {
         locationManager.monitoredRegions.forEach { region in
             locationManager.stopMonitoring(for: region)
@@ -480,7 +433,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     
     // Fetch all trips without driver filtering
     @MainActor
-    private func fetchAllTrips() async throws {
+    func fetchAllTrips() async throws {
         print("Fetching all trips...")
         do {
             // Create a decoder with custom date decoding strategy
@@ -969,7 +922,11 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             try await supabaseController.updateTrip(id: trip.id, status: "delivered")
             print("Updated trip status to 'delivered'")
             
-            await supabaseController.updateVehichleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+            Task {
+                let id = await supabaseController.getUserID()
+                await supabaseController.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+                await supabaseController.updateDriverStatus(newStatus: .available, userID: id, id: nil)
+            }
             
             // Update end time in Supabase
             let response = try await supabaseController.databaseFrom("trips")
@@ -1012,6 +969,58 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         } catch {
             print("Error marking trip as delivered: \(error)")
             throw TripError.updateError("Failed to mark trip as delivered: \(error.localizedDescription)")
+        }
+    }
+    
+    // Update startTrip to handle the transition from upcoming to current status
+    @MainActor
+    func startTrip(trip: Trip) async throws {
+        print("Starting trip \(trip.id)")
+        
+        // Check if there's already a trip in progress
+        if let currentTrip = self.currentTrip {
+            throw TripError.updateError("Cannot start a new trip while another trip is in progress")
+        }
+        
+        do {
+            // First update the trip status
+            try await supabaseController.updateTrip(id: trip.id, status: "current")
+            print("Updated trip status to 'current'")
+            
+            // Then update the start time in a separate call
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+            let formattedDate = dateFormatter.string(from: Date())
+            
+            let response = try await supabaseController.databaseFrom("trips")
+                .update([
+                    "start_time": formattedDate,
+                    "trip_status": "current"
+                ])
+                .eq("id", value: trip.id)
+                .execute()
+            
+            print("Updated trip start_time: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+            
+            // Update local state
+            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
+                var updatedTrip = upcomingTrips[index]
+                updatedTrip.status = .inProgress
+                self.currentTrip = updatedTrip
+                upcomingTrips.remove(at: index)
+            }
+            
+            // Refresh trips to ensure everything is in sync with server
+            Task {
+                let id = await supabaseController.getUserID()
+                await supabaseController.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+                await supabaseController.updateDriverStatus(newStatus: .available, userID: id, id: nil)
+            }
+            try await fetchTrips()
+            print("Trips refreshed after starting trip")
+        } catch {
+            print("Error starting trip: \(error)")
+            throw TripError.updateError("Failed to start trip: \(error.localizedDescription)")
         }
     }
     
