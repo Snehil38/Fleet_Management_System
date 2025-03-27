@@ -16,23 +16,9 @@ class CrewDataController: ObservableObject {
     @Published var fleetManagers: [FleetManager] = []
     @Published var drivers: [Driver] = []
     @Published var maintenancePersonnel: [MaintenancePersonnel] = []
-    
+    @Published var trips: [Trip] = []
     private init() {
         loadFleetManagers()
-        
-        Task {
-            do {
-                let driver = try await SupabaseDataController.shared.fetchDrivers()
-                let personnel = try await SupabaseDataController.shared.fetchMaintenancePersonnel()
-                print(maintenancePersonnel)
-                await MainActor.run {
-                    drivers = driver
-                    maintenancePersonnel = personnel
-                }
-            } catch {
-                print(error.localizedDescription)
-            }
-        }
     }
     
     // MARK: - Loading Sample Data
@@ -235,5 +221,27 @@ class CrewDataController: ObservableObject {
         let driversSalaries = drivers.reduce(0) { $0 + $1.salary }
         let maintenanceSalaries = maintenancePersonnel.reduce(0) { $0 + $1.salary }
         return driversSalaries + maintenanceSalaries
+    }
+    var totalFuelExpenses: Double {
+        return trips.reduce(into: 0.0) { (runningTotal, trip) in
+            // Extract numeric distance from trip 
+            let distance = Double(trip.distance.replacingOccurrences(of: " km", with: "")
+                                 .replacingOccurrences(of: " miles", with: "")) ?? 0.0
+            // Calculate fuel cost using distance
+            runningTotal += distance * 0.8
+        }
+    }
+    
+    private func calculateSalaries() -> Double {
+        return drivers.reduce(0.0) { total, driver in
+            total + (Double(driver.salary) ?? 0.0)
+        }
+    }
+    
+    private func calculateMaintenancePersonnelSalaries() -> Double {
+        return maintenancePersonnel.reduce(0.0) { runningTotal, personnel in
+            let salary = Double(personnel.salary) ?? 0.0
+            return runningTotal + salary
+        }
     }
 }

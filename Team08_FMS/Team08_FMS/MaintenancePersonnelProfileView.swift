@@ -171,7 +171,7 @@ struct MaintenancePersonnelProfileView: View {
             VStack(spacing: 0) {
                 infoRow(title: "Experience", value: "\(personnel.yearsOfExperience) Years")
                 Divider()
-                infoRow(title: "Salary", value: "$\(personnel.salary)")
+//                infoRow(title: "Specialty", value: "\(personnel.specialty.rawValue)")
             }
             .background(Color(.systemBackground))
             .cornerRadius(20)

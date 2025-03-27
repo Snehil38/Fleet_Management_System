@@ -181,6 +181,9 @@ struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var vehicleManager: VehicleManager
     @State private var isEditing = false
+    @State private var isSaving = false
+    @State private var isLoadingDetails = false
+    @State private var detailLoadError: String? = nil
 
     var vehicle: Vehicle?
     
@@ -211,15 +214,72 @@ struct VehicleDetailView: View {
     @State private var selectedRCItem: PhotosPickerItem?
     @State private var selectedInsuranceItem: PhotosPickerItem?
     
-    // Form validation check
-    private var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !year.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !vin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+    // MARK: - Field "Touched" States
+    @State private var nameEdited = false
+    @State private var yearEdited = false
+    @State private var makeEdited = false
+    @State private var modelEdited = false
+    @State private var vinEdited = false
+    @State private var licensePlateEdited = false
+    @State private var bodySubtypeEdited = false
+    @State private var msrpEdited = false
+    
+    // MARK: - Field Validations
+    
+    private var isNameValid: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Only letters (upper and lowercase) and spaces allowed.
+        let regex = "^[A-Za-z ]+$"
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+    
+    private var isYearValid: Bool {
+        if let y = Int(year) {
+            let currentYear = Calendar.current.component(.year, from: Date())
+            return y >= 1900 && y <= currentYear
+        }
+        return false
+    }
+    
+    private var isMakeValid: Bool {
+        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isModelValid: Bool {
+        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isVINValid: Bool {
+        let trimmed = vin.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count == 17
+    }
+    
+    private var isLicensePlateValid: Bool {
+        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isBodySubtypeValid: Bool {
         !bodySubtype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isMSRPValid: Bool {
+        if let msrpValue = Double(msrp) {
+            return msrpValue > 0
+        }
+        return false
+    }
+    
+    // Overall form validity using all validations.
+    private var isFormValid: Bool {
+        isNameValid &&
+        isYearValid &&
+        isMakeValid &&
+        isModelValid &&
+        isVINValid &&
+        isLicensePlateValid &&
+        isBodySubtypeValid &&
+        isMSRPValid
     }
     
     // Initialize with an existing vehicle if provided
@@ -242,106 +302,32 @@ struct VehicleDetailView: View {
             _pollutionExpiry = State(initialValue: vehicle.pollutionExpiry)
             _insuranceExpiry = State(initialValue: vehicle.insuranceExpiry)
             
-            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
-            _rc = State(initialValue: vehicle.documents?.rc)
-            _insurance = State(initialValue: vehicle.documents?.insurance)
+//            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
+//            _rc = State(initialValue: vehicle.documents?.rc)
+//            _insurance = State(initialValue: vehicle.documents?.insurance)
         }
     }
     
     var body: some View {
         Form {
             if vehicle == nil || isEditing {
-                BasicInformationSection(
-                    name: $name,
-                    year: $year,
-                    make: $make,
-                    model: $model,
-                    vin: $vin,
-                    licensePlate: $licensePlate
-                )
+                // Basic Information Section with inline errors.
+                basicInformationSection
+                vehicleDetailsSection
                 
-                VehicleDetailsSection(
-                    vehicleType: $vehicleType,
-                    color: $color,
-                    bodyType: $bodyType,
-                    bodySubtype: $bodySubtype,
-                    msrp: $msrp
-                )
-                
-                DocumentsSection(
-                    pollutionCertificate: $pollutionCertificate,
-                    rc: $rc,
-                    insurance: $insurance,
-                    pollutionExpiry: $pollutionExpiry,
-                    insuranceExpiry: $insuranceExpiry,
-                    showingPollutionPicker: $showingPollutionPicker,
-                    showingRCPicker: $showingRCPicker,
-                    showingInsurancePicker: $showingInsurancePicker
-                )
+                // Documents Section
+                documentSection
             } else {
-                // View mode: show a read-only summary of the vehicle details
-                Section("Basic Information") {
-                    LabeledContent("Name", value: name)
-                    LabeledContent("Year", value: year)
-                    LabeledContent("Make", value: make)
-                    LabeledContent("Model", value: model)
-                    LabeledContent("VIN", value: vin)
-                    LabeledContent("License Plate", value: licensePlate)
-                }
-                
-                Section("Vehicle Details") {
-                    LabeledContent("Type", value: vehicleType.rawValue.capitalized)
-                    LabeledContent("Color", value: color)
-                    LabeledContent("Body Type", value: bodyType.rawValue.capitalized)
-                    LabeledContent("Body Subtype", value: bodySubtype)
-                    LabeledContent("MSRP", value: msrp)
-                }
-                
-                Section("Documents") {
-                    LabeledContent("Pollution Certificate", value: pollutionCertificate != nil ? "Attached" : "Not Attached")
-                    LabeledContent("RC", value: rc != nil ? "Attached" : "Not Attached")
-                    LabeledContent("Insurance", value: insurance != nil ? "Attached" : "Not Attached")
-                    LabeledContent("Pollution Expiry", value: pollutionExpiry.formatted(date: .long, time: .omitted))
-                    LabeledContent("Insurance Expiry", value: insuranceExpiry.formatted(date: .long, time: .omitted))
-                }
-                
-                if let vehicle = vehicle {
-                    StatusSection(
-                        status: vehicle.status,
-                        driverName: nil // Optionally look up the driver's name from driver ID
-                    )
-                }
+                // View mode sections
+                readOnlyBasicInfoSection
+                readOnlyVehicleDetailsSection
+//                readOnlyDocumentsSection
             }
         }
         .navigationTitle("Vehicle Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if vehicle != nil {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if isEditing {
-                        Button("Save") {
-                            saveVehicle()
-                        }
-                        .disabled(!isFormValid)
-                    } else {
-                        Button("Edit") {
-                            isEditing = true
-                        }
-                    }
-                }
-            } else {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        saveVehicle()
-                    }
-                    .disabled(!isFormValid)
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
+            toolbarItems
         }
         .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
         .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
@@ -367,14 +353,278 @@ struct VehicleDetailView: View {
                 }
             }
         }
+//        .onAppear {
+//            if let vehicle = vehicle {
+//                loadVehicleDetails()
+//            }
+//        }
+        .overlay {
+            if isLoadingDetails && vehicle != nil && !isEditing {
+                Color.black.opacity(0.1)
+                    .ignoresSafeArea()
+                ProgressView("Loading vehicle details...")
+                    .padding()
+                    .background(Color(UIColor.systemBackground).opacity(0.8))
+                    .cornerRadius(10)
+                    .shadow(radius: 3)
+            }
+        }
+    }
+    
+    // MARK: - UI Components
+    
+    private var toolbarItems: some ToolbarContent {
+        Group {
+            if vehicle != nil {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isEditing {
+                        Button("Save") {
+                            saveVehicle()
+                        }
+                        .disabled(!isFormValid || isSaving)
+                    } else {
+                        Button("Edit") {
+                            isEditing = true
+                        }
+                    }
+                }
+            } else {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveVehicle()
+                    }
+                    .disabled(!isFormValid || isSaving)
+                }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private var documentSection: some View {
+        DocumentsSection(
+            pollutionCertificate: $pollutionCertificate,
+            rc: $rc,
+            insurance: $insurance,
+            pollutionExpiry: $pollutionExpiry,
+            insuranceExpiry: $insuranceExpiry,
+            showingPollutionPicker: $showingPollutionPicker,
+            showingRCPicker: $showingRCPicker,
+            showingInsurancePicker: $showingInsurancePicker
+        )
+    }
+    
+    private var readOnlyBasicInfoSection: some View {
+        Section("Basic Information") {
+            LabeledContent(label:"Name", value: vehicle?.name ?? "")
+            LabeledContent(label:"Year", value: "\(vehicle?.year ?? 0)")
+            LabeledContent(label:"Make", value: vehicle?.make ?? "")
+            LabeledContent(label:"Model", value: vehicle?.model ?? "")
+            LabeledContent(label:"VIN", value: vehicle?.vin ?? "")
+            LabeledContent(label:"License Plate", value: vehicle?.licensePlate ?? "")
+        }
+    }
+    
+    private var readOnlyVehicleDetailsSection: some View {
+        Section("Vehicle Details") {
+            LabeledContent(label:"Vehicle Type", value: vehicle?.vehicleType.rawValue ?? "")
+            LabeledContent(label:"Color", value: vehicle?.color ?? "")
+            LabeledContent(label:"Body Type", value: vehicle?.bodyType.rawValue ?? "")
+            LabeledContent(label:"Body Subtype", value: vehicle?.bodySubtype ?? "")
+            LabeledContent(label:"MSRP", value: "$\(String(format: "%.2f", vehicle?.msrp ?? 0))")
+        }
+    }
+    
+    // MARK: - Read-Only Document Section
+//    private var readOnlyDocumentsSection: some View {
+//        Section("Documents") {
+//            if isLoadingDetails {
+//                ProgressView("Loading documents...")
+//                    .frame(maxWidth: .infinity, alignment: .center)
+//                    .padding()
+//            } else if let error = detailLoadError {
+//                VStack(alignment: .center, spacing: 10) {
+//                    Text("Failed to load documents")
+//                        .foregroundColor(.red)
+//                    Text(error)
+//                        .font(.caption)
+//                        .foregroundColor(.secondary)
+//                    Button("Retry") {
+//                        loadVehicleDetails()
+//                    }
+//                    .buttonStyle(.bordered)
+//                }
+//                .frame(maxWidth: .infinity, alignment: .center)
+//                .padding()
+//            } else {
+//                // Display document information
+//                if let pollution = pollutionCertificate {
+//                    HStack {
+//                        Text("Pollution Certificate")
+//                        Spacer()
+//                        Image(systemName: "checkmark.circle.fill")
+//                            .foregroundColor(.green)
+//                    }
+//                    Text("Expires: \(pollutionExpiry.formatted(date: .long, time: .omitted))")
+//                        .font(.caption)
+//                } else {
+//                    HStack {
+//                        Text("Pollution Certificate")
+//                        Spacer()
+//                        Text("Not available")
+//                            .foregroundColor(.secondary)
+//                    }
+//                }
+//                
+//                if let rc = rc {
+//                    HStack {
+//                        Text("RC")
+//                        Spacer()
+//                        Image(systemName: "checkmark.circle.fill")
+//                            .foregroundColor(.green)
+//                    }
+//                } else {
+//                    HStack {
+//                        Text("RC")
+//                        Spacer()
+//                        Text("Not available")
+//                            .foregroundColor(.secondary)
+//                    }
+//                }
+//                
+//                if let insurance = insurance {
+//                    HStack {
+//                        Text("Insurance")
+//                        Spacer()
+//                        Image(systemName: "checkmark.circle.fill")
+//                            .foregroundColor(.green)
+//                    }
+//                    Text("Expires: \(insuranceExpiry.formatted(date: .long, time: .omitted))")
+//                        .font(.caption)
+//                } else {
+//                    HStack {
+//                        Text("Insurance")
+//                        Spacer()
+//                        Text("Not available")
+//                            .foregroundColor(.secondary)
+//                    }
+//                }
+//            }
+//        }
+//    }
+    
+    // Extract complex section into a separate computed property
+    private var basicInformationSection: some View {
+        Section("Basic Information") {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Name", text: $name)
+                    .onChange(of: name) { _, _ in nameEdited = true }
+                if nameEdited && !isNameValid {
+                    Text("Name cannot be empty and must not contain numbers.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Year", text: $year)
+                    .keyboardType(.numberPad)
+                    .onChange(of: year) { _, _ in yearEdited = true }
+                if yearEdited && !isYearValid {
+                    Text("Year must be a number between 1900 and the current year.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Make", text: $make)
+                    .onChange(of: make) { _, _ in makeEdited = true }
+                if makeEdited && !isMakeValid {
+                    Text("Make cannot be empty.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Model", text: $model)
+                    .onChange(of: model) { _, _ in modelEdited = true }
+                if modelEdited && !isModelValid {
+                    Text("Model cannot be empty.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("VIN", text: $vin)
+                    .onChange(of: vin) { _, _ in vinEdited = true }
+                if vinEdited && !isVINValid {
+                    Text("VIN must be exactly 17 characters.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("License Plate", text: $licensePlate)
+                    .onChange(of: licensePlate) { _, _ in licensePlateEdited = true }
+                if licensePlateEdited && !isLicensePlateValid {
+                    Text("License Plate cannot be empty.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+        }
+    }
+    
+    private var vehicleDetailsSection: some View {
+        Section("Vehicle Details") {
+            Picker("Vehicle Type", selection: $vehicleType) {
+                ForEach(VehicleType.allCases, id: \.self) { type in
+                    Text(type.rawValue).tag(type)
+                }
+            }
+            
+            TextField("Color", text: $color)
+            
+            Picker("Body Type", selection: $bodyType) {
+                ForEach(BodyType.allCases, id: \.self) { type in
+                    Text(type.rawValue).tag(type)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Body Subtype", text: $bodySubtype)
+                    .onChange(of: bodySubtype) { _, _ in bodySubtypeEdited = true }
+                if bodySubtypeEdited && !isBodySubtypeValid {
+                    Text("Body Subtype cannot be empty.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("MSRP", text: $msrp)
+                    .keyboardType(.decimalPad)
+                    .onChange(of: msrp) { _, _ in msrpEdited = true }
+                if msrpEdited && !isMSRPValid {
+                    Text("MSRP must be a positive number.")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+        }
     }
     
     private func saveVehicle() {
-        let documents = VehicleDocuments(
-            pollutionCertificate: pollutionCertificate ?? Data(),
-            rc: rc ?? Data(),
-            insurance: insurance ?? Data()
-        )
+        // Prevent duplicate taps.
+        guard !isSaving else { return }
+        isSaving = true
         
         if let originalVehicle = vehicle {
             // Build an updated Vehicle using current state values.
@@ -394,13 +644,17 @@ struct VehicleDetailView: View {
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
                 status: originalVehicle.status,
-                driverId: originalVehicle.driverId,
-                documents: documents
+                driverId: originalVehicle.driverId
             )
             
             Task {
-                try await SupabaseDataController.shared.updateVehicle(vehicle: updatedVehicle)
-                vehicleManager.loadVehicles()
+                defer { isSaving = false }
+                do {
+                    try await SupabaseDataController.shared.updateVehicle(vehicle: updatedVehicle)
+                    await vehicleManager.loadVehiclesAsync()
+                } catch {
+                    print("Error updating vehicle: \(error.localizedDescription)")
+                }
             }
         } else {
             let newVehicle = Vehicle(
@@ -417,12 +671,16 @@ struct VehicleDetailView: View {
                 msrp: Double(msrp) ?? 0,
                 pollutionExpiry: pollutionExpiry,
                 insuranceExpiry: insuranceExpiry,
-                status: .available,
-                documents: documents
+                status: .available
             )
             Task {
-                try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
-                vehicleManager.loadVehicles()
+                defer { isSaving = false }
+                do {
+                    try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
+                    await vehicleManager.loadVehiclesAsync()
+                } catch {
+                    print("Error inserting vehicle: \(error.localizedDescription)")
+                }
             }
         }
         
@@ -433,6 +691,37 @@ struct VehicleDetailView: View {
             dismiss()
         }
     }
+
+//    private func loadVehicleDetails() {
+//        
+//        isLoadingDetails = true
+//        detailLoadError = nil
+        
+//        Task {
+//            do {
+//                if let fullDetails = try await SupabaseDataController.shared.fetchVehicleDetails(vehicleId: vehicle.id) {
+//                    await MainActor.run {
+//                        // Only update the document data
+//                        pollutionCertificate = fullDetails.documents?.pollutionCertificate
+//                        rc = fullDetails.documents?.rc
+//                        insurance = fullDetails.documents?.insurance
+//                        
+//                        isLoadingDetails = false
+//                    }
+//                } else {
+//                    await MainActor.run {
+//                        detailLoadError = "Could not find detailed vehicle information"
+//                        isLoadingDetails = false
+//                    }
+//                }
+//            } catch {
+//                await MainActor.run {
+//                    detailLoadError = error.localizedDescription
+//                    isLoadingDetails = false
+//                }
+//            }
+//        }
+//    }
 }
 
 struct VehicleSaveView: View {
@@ -465,36 +754,182 @@ struct VehicleSaveView: View {
     @State private var selectedRCItem: PhotosPickerItem?
     @State private var selectedInsuranceItem: PhotosPickerItem?
 
-    private var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !year.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !vin.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+    // MARK: - Touched State Variables
+    @State private var nameEdited = false
+    @State private var yearEdited = false
+    @State private var makeEdited = false
+    @State private var modelEdited = false
+    @State private var vinEdited = false
+    @State private var licensePlateEdited = false
+    @State private var bodySubtypeEdited = false
+    @State private var msrpEdited = false
+    
+    // MARK: - Save Operation State
+    @State private var isSaving = false
+
+    // MARK: - Field Validations
+
+    // Name must not be empty, must not start with a number, and must not contain any digits.
+    private var isNameValid: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Only letters (upper and lowercase) and spaces allowed.
+        let regex = "^[A-Za-z ]+$"
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+
+    private var isYearValid: Bool {
+        if let y = Int(year) {
+            let currentYear = Calendar.current.component(.year, from: Date())
+            return y >= 1900 && y <= currentYear
+        }
+        return false
+    }
+
+    private var isMakeValid: Bool {
+        !make.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isModelValid: Bool {
+        !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isVINValid: Bool {
+        let trimmed = vin.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count == 17
+    }
+
+    private var isLicensePlateValid: Bool {
+        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isBodySubtypeValid: Bool {
         !bodySubtype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isMSRPValid: Bool {
+        if let msrpValue = Double(msrp) {
+            return msrpValue > 0
+        }
+        return false
+    }
+
+    // Overall form is valid if all validations pass.
+    private var isFormValid: Bool {
+        isNameValid &&
+        isYearValid &&
+        isMakeValid &&
+        isModelValid &&
+        isVINValid &&
+        isLicensePlateValid &&
+        isBodySubtypeValid &&
+        isMSRPValid
     }
 
     var body: some View {
         NavigationView {
             Form {
-                BasicInformationSection(
-                    name: $name,
-                    year: $year,
-                    make: $make,
-                    model: $model,
-                    vin: $vin,
-                    licensePlate: $licensePlate
-                )
+                Section(header: Text("Basic Information")) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Name", text: $name)
+                            .onChange(of: name) { _, _ in nameEdited = true }
+                        if nameEdited && !isNameValid {
+                            Text("Name must not be empty or contain numbers.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
 
-                VehicleDetailsSection(
-                    vehicleType: $vehicleType,
-                    color: $color,
-                    bodyType: $bodyType,
-                    bodySubtype: $bodySubtype,
-                    msrp: $msrp
-                )
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Year", text: $year)
+                            .keyboardType(.numberPad)
+                            .onChange(of: year) { _, _ in yearEdited = true }
+                        if yearEdited && !isYearValid {
+                            Text("Year must be a number between 1900 and the current year.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
 
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Make", text: $make)
+                            .onChange(of: make) { _, _ in makeEdited = true }
+                        if makeEdited && !isMakeValid {
+                            Text("Make cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Model", text: $model)
+                            .onChange(of: model) { _, _ in modelEdited = true }
+                        if modelEdited && !isModelValid {
+                            Text("Model cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("VIN", text: $vin)
+                            .onChange(of: vin) { _, _ in vinEdited = true }
+                        if vinEdited && !isVINValid {
+                            Text("VIN must be exactly 17 characters.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("License Plate", text: $licensePlate)
+                            .onChange(of: licensePlate) { _, _ in licensePlateEdited = true }
+                        if licensePlateEdited && !isLicensePlateValid {
+                            Text("License Plate cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+
+                Section(header: Text("Vehicle Details")) {
+                    Picker("Vehicle Type", selection: $vehicleType) {
+                        ForEach(VehicleType.allCases, id: \.self) { type in
+                            Text(type.rawValue.capitalized)
+                        }
+                    }
+                    
+                    TextField("Color", text: $color)
+                    
+                    Picker("Body Type", selection: $bodyType) {
+                        ForEach(BodyType.allCases, id: \.self) { type in
+                            Text(type.rawValue.capitalized)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Body Subtype", text: $bodySubtype)
+                            .onChange(of: bodySubtype) { _, _ in bodySubtypeEdited = true }
+                        if bodySubtypeEdited && !isBodySubtypeValid {
+                            Text("Body Subtype cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("MSRP", text: $msrp)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: msrp) { _, _ in msrpEdited = true }
+                        if msrpEdited && !isMSRPValid {
+                            Text("MSRP must be a positive number.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+
+                // Documents Section remains unchanged.
                 DocumentsSection(
                     pollutionCertificate: $pollutionCertificate,
                     rc: $rc,
@@ -513,7 +948,7 @@ struct VehicleSaveView: View {
                     Button("Save") {
                         saveVehicle()
                     }
-                    .disabled(!isFormValid)
+                    .disabled(!isFormValid || isSaving)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -521,40 +956,44 @@ struct VehicleSaveView: View {
                     }
                 }
             }
-            // Document pickers for uploading attachments
-            .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
-            .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
-            .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
-            .onChange(of: selectedPollutionItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        pollutionCertificate = data
-                    }
-                }
-            }
-            .onChange(of: selectedRCItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        rc = data
-                    }
-                }
-            }
-            .onChange(of: selectedInsuranceItem) { _, newItem in
-                Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                        insurance = data
-                    }
-                }
-            }
+            // Document pickers for uploading attachments.
+//            .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
+//            .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
+//            .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
+//            .onChange(of: selectedPollutionItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        pollutionCertificate = data
+//                    }
+//                }
+//            }
+//            .onChange(of: selectedRCItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        rc = data
+//                    }
+//                }
+//            }
+//            .onChange(of: selectedInsuranceItem) { _, newItem in
+//                Task {
+//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
+//                        insurance = data
+//                    }
+//                }
+//            }
         }
     }
 
     private func saveVehicle() {
-        let documents = VehicleDocuments(
-            pollutionCertificate: pollutionCertificate ?? Data(),
-            rc: rc ?? Data(),
-            insurance: insurance ?? Data()
-        )
+        // Prevent duplicate taps.
+        guard !isSaving else { return }
+        isSaving = true
+
+//        let documents = VehicleDocuments(
+//            pollutionCertificate: pollutionCertificate ?? Data(),
+//            rc: rc ?? Data(),
+//            insurance: insurance ?? Data()
+//        )
 
         let newVehicle = Vehicle(
             name: name,
@@ -570,15 +1009,18 @@ struct VehicleSaveView: View {
             msrp: Double(msrp) ?? 0,
             pollutionExpiry: pollutionExpiry,
             insuranceExpiry: insuranceExpiry,
-            status: .available,
-            documents: documents
+            status: .available
         )
 
         Task {
-            try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
-            vehicleManager.loadVehicles()
-            dismiss()
+            defer { isSaving = false }
+            do {
+                try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
+                await vehicleManager.loadVehiclesAsync()
+                dismiss()
+            } catch {
+                print("Error inserting vehicle: \(error.localizedDescription)")
+            }
         }
     }
 }
-

@@ -15,9 +15,32 @@ class AppDataController {
     }
     
     func randomPasswordGenerator(length: Int) -> String {
-        let character = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        
-        return String((0..<length).map { _ in character.randomElement()! })
+        let lowercase = "abcdefghijklmnopqrstuvwxyz"
+        let uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        let digits = "0123456789"
+        let specialCharacters = "#$@!%&*?"
+
+        let allCharacters = lowercase + uppercase + digits + specialCharacters
+
+        guard length >= 6 else {
+            fatalError("Password length must be at least 6 characters.")
+        }
+
+        // Ensure at least one character from each required category
+        let requiredCharacters = [
+            lowercase.randomElement()!,
+            uppercase.randomElement()!,
+            digits.randomElement()!,
+            specialCharacters.randomElement()!
+        ]
+
+        let remainingCharacters = (0..<(length - requiredCharacters.count)).map { _ in
+            allCharacters.randomElement()!
+        }
+
+        let password = (requiredCharacters + remainingCharacters).shuffled()
+
+        return String(password)
     }
     
     func getStatusString(status: Status) -> String {
@@ -57,7 +80,7 @@ class AppDataController {
         case .electricalSystemsCertified:
             return "Electrical Systems Certified"
         case .heavyEquipmentTechnician:
-            return "Heavy Equiment Technician"
+            return "Heavy Equipment Technician"
         }
     }
 }

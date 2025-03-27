@@ -20,7 +20,7 @@ class SupabaseDataController: ObservableObject {
     @Published var alertMessage = ""
     @Published var session: Session?
     
-    private let supabase = SupabaseClient(
+     let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
         supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrZnJ2enh3amxpbWhodmR3d3FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTA5MjUsImV4cCI6MjA1Nzc4NjkyNX0.7vNQWGbjOYFeynNt8N8V-DzoJbS3qq28o3LAa1XvLnw"
     )
@@ -35,9 +35,10 @@ class SupabaseDataController: ObservableObject {
         let smtp = SMTP(
             hostname: "smtp.gmail.com",     // SMTP server address
             email: "c0sm042532@gmail.com",        // username to login
-            password: "xjsk jrno odyh exoe"            // password to login
+            password: "xjsk jrno odyh exoe",
+            port: 587
         )
-        let fromUser = Mail.User(name: "Dr. Light", email: "c0sm042532@gmail.com")
+        let fromUser = Mail.User(name: "Team08 FMS", email: "c0sm042532@gmail.com")
         let toUser = Mail.User(name: toName, email: toEmail)
         let mail = Mail(from: fromUser, to: [toUser], subject: subject, text: text)
         smtp.send(mail) { (error) in
@@ -178,7 +179,9 @@ class SupabaseDataController: ObservableObject {
         }
         
         do {
-            session = supabase.auth.currentSession
+            await MainActor.run {
+                session = supabase.auth.currentSession
+            }
             let password = AppDataController.shared.randomPasswordGenerator(length: 6)
             print(password)
             let signUpResponse = try await supabase.auth.signUp(email: email, password: password)
@@ -196,8 +199,21 @@ class SupabaseDataController: ObservableObject {
                 .from("gen_pass")
                 .insert(genPass)
                 .execute()
-            let text = "Your Login Crediets as \(role) are as follows:\nPassword: \(password)"
-            sendEmail(toName: name, toEmail: email, subject: "Welcome to Fleet Management System", text: text)
+            
+            let inviteEmail = """
+            Dear \(name),
+
+            Welcome to Fleet Management System! We're excited to have you on board.
+
+            Your login credentials as a \(role) are as follows:
+
+            - Email: \(email)
+            - Password: \(password)
+
+            Please log into the app and update your password for security.
+            """
+            
+            sendEmail(toName: name, toEmail: email, subject: "Welcome to Fleet Management System", text: inviteEmail)
             
             print("User signed up successfully with role: \(role)")
             
@@ -251,7 +267,7 @@ class SupabaseDataController: ObservableObject {
                     }
                     signOut()
                 }
-                if !is2faEnabled {
+                if !is2faEnabled || isAuthenticated {
                     await MainActor.run {
                         isAuthenticated = true
                     }
@@ -779,63 +795,30 @@ class SupabaseDataController: ObservableObject {
     
     func fetchVehicles() async throws -> [Vehicle] {
         do {
+            // Specify only the fields we need for the list view
+            // This significantly reduces the data transfer size
             let response = try await supabase
                 .from("vehicles")
-                .select()
+                .select("id, name, year, make, model, vin, license_plate, vehicle_type, color, body_type, body_subtype, msrp, pollution_expiry, insurance_expiry, status, driver_id")
                 .notEquals("status", value: "Decommissioned")
+                .limit(100) // Add pagination to improve performance
                 .execute()
             
             let data = response.data
             
-            // Decode JSON as an array of dictionaries first.
-            guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
-                print("Invalid JSON structure")
-                return []
-            }
+            // Configure date formatter for decoding
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
             
-            // Set up input formatter for "yyyy-MM-dd"
-            let inputFormatter = DateFormatter()
-            inputFormatter.dateFormat = "yyyy-MM-dd"
-            inputFormatter.locale = Locale(identifier: "en_US_POSIX")
-            
-            // Set up output formatter for "yyyy-MM-dd" (you can change this if needed)
-            let outputFormatter = DateFormatter()
-            outputFormatter.dateFormat = "yyyy-MM-dd"
-            outputFormatter.locale = Locale(identifier: "en_US_POSIX")
-            outputFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            
-            // Fix date format for pollution_expiry and insurance_expiry fields.
-            for i in 0..<jsonArray.count {
-                // Convert pollution_expiry from string to Date and back to formatted string.
-                if let pollutionExpiryString = jsonArray[i]["pollution_expiry"] as? String,
-                   let pollutionDate = inputFormatter.date(from: pollutionExpiryString) {
-                    let formattedPollutionExpiry = outputFormatter.string(from: pollutionDate)
-                    jsonArray[i]["pollution_expiry"] = formattedPollutionExpiry
-                }
-                
-                // Convert insurance_expiry from string to Date and back to formatted string.
-                if let insuranceExpiryString = jsonArray[i]["insurance_expiry"] as? String,
-                   let insuranceDate = inputFormatter.date(from: insuranceExpiryString) {
-                    let formattedInsuranceExpiry = outputFormatter.string(from: insuranceDate)
-                    jsonArray[i]["insurance_expiry"] = formattedInsuranceExpiry
-                }
-            }
-            
-            // Convert the transformed JSON array back to Data.
-            let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
-            
-            // Create a date formatter for decoding dates from JSON.
-            let decoderDateFormatter = DateFormatter()
-            decoderDateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            decoderDateFormatter.dateFormat = "yyyy-MM-dd"
-            decoderDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            
+            // Configure decoder with date formatter
             let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .formatted(decoderDateFormatter)
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
             
-            // Decode into Vehicle model
-            let vehicles = try decoder.decode([Vehicle].self, from: transformedData)
-//            print("Decoded Vehicles: \(vehicles)")
+            // Decode data directly - just like maintenance personnel
+            let vehicles = try decoder.decode([Vehicle].self, from: data)
+            
             return vehicles
         } catch {
             print("Error fetching vehicles: \(error)")
@@ -993,9 +976,9 @@ class SupabaseDataController: ObservableObject {
         let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
 
         // 3. Convert document `Data` fields to Base64 strings (if they exist)
-        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
-        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
-        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+//        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+//        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+//        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
 
         // 5. Create an instance of the payload
         let payload = VehiclePayload(
@@ -1014,10 +997,10 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId,
-            pollution_certificate: pollutionCertBase64,
-            rc: rcBase64,
-            insurance: insuranceBase64
+            driver_id: vehicle.driverId
+//            pollution_certificate: pollutionCertBase64,
+//            rc: rcBase64,
+//            insurance: insuranceBase64
         )
 
         do {
@@ -1045,9 +1028,9 @@ class SupabaseDataController: ObservableObject {
         let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
 
         // 3. Convert document `Data` fields to Base64 strings (if they exist)
-        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
-        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
-        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+//        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+//        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+//        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
 
         // 5. Create an instance of the update payload with current vehicle details.
         let payload = VehiclePayload(
@@ -1066,10 +1049,7 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId,
-            pollution_certificate: pollutionCertBase64,
-            rc: rcBase64,
-            insurance: insuranceBase64
+            driver_id: vehicle.driverId
         )
 
         do {
@@ -1115,6 +1095,119 @@ class SupabaseDataController: ObservableObject {
             print("Update success: \(response)")
         } catch {
             print("Error updating vehicle: \(error)")
+        }
+    }
+    
+    // MARK: - Trip Management
+    
+    struct TripPayload: Codable {
+        let destination: String
+        let vehicle_id: UUID
+        let driver_id: UUID?
+        let start_time: Date?
+        let end_time: Date?
+        let start_latitude: Double?
+        let start_longitude: Double?
+        let end_latitude: Double?
+        let end_longitude: Double?
+        let notes: String?
+        let pickup: String?
+        let estimated_distance: Double?
+        let estimated_time: Double?
+        let estimated_cost: Double?
+    }
+    
+    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?, distance: Double? = nil, time: Double? = nil, cost: Double? = nil) async throws -> Bool {
+        let payload = TripPayload(
+            destination: destination,
+            vehicle_id: vehicleId,
+            driver_id: driverId,
+            start_time: startTime,
+            end_time: endTime,
+            start_latitude: startLat,
+            start_longitude: startLong,
+            end_latitude: endLat,
+            end_longitude: endLong,
+            notes: notes,
+            pickup: name,
+            estimated_distance: distance,
+            estimated_time: time,
+            estimated_cost: cost
+        )
+        
+        do {
+            let response = try await supabase
+                .from("trips")
+                .insert(payload)
+                .execute()
+            
+            print("Trip created successfully: \(response)")
+            return true
+        } catch {
+            print("Error creating trip: \(error)")
+            return false
+        }
+    }
+
+    // Optimized function to fetch a single vehicle with all details including documents
+    func fetchVehicleDetails(vehicleId: UUID) async throws -> Vehicle? {
+        do {
+            // First check if we already have this vehicle in memory
+            // If so, we can fetch just the documents to supplement the data
+            
+            let response = try await supabase
+                .from("vehicles")
+                .select("*") // Need all fields including documents
+                .eq("id", value: vehicleId)
+                .single() // Only need one record
+                .execute()
+            
+            let data = response.data
+            
+            // Configure date formatter for decoding
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            // Configure decoder with date formatter
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            
+            // Decode directly
+            let vehicle = try decoder.decode(Vehicle.self, from: data)
+            return vehicle
+        } catch {
+            print("Error fetching vehicle details: \(error)")
+            return nil
+        }
+    }
+
+    // Add these new public methods
+    public func databaseFrom(_ table: String) -> PostgrestQueryBuilder {
+        return supabase.from(table)
+    }
+
+    public func updateTrip(id: UUID, status: String) async throws {
+        try await supabase
+            .from("trips")
+            .update(["trip_status": status])
+            .eq("id", value: id)
+            .execute()
+    }
+    
+    public func updateTrip(id: UUID, driverId: UUID) async throws {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .update(["driver_id": driverId])
+                .eq("id", value: id)
+                .execute()
+            
+            print("Trip update success: \(response)")
+        } catch {
+            print("Error updating trip: \(error)")
+            throw error
         }
     }
 }

@@ -9,6 +9,11 @@ import SwiftUI
 struct DriverTabView: View {
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
+    let driverId: UUID
+
+    init(driverId: UUID) {
+        self.driverId = driverId
+    }
 
     @State private var showingChatBot = false
     @State private var showingPreTripInspection = false
@@ -18,12 +23,6 @@ struct DriverTabView: View {
     @State private var alertMessage = ""
     @State private var selectedTab = 0
     @State private var showingProfileView = false
-    
-    // State properties for trip data
-    @State private var currentTrip: Trip
-    @State private var upcomingTrips: [Trip]
-    @State private var recentDeliveries: [DeliveryDetails]
-    
     @State private var showingNavigation = false
     @State private var showingDeliveryDetails = false
     @State private var selectedDelivery: DeliveryDetails?
@@ -37,13 +36,6 @@ struct DriverTabView: View {
         RouteOption(id: "3", name: "Route 3", eta: "1h 21m", distance: "53 km", isRecommended: false)
     ]
     @State private var selectedRouteId: String = "1"
-    
-    init() {
-        // Initialize from the TripDataController instead
-        _currentTrip = State(initialValue: TripDataController.shared.currentTrip)
-        _upcomingTrips = State(initialValue: TripDataController.shared.upcomingTrips)
-        _recentDeliveries = State(initialValue: TripDataController.shared.recentDeliveries)
-    }
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -61,7 +53,13 @@ struct DriverTabView: View {
             }
             .tag(1)
         }
+        .environmentObject(tripController)
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
+        .task {
+            // Set the driver ID and load trips
+            await tripController.setDriverId(driverId)
+            await tripController.refreshTrips()
+        }
     }
     
     private var mainContentView: some View {
@@ -75,39 +73,135 @@ struct DriverTabView: View {
             .edgesIgnoringSafeArea(.all)
             
             NavigationView {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        // Current Delivery Card
-                        if currentTrip.status == .current && availabilityManager.isAvailable {
-                            currentDeliveryCard
+                ZStack {
+                    if tripController.isLoading {
+                        VStack {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .padding()
+                            Text("Loading trips...")
+                                .foregroundColor(.gray)
                         }
-                        
-                        // Only show upcoming trips and trip queue if available
-                        if availabilityManager.isAvailable {
-                            // Trip Queue Section
-                            if !tripQueue.isEmpty {
-                                tripQueueSection
+                    } else {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 24) {
+                                // Current Delivery Card
+                                if let currentTrip = tripController.currentTrip,
+                                   currentTrip.status == .inProgress && availabilityManager.isAvailable {
+                                    currentDeliveryCard(currentTrip)
+                                }
+                                
+                                // Only show upcoming trips and trip queue if available
+                                if availabilityManager.isAvailable {
+                                    // Trip Queue Section
+                                    if !tripQueue.isEmpty {
+                                        tripQueueSection
+                                    }
+
+                                    // Upcoming Trips Section
+                                    VStack(alignment: .leading, spacing: 20) {
+                                        HStack {
+                                            Text("Upcoming Trips")
+                                                .font(.system(size: 24, weight: .bold))
+                                            
+                                            if !tripController.upcomingTrips.isEmpty {
+                                                Text("\(tripController.upcomingTrips.count)")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 4)
+                                                    .background(Color.blue)
+                                                    .cornerRadius(12)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal)
+
+                                        if tripController.upcomingTrips.isEmpty {
+                                            emptyUpcomingTripsView
+                                        } else {
+                                            VStack(spacing: 0) {
+                                                ForEach(tripController.upcomingTrips) { trip in
+                                                    UpcomingTripRow(trip: trip)
+                                                        .environmentObject(tripController)
+                                                    if trip.id != tripController.upcomingTrips.last?.id {
+                                                        Divider()
+                                                            .padding(.horizontal)
+                                                    }
+                                                }
+                                            }
+                                            .background(Color(.systemBackground))
+                                            .cornerRadius(20)
+                                            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                            .padding(.horizontal)
+                                        }
+                                    }
+                                } else {
+                                    // Display message when driver is unavailable
+                                    unavailableDriverSection
+                                }
+
+                                // Recent Deliveries Section
+                                VStack(alignment: .leading, spacing: 20) {
+                                    HStack {
+                                        Text("Recent Deliveries")
+                                            .font(.system(size: 24, weight: .bold))
+                                        
+                                        if !tripController.recentDeliveries.isEmpty {
+                                            Text("\(tripController.recentDeliveries.count)")
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 4)
+                                                .background(Color.green)
+                                                .cornerRadius(12)
+                                        }
+                                        
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal)
+                                    
+                                    if tripController.recentDeliveries.isEmpty {
+                                        emptyRecentDeliveriesView
+                                    } else {
+                                        VStack(spacing: 0) {
+                                            ForEach(tripController.recentDeliveries) { delivery in
+                                                Button(action: {
+                                                    selectedDelivery = delivery
+                                                    showingDeliveryDetails = true
+                                                }) {
+                                                    DeliveryRow(delivery: delivery)
+                                                }
+                                                .buttonStyle(PlainButtonStyle())
+                                                
+                                                if delivery.id != tripController.recentDeliveries.last?.id {
+                                                    Divider()
+                                                        .padding(.horizontal)
+                                                }
+                                            }
+                                        }
+                                        .background(Color(.systemBackground))
+                                        .cornerRadius(20)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                        .padding(.horizontal)
+                                    }
+                                }
+                                
+                                // Bottom padding for better scrolling experience
+                                Spacer().frame(height: 20)
                             }
-
-                            // Upcoming Trips
-                            upcomingTripsSection
-                        } else {
-                            // Display message when driver is unavailable
-                            unavailableDriverSection
+                            .padding(.top, 8)
                         }
-
-                        // Recent Deliveries
-                        recentDeliveriesSection
-                        
-                        // Bottom padding for better scrolling experience
-                        Spacer().frame(height: 20)
+                        .refreshable {
+                            await tripController.refreshTrips()
+                        }
                     }
-                    .padding(.top, 8)
                 }
                 .navigationTitle("Home")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItemGroup(placement: .navigationBarTrailing) {
                         HStack(spacing: 16) {
                             Button(action: {
                                 showingChatBot = true
@@ -150,9 +244,21 @@ struct DriverTabView: View {
             VehicleInspectionView(isPreTrip: true) { success in
                 if success {
                     // Only mark as completed if successful
-                    currentTrip.hasCompletedPreTrip = true
+                    if let currentTrip = tripController.currentTrip {
+                        Task {
+                            do {
+                                try await tripController.updateTripInspectionStatus(
+                                    tripId: currentTrip.id,
+                                    isPreTrip: true,
+                                    completed: true
+                                )
+                            } catch {
+                                alertMessage = "Failed to update pre-trip inspection status: \(error.localizedDescription)"
+                                showingAlert = true
+                            }
+                        }
+                    }
                 } else {
-                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before starting the trip"
                     showingAlert = true
                 }
@@ -161,18 +267,34 @@ struct DriverTabView: View {
         .sheet(isPresented: $showingPostTripInspection) {
             VehicleInspectionView(isPreTrip: false) { success in
                 if success {
-                    // Only mark as completed and mark delivered if successful
-                    currentTrip.hasCompletedPostTrip = true
-                    markCurrentTripDelivered()
+                    // Only mark as completed if successful
+                    if let currentTrip = tripController.currentTrip {
+                        Task {
+                            do {
+                                try await tripController.updateTripInspectionStatus(
+                                    tripId: currentTrip.id,
+                                    isPreTrip: false,
+                                    completed: true
+                                )
+                                await MainActor.run {
+                                    markCurrentTripDelivered()
+                                }
+                            } catch {
+                                alertMessage = "Failed to update post-trip inspection status: \(error.localizedDescription)"
+                                showingAlert = true
+                            }
+                        }
+                    }
                 } else {
-                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before completing delivery"
                     showingAlert = true
                 }
             }
         }
         .sheet(isPresented: $showingVehicleDetails) {
-            VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
+            if let currentTrip = tripController.currentTrip {
+                VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
+            }
         }
         .alert(isPresented: $showingAlert) {
             Alert(
@@ -190,10 +312,10 @@ struct DriverTabView: View {
     
     private var navigationOverlay: some View {
         RealTimeNavigationView(
-            destination: currentTrip.destinationCoordinate,
-            destinationName: currentTrip.destination,
-            address: currentTrip.address,
-            sourceCoordinate: currentTrip.sourceCoordinate,
+            destination: tripController.currentTrip?.destinationCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            destinationName: tripController.currentTrip?.destination ?? "",
+            address: tripController.currentTrip?.address ?? "",
+            sourceCoordinate: tripController.currentTrip?.sourceCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
             onDismiss: { 
                 withAnimation(.easeInOut(duration: 0.3)) {
                     showingNavigation = false 
@@ -205,12 +327,12 @@ struct DriverTabView: View {
         .zIndex(1)
     }
     
-    private var currentDeliveryCard: some View {
+    private func currentDeliveryCard(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Current Delivery")
                 .font(.system(size: 22, weight: .bold))
             
-            currentDeliveryContent
+            currentDeliveryContent(trip)
         }
         .padding(16)
         .background(Color(.systemBackground))
@@ -219,7 +341,7 @@ struct DriverTabView: View {
         .padding(.horizontal)
     }
     
-    private var currentDeliveryContent: some View {
+    private func currentDeliveryContent(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             // Vehicle Details Button
             Button(action: {
@@ -231,7 +353,7 @@ struct DriverTabView: View {
                     VStack(alignment: .leading) {
                         Text("Vehicle Details")
                             .font(.headline)
-                        Text(currentTrip.vehicleDetails.licensePlate)
+                        Text(trip.vehicleDetails.licensePlate)
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
@@ -246,7 +368,7 @@ struct DriverTabView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            tripLocationsView
+            tripLocationsView(trip)
             
             // Status Cards - Integrated with route selection
             if !isCurrentTripDeclined {
@@ -268,7 +390,7 @@ struct DriverTabView: View {
                                 .foregroundColor(.gray)
                         }
                         
-                        Text(selectedRouteEta)
+                        Text(selectedRouteEta(trip))
                             .font(.system(size: 24, weight: .bold))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -293,7 +415,7 @@ struct DriverTabView: View {
                                 .foregroundColor(.gray)
                         }
                         
-                        Text(selectedRouteDistance)
+                        Text(selectedRouteDistance(trip))
                             .font(.system(size: 24, weight: .bold))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -303,17 +425,17 @@ struct DriverTabView: View {
                 }
             }
             
-            tripActionButtons
+            tripActionButtons(trip)
         }
     }
     
     // Route Information
-    private var selectedRouteEta: String {
-        availableRoutes.first(where: { $0.id == selectedRouteId })?.eta ?? currentTrip.eta
+    private func selectedRouteEta(_ trip: Trip) -> String {
+        availableRoutes.first(where: { $0.id == selectedRouteId })?.eta ?? trip.eta
     }
     
-    private var selectedRouteDistance: String {
-        availableRoutes.first(where: { $0.id == selectedRouteId })?.distance ?? currentTrip.distance
+    private func selectedRouteDistance(_ trip: Trip) -> String {
+        availableRoutes.first(where: { $0.id == selectedRouteId })?.distance ?? trip.distance
     }
     
     private var routeSelectionView: some View {
@@ -379,7 +501,7 @@ struct DriverTabView: View {
         let isRecommended: Bool
     }
     
-    private var tripLocationsView: some View {
+    private func tripLocationsView(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Simplified container with integrated progress line
             VStack(alignment: .leading, spacing: 20) {
@@ -407,7 +529,7 @@ struct DriverTabView: View {
                         Text("Starting Point")
                             .font(.subheadline)
                             .foregroundColor(.gray)
-                        Text(currentTrip.startingPoint)
+                        Text(trip.startingPoint)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.primary)
                         Text("Mumbai, Maharashtra")
@@ -428,10 +550,10 @@ struct DriverTabView: View {
                         Text("Destination")
                             .font(.subheadline)
                             .foregroundColor(.gray)
-                        Text(currentTrip.destination)
+                        Text(trip.destination)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(.primary)
-                        Text(currentTrip.address)
+                        Text(trip.address)
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -442,7 +564,7 @@ struct DriverTabView: View {
         .padding(.horizontal, 10)
     }
     
-    private var tripActionButtons: some View {
+    private func tripActionButtons(_ trip: Trip) -> some View {
         VStack(spacing: 10) {
             if isCurrentTripDeclined {
                 // Show Accept/Decline buttons for declined trip
@@ -460,11 +582,11 @@ struct DriverTabView: View {
                         icon: "xmark",
                         color: .red
                     ) {
-                        // Remove from current and add to upcoming
-                        upcomingTrips.append(currentTrip)
-                        if let nextTrip = upcomingTrips.first {
-                            currentTrip = nextTrip
-                            upcomingTrips.removeFirst()
+                        Task {
+                            // Remove from current and add to upcoming
+                            if let index = tripQueue.firstIndex(where: { $0.id == trip.id }) {
+                                tripQueue.remove(at: index)
+                            }
                         }
                     }
                 }
@@ -474,9 +596,9 @@ struct DriverTabView: View {
                     ActionButton(
                         title: "Start\nNavigation",
                         icon: "location.fill",
-                        color: currentTrip.hasCompletedPreTrip ? .blue : .gray
+                        color: trip.hasCompletedPreTrip ? .blue : .gray
                     ) {
-                        if !currentTrip.hasCompletedPreTrip {
+                        if !trip.hasCompletedPreTrip {
                             alertMessage = "Please complete pre-trip inspection before starting navigation"
                             showingAlert = true
                         } else {
@@ -489,9 +611,9 @@ struct DriverTabView: View {
                     ActionButton(
                         title: "Pre-Trip Inspection",
                         icon: "checklist",
-                        color: currentTrip.hasCompletedPreTrip ? .gray : .orange
+                        color: trip.hasCompletedPreTrip ? .gray : .orange
                     ) {
-                        if !currentTrip.hasCompletedPreTrip {
+                        if !trip.hasCompletedPreTrip {
                             showingPreTripInspection = true
                         }
                     }
@@ -502,12 +624,17 @@ struct DriverTabView: View {
                     icon: "checkmark.circle.fill",
                     color: .green
                 ) {
-                    if !currentTrip.hasCompletedPreTrip {
+                    if !trip.hasCompletedPreTrip {
                         alertMessage = "Please complete pre-trip inspection before marking as delivered"
                         showingAlert = true
-                    } else if currentTrip.hasCompletedPostTrip {
+                    } else if trip.hasCompletedPostTrip {
                         // Already completed post-trip
-                        markCurrentTripDelivered()
+                        // Use Task to handle the async call
+                        Task {
+                            await MainActor.run {
+                                markCurrentTripDelivered()
+                            }
+                        }
                     } else {
                         showingPostTripInspection = true
                     }
@@ -527,18 +654,22 @@ struct DriverTabView: View {
                     QueuedTripRow(
                         trip: trip,
                         onStart: {
-                            // Make this trip current
-                            currentTrip = trip
-                            currentTrip.status = .current
-                            if let index = tripQueue.firstIndex(where: { $0.id == trip.id }) {
-                                tripQueue.remove(at: index)
+                            Task {
+                                do {
+                                    try await tripController.startTrip(trip: trip)
+                                    if let index = tripQueue.firstIndex(where: { $0.id == trip.id }) {
+                                        tripQueue.remove(at: index)
+                                    }
+                                } catch {
+                                    alertMessage = "Failed to start trip: \(error.localizedDescription)"
+                                    showingAlert = true
+                                }
                             }
                         },
                         onDecline: {
-                            // Remove from queue and add to upcoming
+                            // Remove from queue
                             if let index = tripQueue.firstIndex(where: { $0.id == trip.id }) {
-                                let declinedTrip = tripQueue.remove(at: index)
-                                upcomingTrips.append(declinedTrip)
+                                tripQueue.remove(at: index)
                             }
                         }
                     )
@@ -552,20 +683,6 @@ struct DriverTabView: View {
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
             .padding(.horizontal)
-        }
-    }
-    
-    private var upcomingTripsSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Upcoming Trips")
-                .font(.system(size: 24, weight: .bold))
-                .padding(.horizontal)
-
-            if upcomingTrips.isEmpty {
-                emptyUpcomingTripsView
-            } else {
-                upcomingTripsList
-            }
         }
     }
     
@@ -588,54 +705,6 @@ struct DriverTabView: View {
         .padding(.horizontal)
     }
     
-    private var upcomingTripsList: some View {
-        VStack(spacing: 0) {
-            ForEach(upcomingTrips) { trip in
-                UpcomingTripRow(
-                    trip: trip,
-                    onAccept: {
-                        if availabilityManager.isAvailable {
-                            tripQueue.append(trip)
-                            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
-                                upcomingTrips.remove(at: index)
-                            }
-                        } else {
-                            alertMessage = "You must be available to accept new trips"
-                            showingAlert = true
-                        }
-                    },
-                    onDecline: {
-                        if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
-                            upcomingTrips.remove(at: index)
-                        }
-                    }
-                )
-                if trip.id != upcomingTrips.last?.id {
-                    Divider()
-                        .padding(.horizontal)
-                }
-            }
-        }
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-        .padding(.horizontal)
-    }
-    
-    private var recentDeliveriesSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Recent Deliveries")
-                .font(.system(size: 24, weight: .bold))
-                .padding(.horizontal)
-            
-            if recentDeliveries.isEmpty {
-                emptyRecentDeliveriesView
-            } else {
-                recentDeliveriesList
-            }
-        }
-    }
-    
     private var emptyRecentDeliveriesView: some View {
         VStack(spacing: 12) {
             Image(systemName: "clock.arrow.circlepath")
@@ -649,29 +718,6 @@ struct DriverTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(40)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-        .padding(.horizontal)
-    }
-    
-    private var recentDeliveriesList: some View {
-        VStack(spacing: 0) {
-            ForEach(recentDeliveries) { delivery in
-                Button(action: {
-                    selectedDelivery = delivery
-                    showingDeliveryDetails = true
-                }) {
-                    DeliveryRow(delivery: delivery)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                if delivery.id != recentDeliveries.last?.id {
-                    Divider()
-                        .padding(.horizontal)
-                }
-            }
-        }
         .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
@@ -704,28 +750,77 @@ struct DriverTabView: View {
     }
     
     private func markCurrentTripDelivered() {
-        if currentTrip.hasCompletedPostTrip {
-            // Use the TripDataController to mark the trip as delivered
-            tripController.markTripAsDelivered(trip: currentTrip)
-            
-            // Update local state to match the controller
-            currentTrip = tripController.currentTrip
-            recentDeliveries = tripController.recentDeliveries
-            
-            // Clear current trip if no more trips
-            if tripQueue.isEmpty && upcomingTrips.isEmpty {
-                currentTrip.status = .delivered
+        if let trip = tripController.currentTrip, trip.hasCompletedPostTrip {
+            // Create a Task to handle the async operation
+            Task {
+                do {
+                    // First update the trip inspection status in Supabase if needed
+                    if !trip.hasCompletedPreTrip {
+                        try await tripController.updateTripInspectionStatus(
+                            tripId: trip.id,
+                            isPreTrip: true,
+                            completed: true
+                        )
+                    }
+                    
+                    if !trip.hasCompletedPostTrip {
+                        try await tripController.updateTripInspectionStatus(
+                            tripId: trip.id,
+                            isPreTrip: false,
+                            completed: true
+                        )
+                    }
+                    
+                    // Then mark the trip as delivered in Supabase
+                    try await tripController.markTripAsDelivered(trip: trip)
+                    print("Trip marked as delivered successfully")
+                    
+                    // Explicitly refresh trips to ensure data is updated
+                    await tripController.refreshTrips()
+                    
+                    // If there are no more trips, move to the next one
+                    if tripController.currentTrip == nil {
+                        if !tripQueue.isEmpty {
+                            // Take the next trip from the queue
+                            let nextTrip = tripQueue.removeFirst()
+                            Task {
+                                try await tripController.startTrip(trip: nextTrip)
+                            }
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        alertMessage = "Failed to mark trip as delivered: \(error.localizedDescription)"
+                        showingAlert = true
+                    }
+                    print("Error marking trip as delivered: \(error)")
+                }
+            }
+        } else {
+            // If pre-trip not completed, show alert
+            if let trip = tripController.currentTrip, !trip.hasCompletedPreTrip {
+                alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                showingAlert = true
+            }
+            // If post-trip not completed, show post-trip inspection
+            else if let trip = tripController.currentTrip, !trip.hasCompletedPostTrip {
+                showingPostTripInspection = true
+            } else {
+                print("Cannot mark as delivered: trip is nil")
             }
         }
     }
     
     private func acceptTrip(_ trip: Trip) {
         // If there's no current trip, make this the current trip
-        if currentTrip.status != .current {
-            currentTrip = trip
-            currentTrip.status = .current
-            if let index = upcomingTrips.firstIndex(where: { $0.id == trip.id }) {
-                upcomingTrips.remove(at: index)
+        if tripController.currentTrip?.status != .inProgress {
+            Task {
+                do {
+                    try await tripController.startTrip(trip: trip)
+                } catch {
+                    alertMessage = "Failed to start trip: \(error.localizedDescription)"
+                    showingAlert = true
+                }
             }
         }
     }
@@ -735,102 +830,168 @@ struct DeliveryRow: View {
     let delivery: DeliveryDetails
     
     var body: some View {
-        HStack {
-            Circle()
-                .fill(Color.green)
-                .frame(width: 8, height: 8)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(delivery.location)
-                    .font(.headline)
-                Text(delivery.date)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(delivery.location)
+                        .font(.headline)
+                    Text(delivery.date)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                Text(delivery.status)
                     .font(.caption)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.green.opacity(0.1))
+                    .foregroundColor(.green)
+                    .cornerRadius(12)
+                
+                Image(systemName: "chevron.right")
                     .foregroundColor(.gray)
             }
             
-            Spacer()
+            // Get first line of notes for display as preview
+            if let firstLine = delivery.notes.split(separator: "\n").first {
+                HStack(spacing: 6) {
+                    Image(systemName: "shippingbox.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    
+                    Text(String(firstLine).replacingOccurrences(of: "Trip: ", with: ""))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                }
+                .padding(.leading, 16)
+            }
             
-            Text(delivery.status)
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.green.opacity(0.1))
-                .foregroundColor(.green)
-                .cornerRadius(12)
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(.gray)
+            // Display the vehicle info
+            HStack(spacing: 6) {
+                Image(systemName: "car.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(.blue)
+                
+                Text(delivery.vehicle)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.leading, 16)
         }
-        .padding()
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
     }
 }
 
 struct UpcomingTripRow: View {
     let trip: Trip
-    let onAccept: () -> Void
-    let onDecline: () -> Void
-    @State private var showingDeclineAlert = false
+    @EnvironmentObject var tripController: TripDataController
+    @State private var showingAlert = false
+    @State private var errorMessage = ""
+    @State private var showingDetails = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with destination and start button
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(trip.name)
-                        .font(.caption)
-                        .foregroundColor(.blue)
                     Text(trip.destination)
-                        .font(.headline)
-                    Text(trip.address)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.primary)
+                    if let pickup = trip.pickup {
+                        Text(pickup)
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                    }
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(trip.eta)
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                    Text(trip.distance)
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                Button(action: {
+                    Task {
+                        do {
+                            try await tripController.startTrip(trip: trip)
+                        } catch {
+                            errorMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
+                            showingAlert = true
+                        }
+                    }
+                }) {
+                    Text("Start Trip")
+                        .font(.system(.subheadline, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .cornerRadius(20)
                 }
             }
             
-            HStack(spacing: 12) {
-                Button(action: onAccept) {
-                    HStack {
-                        Image(systemName: "checkmark")
-                        Text("Add to Queue")
+            VStack(alignment: .leading, spacing: 8) {
+                // Cargo Type
+                if let notes = trip.notes,
+                   let cargoType = notes.components(separatedBy: "Cargo Type:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "shippingbox")
+                            .foregroundColor(.orange)
+                            .font(.system(size: 14))
+                        Text("Cargo Type:")
+                            .foregroundColor(.gray)
+                        Text(cargoType)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.green.opacity(0.1))
-                    .foregroundColor(.green)
-                    .cornerRadius(8)
+                    .font(.subheadline)
                 }
                 
-                Button(action: { showingDeclineAlert = true }) {
-                    HStack {
-                        Image(systemName: "xmark")
-                        Text("Decline")
+                // Distance
+                if !trip.distance.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.left.and.right")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 14))
+                        Text("Distance:")
+                            .foregroundColor(.gray)
+                        Text(trip.distance)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.red.opacity(0.1))
-                    .foregroundColor(.red)
-                    .cornerRadius(8)
+                    .font(.subheadline)
                 }
+                
+                // Pickup
+                if let pickup = trip.pickup {
+                    HStack(spacing: 4) {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(.red)
+                            .font(.system(size: 14))
+                        Text("Pickup:")
+                            .foregroundColor(.gray)
+                        Text(pickup)
+                    }
+                    .font(.subheadline)
+                }
+            }
+            
+            // View Details button
+            Button(action: { showingDetails = true }) {
+                Text("View Details")
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
             }
         }
         .padding()
-        .alert(isPresented: $showingDeclineAlert) {
-            Alert(
-                title: Text("Decline Trip"),
-                message: Text("Are you sure you want to decline trip \(trip.name)?"),
-                primaryButton: .destructive(Text("Decline")) {
-                    onDecline()
-                },
-                secondaryButton: .cancel()
-            )
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
+        .sheet(isPresented: $showingDetails) {
+            TripDetailsView(trip: trip)
         }
     }
 }
@@ -944,27 +1105,74 @@ struct DeliveryDetailsView: View {
     @Environment(\.presentationMode) var presentationMode
     let delivery: DeliveryDetails
     
+    // Parse notes to get structured information
+    private var parsedNotes: [String: String] {
+        var result = [String: String]()
+        let lines = delivery.notes.split(separator: "\n")
+        
+        for line in lines where line.contains(":") {
+            let parts = line.split(separator: ":", maxSplits: 1)
+            if parts.count == 2 {
+                let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+                let value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                result[key] = value
+            }
+        }
+        
+        return result
+    }
+    
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Delivery Information")) {
-                    DetailRow(icon: "mappin.circle.fill", title: "Location", value: delivery.location)
-                    DetailRow(icon: "calendar", title: "Date", value: delivery.date)
+                // Trip Info Section
+                Section(header: Text("Trip Information")) {
+                    if let tripName = parsedNotes["Trip"] {
+                        DetailRow(icon: "shippingbox.fill", title: "Trip ID", value: tripName)
+                    }
+                    DetailRow(icon: "mappin.circle.fill", title: "Destination", value: delivery.location)
+                    DetailRow(icon: "calendar", title: "Delivery Date", value: delivery.date)
                     DetailRow(icon: "checkmark.circle.fill", title: "Status", value: delivery.status)
                 }
                 
+                // Route Details Section
+                Section(header: Text("Route Details")) {
+                    if let startPoint = parsedNotes["From"] {
+                        DetailRow(icon: "arrow.up.circle.fill", title: "Starting Point", value: startPoint)
+                    }
+                    if let distance = parsedNotes["Distance"] {
+                        DetailRow(icon: "arrow.left.and.right", title: "Distance", value: distance)
+                    }
+                }
+                
+                // Cargo Section
+                Section(header: Text("Cargo Information")) {
+                    if let cargo = parsedNotes["Cargo"] {
+                        DetailRow(icon: "box.truck.fill", title: "Cargo Type", value: cargo)
+                    }
+                }
+                
+                // Vehicle & Driver Info Section
                 Section(header: Text("Driver & Vehicle")) {
                     DetailRow(icon: "person.fill", title: "Driver", value: delivery.driver)
                     DetailRow(icon: "truck.box.fill", title: "Vehicle", value: delivery.vehicle)
                 }
                 
-                Section(header: Text("Notes")) {
-                    Text(delivery.notes)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .padding(.vertical, 8)
+                // Additional Notes Section (original notes minus structured info)
+                let filteredNotes = delivery.notes.split(separator: "\n")
+                    .filter { !$0.contains("Trip:") && !$0.contains("Cargo:") && !$0.contains("Distance:") && !$0.contains("From:") }
+                    .joined(separator: "\n")
+                
+                if !filteredNotes.isEmpty {
+                    Section(header: Text("Additional Notes")) {
+                        Text(filteredNotes)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .padding(.vertical, 8)
+                    }
                 }
                 
+                // Proof of Delivery Section
                 Section(header: Text("Proof of Delivery")) {
                     HStack {
                         Image(systemName: "doc.fill")
@@ -1002,6 +1210,9 @@ struct QueuedTripRow: View {
     let onStart: () -> Void
     let onDecline: () -> Void
     @State private var showingDeclineAlert = false
+    @StateObject private var tripController = TripDataController.shared
+    @State private var alertMessage = ""
+    @State private var showingAlert = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1044,7 +1255,17 @@ struct QueuedTripRow: View {
             .cornerRadius(8)
             
             HStack(spacing: 12) {
-                Button(action: onStart) {
+                Button(action: {
+                    Task {
+                        do {
+                            try await tripController.startTrip(trip: trip)
+                            onStart()
+                        } catch {
+                            alertMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
+                            showingAlert = true
+                        }
+                    }
+                }) {
                     HStack {
                         Image(systemName: "play.fill")
                         Text("Start Trip")
@@ -1079,6 +1300,11 @@ struct QueuedTripRow: View {
                 },
                 secondaryButton: .cancel()
             )
+        }
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
         }
     }
 }
@@ -1118,6 +1344,6 @@ struct MapPolyline: View {
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        DriverTabView()
+        DriverTabView(driverId: UUID())
     }
 } 

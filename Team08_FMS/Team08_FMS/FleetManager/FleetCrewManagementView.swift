@@ -366,11 +366,13 @@ struct CrewCardView: View {
         if currentCrew is Driver {
             Task {
                 await SupabaseDataController.shared.softDeleteDriver(for: currentCrew.id)
+                CrewDataController.shared.update()
             }
         }
         else {
             Task {
                 await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: currentCrew.id)
+                CrewDataController.shared.update()
             }
         }
         CrewDataController.shared.update()

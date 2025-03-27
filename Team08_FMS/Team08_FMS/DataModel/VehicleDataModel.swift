@@ -52,7 +52,7 @@ enum BodyType: String, Codable, CaseIterable {
     }
 }
 
-struct VehicleDocuments: Codable {
+struct VehicleDocuments: Codable, Equatable {
     var pollutionCertificate: Data?
     var rc: Data?
     var insurance: Data?
@@ -81,14 +81,9 @@ struct VehiclePayload: Codable {
     let insurance_expiry: String
     let status: VehicleStatus
     let driver_id: UUID?
-    
-    // Document fields as Base64-encoded strings
-    let pollution_certificate: String?
-    let rc: String?
-    let insurance: String?
 }
 
-struct Vehicle: Identifiable, Codable {
+struct Vehicle: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var name: String
     var year: Int
@@ -105,7 +100,6 @@ struct Vehicle: Identifiable, Codable {
     var insuranceExpiry: Date
     var status: VehicleStatus
     var driverId: UUID?
-    var documents: VehicleDocuments?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -124,7 +118,44 @@ struct Vehicle: Identifiable, Codable {
         case insuranceExpiry = "insurance_expiry"
         case status
         case driverId = "driver_id"
-        case documents
+    }
+    
+    static func == (lhs: Vehicle, rhs: Vehicle) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.name == rhs.name &&
+               lhs.year == rhs.year &&
+               lhs.make == rhs.make &&
+               lhs.model == rhs.model &&
+               lhs.vin == rhs.vin &&
+               lhs.licensePlate == rhs.licensePlate &&
+               lhs.vehicleType == rhs.vehicleType &&
+               lhs.color == rhs.color &&
+               lhs.bodyType == rhs.bodyType &&
+               lhs.bodySubtype == rhs.bodySubtype &&
+               lhs.msrp == rhs.msrp &&
+               lhs.pollutionExpiry == rhs.pollutionExpiry &&
+               lhs.insuranceExpiry == rhs.insuranceExpiry &&
+               lhs.status == rhs.status &&
+               lhs.driverId == rhs.driverId
+    }
+    
+    static func mockVehicle(licensePlate: String = "Unknown") -> Vehicle {
+        Vehicle(
+            name: "Mock Vehicle",
+            year: 2024,
+            make: "Generic",
+            model: "Model",
+            vin: "12345678901234567",
+            licensePlate: licensePlate,
+            vehicleType: .truck,
+            color: "White",
+            bodyType: .cargo,
+            bodySubtype: "Standard",
+            msrp: 50000.0,
+            pollutionExpiry: Date().addingTimeInterval(365*24*60*60),
+            insuranceExpiry: Date().addingTimeInterval(365*24*60*60),
+            status: .available
+        )
     }
 }
 

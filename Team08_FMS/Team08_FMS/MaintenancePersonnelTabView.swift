@@ -28,7 +28,7 @@ struct MaintenancePersonnelTabView: View {
             VStack {
                 // Header
                 HStack {
-                    Text("Dashboard")
+                    Text("Home")
                         .font(.title)
                         .fontWeight(.bold)
                     Spacer()
@@ -255,8 +255,11 @@ struct ContactRow: View {
     
     var body: some View {
         HStack {
+            Text(title)
+                .fontWeight(.medium)
             Spacer()
             Text(value)
+                .foregroundColor(.gray)
         }
     }
 }

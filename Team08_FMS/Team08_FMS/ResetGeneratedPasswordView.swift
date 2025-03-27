@@ -66,20 +66,35 @@ struct ResetGeneratedPasswordView: View {
         }
     }
     
-    // Function to update password in Supabase
-    func resetPassword() {
+    // Validates the password based on given criteria.
+    private func isValidPassword(_ password: String) -> Bool {
+        let passwordRegex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[#$@!%&*?])[A-Za-z\\d#$@!%&*?]{6,}$"
+        return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
+    }
+    
+    // Function to update password in Supabase.
+    private func resetPassword() {
+        // Check length is at least 6 characters.
         guard newPassword.count >= 6 else {
             message = "Password must be at least 6 characters long."
             showAlert = true
             return
         }
         
+        // Validate the password using regex.
+        guard isValidPassword(newPassword) else {
+            message = "Password must include at least one uppercase letter, one lowercase letter, one digit, and one special character."
+            showAlert = true
+            return
+        }
+        
+        // Check the two password fields match.
         guard newPassword == confirmPassword else {
             message = "Passwords do not match."
             showAlert = true
             return
         }
-
+        
         Task {
             isLoading = true
             let success = await SupabaseDataController.shared.updatePassword(newPassword: newPassword)
@@ -91,6 +106,7 @@ struct ResetGeneratedPasswordView: View {
         }
     }
 }
+
 
 struct ResetPasswordView: View {
     @Environment(\.presentationMode) var presentationMode

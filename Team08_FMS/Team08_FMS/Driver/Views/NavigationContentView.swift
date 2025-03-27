@@ -12,6 +12,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var remainingTime: TimeInterval = 0
     @Published var nextStepDistance: CLLocationDistance = 0
     @Published var alternativeRoutes: [MKRoute] = []
+    @Published var recentLocations: [CLLocation] = [] // Track recent locations for smooth animation
     
     private let locationManager: CLLocationManager
     private let _destination: CLLocationCoordinate2D
@@ -21,7 +22,8 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // Track both the last update time and the last location
     private var lastLocationUpdate: Date = Date()
     private(set) var lastLocation: CLLocation?
-    private let updateThreshold: TimeInterval = 1.0 // Update every second
+    private let updateThreshold: TimeInterval = 0.5 // Update every half second for smoother tracking
+    private let locationHistoryLimit = 5 // Keep last 5 locations for smooth animation
     
     // Vehicle specifications
     enum VehicleType {
@@ -100,8 +102,20 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         lastLocation = location
         userLocation = location.coordinate
         
+        // Add to recent locations and maintain history limit
+        recentLocations.append(location)
+        if recentLocations.count > locationHistoryLimit {
+            recentLocations.removeFirst()
+        }
+        
         // Update route if needed
         updateRoute(from: location)
+        
+        // Calculate speed and update ETA
+        if recentLocations.count >= 2 {
+            let speed = calculateCurrentSpeed()
+            updateETABasedOnSpeed(speed)
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
@@ -486,6 +500,38 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Cap to a reasonable number if we have too many
         if alternativeRoutes.count > 5 {
             alternativeRoutes = Array(alternativeRoutes.prefix(5))
+        }
+    }
+    
+    private func calculateCurrentSpeed() -> CLLocationSpeed {
+        guard recentLocations.count >= 2 else { return 0 }
+        
+        let lastTwo = Array(recentLocations.suffix(2))
+        let distance = lastTwo[0].distance(from: lastTwo[1])
+        let time = lastTwo[1].timestamp.timeIntervalSince(lastTwo[0].timestamp)
+        
+        return distance / time // meters per second
+    }
+    
+    private func updateETABasedOnSpeed(_ speed: CLLocationSpeed) {
+        guard let route = route else { return }
+        
+        // Only update if we're moving (speed > 0.5 m/s or about 1.8 km/h)
+        if speed > 0.5 {
+            // Convert speed to km/h for easier calculation
+            let speedKmh = speed * 3.6
+            
+            // Update remaining time based on current speed and remaining distance
+            if remainingDistance > 0 {
+                remainingTime = (remainingDistance * 1000) / speed // Convert km to m for calculation
+            }
+            
+            // Update next step distance if we have a current step
+            if let currentStep = currentStep,
+               let userLocation = userLocation {
+                let stepCoord = currentStep.polyline.coordinate
+                nextStepDistance = calculateDistance(from: userLocation, to: stepCoord)
+            }
         }
     }
 }

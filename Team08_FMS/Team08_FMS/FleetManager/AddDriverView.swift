@@ -20,15 +20,65 @@ struct AddDriverView: View {
     
     let licenseTypes = ["Class A CDL", "Class B CDL", "Class C CDL", "Non-CDL"]
     
-    private var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !experience.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !salary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        Double(salary) ?? 0 > 0 &&
-        Int(experience) != nil &&
+    // MARK: - Touched States for Inline Validation
+    @State private var nameEdited = false
+    @State private var experienceEdited = false
+    @State private var phoneEdited = false
+    @State private var emailEdited = false
+    @State private var licenseNumberEdited = false
+    @State private var salaryEdited = false
+    
+    // Save state to prevent duplicate taps.
+    @State private var isSaving = false
+    
+    // MARK: - Field Validations
+    private var isNameValid: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Only letters and spaces allowed.
+        let regex = "^[A-Za-z ]+$"
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+    
+    private var isExperienceValid: Bool {
+        if let exp = Int(experience), exp >= 0 {
+            return true
+        }
+        return false
+    }
+    
+    private var isPhoneValid: Bool {
+        let trimmed = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && Int(trimmed) != nil
+    }
+    
+    private var isEmailValid: Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        // Basic email regex.
+        let regex = #"^\S+@\S+\.\S+$"#
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmed)
+    }
+    
+    private var isLicenseValid: Bool {
         !licenseNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
+    private var isSalaryValid: Bool {
+        if let sal = Double(salary), sal > 0 {
+            return true
+        }
+        return false
+    }
+    
+    // Overall form validity.
+    private var isFormValid: Bool {
+        isNameValid &&
+        isExperienceValid &&
+        isPhoneValid &&
+        isEmailValid &&
+        isLicenseValid &&
+        isSalaryValid
     }
     
     var body: some View {
@@ -36,7 +86,17 @@ struct AddDriverView: View {
             Form {
                 // Basic Information
                 Section("Basic Information") {
-                    TextField("Full Name", text: $name)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Full Name", text: $name)
+                            .onChange(of: name) { _, _ in nameEdited = true }
+                        if nameEdited && !isNameValid {
+                            Text("Name cannot be empty and must contain only letters and spaces.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    // Optionally, auto-generate avatar initials from name.
                     TextField("Avatar (optional)", text: $avatar)
                         .onChange(of: name) { _, _ in
                             if avatar.isEmpty {
@@ -48,34 +108,75 @@ struct AddDriverView: View {
                 
                 // Contact Information
                 Section("Contact Information") {
-                    TextField("Phone Number", text: $phoneNumber)
-                        .keyboardType(.phonePad)
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Phone Number", text: $phoneNumber)
+                            .keyboardType(.phonePad)
+                            .onChange(of: phoneNumber) { _, _ in phoneEdited = true }
+                        if phoneEdited && !isPhoneValid {
+                            Text("Phone must be numeric and cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Email", text: $email)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                            .onChange(of: email) { _, _ in emailEdited = true }
+                        if emailEdited && !isEmailValid {
+                            Text("Enter a valid email address.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
                     TextField("Address", text: $address)
                 }
                 
                 // Professional Details
                 Section("Professional Details") {
-                    TextField("Experience (years)", text: $experience)
-                        .keyboardType(.numberPad)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Experience (years)", text: $experience)
+                            .keyboardType(.numberPad)
+                            .onChange(of: experience) { _, _ in experienceEdited = true }
+                        if experienceEdited && !isExperienceValid {
+                            Text("Experience must be a nonnegative number.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
                     
-                    TextField("Driver License Number", text: $licenseNumber)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Driver License Number", text: $licenseNumber)
+                            .onChange(of: licenseNumber) { _, _ in licenseNumberEdited = true }
+                        if licenseNumberEdited && !isLicenseValid {
+                            Text("License number cannot be empty.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
                     
                     DatePicker("License Expiration", selection: $licenseExpiration, displayedComponents: .date)
                 }
                 
                 // Compensation
                 Section("Compensation") {
-                    TextField("Monthly Salary", text: $salary)
-                        .keyboardType(.decimalPad)
-                        .onChange(of: salary) { _, newValue in
-                            let filtered = newValue.filter { "0123456789.".contains($0) }
-                            if filtered != newValue {
-                                salary = filtered
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Monthly Salary", text: $salary)
+                            .keyboardType(.decimalPad)
+                            .onChange(of: salary) { newValue, _ in
+                                // Filter non-numeric characters (keeping one dot).
+                                let filtered = newValue.filter { "0123456789.".contains($0) }
+                                if filtered != newValue {
+                                    salary = filtered
+                                }
+                                salaryEdited = true
                             }
+                        if salaryEdited && !isSalaryValid {
+                            Text("Salary must be a positive number.")
+                                .font(.caption)
+                                .foregroundColor(.red)
                         }
+                    }
                 }
             }
             .navigationTitle("Add Driver")
@@ -90,22 +191,25 @@ struct AddDriverView: View {
                     Button("Save") {
                         saveDriver()
                     }
-                    .disabled(!isFormValid)
+                    .disabled(!isFormValid || isSaving)
                 }
             }
         }
     }
     
     private func saveDriver() {
+        guard !isSaving else { return }
+        isSaving = true
         Task {
             guard let salaryDouble = Double(salary),
                   let experienceInt = Int(experience),
-                let phoneNumberInt = Int(phoneNumber) else {
-                print("Invalid salary or experience format.")
+                  let phoneNumberInt = Int(phoneNumber) else {
+                print("Invalid salary, experience, or phone number format.")
+                isSaving = false
                 return
             }
             
-            // Create a new Driver instance. Make sure your Driver model conforms to Codable.
+            // Create a new Driver instance. (Make sure your Driver model conforms to Codable.)
             var newDriver = Driver(
                 userID: UUID(),
                 name: name,
@@ -123,21 +227,22 @@ struct AddDriverView: View {
                 status: .available
             )
             
-            Task {
-                do {
-                    guard let signUpID = await supabase.signUp(name: newDriver.name, email: newDriver.email, phoneNo: newDriver.phoneNumber, role: "driver") else { return }
-                    newDriver.userID = signUpID
-                    // Call the SupabaseDataController function to insert the driver
-                    try await supabase.insertDriver(driver: newDriver, password: AppDataController.shared.randomPasswordGenerator(length: 6))
-                    await supabase.setUserSession()
-                    await MainActor.run {
-                        crewDataController.update()
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                } catch {
-                    print("Error saving driver: \(error.localizedDescription)")
+            do {
+                guard let signUpID = await supabase.signUp(name: newDriver.name, email: newDriver.email, phoneNo: newDriver.phoneNumber, role: "driver") else {
+                    isSaving = false
+                    return
                 }
+                newDriver.userID = signUpID
+                try await supabase.insertDriver(driver: newDriver, password: AppDataController.shared.randomPasswordGenerator(length: 6))
+                await supabase.setUserSession()
+                await MainActor.run {
+                    crewDataController.update()
+                    presentationMode.wrappedValue.dismiss()
+                }
+            } catch {
+                print("Error saving driver: \(error.localizedDescription)")
             }
+            isSaving = false
         }
     }
 }
