@@ -3,9 +3,6 @@ import MapKit
 import AVFoundation
 import CoreLocation
 
-// Import custom components
-import SwiftUI
-
 struct DriverTabView: View {
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
