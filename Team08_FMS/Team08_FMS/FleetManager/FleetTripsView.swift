@@ -305,6 +305,15 @@ struct TripCardView: View {
         .sheet(isPresented: $showingDetails) {
             TripDetailView(trip: trip)
         }
+        .contextMenu {
+            if trip.status == .pending || trip.status == .assigned {
+                Button(role: .destructive) {
+    //                showingDeleteAlert = true
+                } label: {
+                    Label("Delete Trip", systemImage: "trash")
+                }
+            }
+        }
         .onAppear {
             crewController.update()
         }
@@ -513,9 +522,16 @@ struct TripDetailView: View {
             .navigationTitle("Trip Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
                         dismiss()
+                    }
+                }
+                if trip.status == .assigned || trip.status == .pending {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Edit") {
+                            // handle operations here
+                        }
                     }
                 }
             }
