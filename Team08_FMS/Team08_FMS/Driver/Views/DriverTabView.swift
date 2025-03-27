@@ -100,9 +100,23 @@ struct DriverTabView: View {
 
                                     // Upcoming Trips Section
                                     VStack(alignment: .leading, spacing: 20) {
-                                        Text("Upcoming Trips")
-                                            .font(.system(size: 24, weight: .bold))
-                                            .padding(.horizontal)
+                                        HStack {
+                                            Text("Upcoming Trips")
+                                                .font(.system(size: 24, weight: .bold))
+                                            
+                                            if !tripController.upcomingTrips.isEmpty {
+                                                Text("\(tripController.upcomingTrips.count)")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 4)
+                                                    .background(Color.blue)
+                                                    .cornerRadius(12)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal)
 
                                         if tripController.upcomingTrips.isEmpty {
                                             emptyUpcomingTripsView
@@ -951,7 +965,7 @@ struct UpcomingTripRow: View {
                 // Pickup location
                 if let pickup = trip.pickup {
                     HStack {
-                        Image(systemName: "mappin.circle.fill")
+                        Image(systemName: "location.fill")
                             .foregroundColor(.red)
                         Text("Pickup:")
                             .foregroundColor(.gray)
@@ -959,29 +973,16 @@ struct UpcomingTripRow: View {
                             .foregroundColor(.black)
                     }
                 }
-                
-                // Estimated Fuel Cost
-                if let notes = trip.notes,
-                   let fuelCost = notes.components(separatedBy: "Estimated Fuel Cost:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) {
-                    HStack {
-                        Image(systemName: "fuelpump.fill")
-                            .foregroundColor(.green)
-                        Text("Est. Fuel Cost:")
-                            .foregroundColor(.gray)
-                        Text(fuelCost)
-                            .foregroundColor(.black)
-                    }
-                }
             }
         }
-        .padding(16)
+        .padding()
         .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
-        .alert("Error", isPresented: $showingAlert) {
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text(errorMessage)
+            Text("You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip.")
         }
     }
 }
@@ -1251,7 +1252,7 @@ struct QueuedTripRow: View {
                             try await tripController.startTrip(trip: trip)
                             onStart()
                         } catch {
-                            alertMessage = error.localizedDescription
+                            alertMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
                             showingAlert = true
                         }
                     }
@@ -1291,7 +1292,7 @@ struct QueuedTripRow: View {
                 secondaryButton: .cancel()
             )
         }
-        .alert("Error", isPresented: $showingAlert) {
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)
