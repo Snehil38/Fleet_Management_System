@@ -7,6 +7,7 @@ struct NavigationMapView: UIViewRepresentable {
     @Binding var route: MKRoute?
     @Binding var userHeading: Double
     let followsUserLocation: Bool
+    @Binding var isRouteCompleted: Bool
     
     // For updating ETA and distance
     var onLocationUpdate: ((CLLocation) -> Void)?
@@ -20,6 +21,7 @@ struct NavigationMapView: UIViewRepresentable {
         enum AnnotationType {
             case source
             case destination
+            case completed
         }
         
         init(coordinate: CLLocationCoordinate2D, title: String?, subtitle: String? = nil, type: AnnotationType) {
@@ -78,8 +80,11 @@ struct NavigationMapView: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: MKMapView, context: Context) {
-        // Update route overlay
-        if let route = route {
+        // Update route overlay based on completion status
+        if isRouteCompleted {
+            mapView.removeOverlays(mapView.overlays)
+            context.coordinator.currentRouteId = nil
+        } else if let route = route {
             let currentRouteId = route.polyline.hash
             if context.coordinator.currentRouteId != currentRouteId {
                 mapView.removeOverlays(mapView.overlays)
@@ -107,9 +112,6 @@ struct NavigationMapView: UIViewRepresentable {
                     }
                 }
             }
-        } else {
-            mapView.removeOverlays(mapView.overlays)
-            context.coordinator.currentRouteId = nil
         }
         
         // Update user location and camera
@@ -205,7 +207,12 @@ struct NavigationMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if annotation is MKUserLocation {
                 let annotationView = MKAnnotationView(annotation: annotation, reuseIdentifier: "UserLocation")
-                annotationView.image = UIImage(systemName: "car.fill")
+                // Update car icon based on route completion
+                if parent.isRouteCompleted {
+                    annotationView.image = UIImage(systemName: "checkmark.circle.fill")?.withTintColor(.systemGreen, renderingMode: .alwaysOriginal)
+                } else {
+                    annotationView.image = UIImage(systemName: "car.fill")
+                }
                 annotationView.canShowCallout = true
                 return annotationView
             }
@@ -236,28 +243,29 @@ struct NavigationMapView: UIViewRepresentable {
             // Enhanced annotation styling
             switch mapAnnotation.type {
             case .source:
-                annotationView?.markerTintColor = .systemBlue
-                annotationView?.glyphImage = UIImage(systemName: "location.fill")
+                if parent.isRouteCompleted {
+                    annotationView?.markerTintColor = .systemGreen
+                    annotationView?.glyphImage = UIImage(systemName: "checkmark.circle.fill")
+                } else {
+                    annotationView?.markerTintColor = .systemBlue
+                    annotationView?.glyphImage = UIImage(systemName: "location.fill")
+                }
                 annotationView?.animatesWhenAdded = true
                 
-                // Add pulse animation
-                let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
-                pulseAnimation.duration = 1.0
-                pulseAnimation.fromValue = 1.0
-                pulseAnimation.toValue = 1.2
-                pulseAnimation.autoreverses = true
-                pulseAnimation.repeatCount = .infinity
-                annotationView?.layer.add(pulseAnimation, forKey: "pulse")
-                
             case .destination:
-                annotationView?.markerTintColor = .systemRed
-                annotationView?.glyphImage = UIImage(systemName: "flag.fill")
+                if parent.isRouteCompleted {
+                    annotationView?.markerTintColor = .systemGreen
+                    annotationView?.glyphImage = UIImage(systemName: "flag.checkered.circle.fill")
+                } else {
+                    annotationView?.markerTintColor = .systemRed
+                    annotationView?.glyphImage = UIImage(systemName: "flag.fill")
+                }
                 annotationView?.displayPriority = .required
                 
-                // Add bounce animation
-                UIView.animate(withDuration: 0.6, delay: 0, options: [.autoreverse, .repeat]) {
-                    annotationView?.transform = CGAffineTransform(translationX: 0, y: -8)
-                }
+            case .completed:
+                annotationView?.markerTintColor = .systemGreen
+                annotationView?.glyphImage = UIImage(systemName: "checkmark.circle.fill")
+                annotationView?.displayPriority = .required
             }
             
             // Add shadow for depth
