@@ -123,6 +123,7 @@ class SupabaseDataController: ObservableObject {
             await fetchUserRole(userID: session!.user.id)
             await MainActor.run {
                 self.isAuthenticated = true
+                userID = supabase.auth.currentUser?.id
             }
             print("Auto-login successful")
         } catch {

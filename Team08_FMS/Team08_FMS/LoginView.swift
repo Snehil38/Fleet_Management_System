@@ -58,6 +58,7 @@ struct LoginView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @FocusState private var isPasswordFocused: Bool
+    @State private var passwordFieldHasBeenFocused: Bool = false
     @StateObject private var dataController = SupabaseDataController.shared
     @State private var isLoading: Bool = false
     @State private var navigateToVerify = false
@@ -106,13 +107,18 @@ struct LoginView: View {
                         .padding(.trailing, 30)
                 }
             }
+            .onChange(of: isPasswordFocused) { newValue in
+                if newValue {
+                    passwordFieldHasBeenFocused = true
+                }
+            }
             
-            // Only display the password criteria view when the password field is focused.
-            if isPasswordFocused {
+            // Show criteria view if the field has been focused at least once.
+            if passwordFieldHasBeenFocused {
                 PasswordCriteriaView(password: password)
                     .padding(.horizontal, 20)
                     .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.spring(response: 0.7, dampingFraction: 0.8, blendDuration: 0.5), value: isPasswordFocused)
+                    .animation(.spring(response: 0.7, dampingFraction: 0.8, blendDuration: 0.5), value: password)
             }
             
             Button(action: {
@@ -169,6 +175,7 @@ struct LoginView: View {
         return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
     }
 }
+
 
 struct PasswordCriteriaView: View {
     let password: String

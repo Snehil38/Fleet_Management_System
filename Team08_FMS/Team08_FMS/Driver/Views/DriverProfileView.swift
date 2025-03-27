@@ -235,7 +235,7 @@ struct DriverProfileView: View {
     }
     
     private var resetPasswordButton: some View {
-        NavigationLink(destination: ResetPasswordView(userID: supabaseDataController.userID!)) {
+        NavigationLink(destination: ResetPasswordView()) {
             HStack {
                 Image(systemName: "lock.rotation")
                     .foregroundColor(.blue)

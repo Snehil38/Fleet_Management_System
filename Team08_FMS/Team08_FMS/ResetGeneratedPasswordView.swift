@@ -125,7 +125,6 @@ struct ResetGeneratedPasswordView: View {
 }
 
 struct ResetPasswordView: View {
-    let userID: UUID
     @Environment(\.presentationMode) var presentationMode
     @State private var currentPassword = ""
     @State private var newPassword = ""
