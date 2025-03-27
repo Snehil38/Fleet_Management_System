@@ -4,19 +4,17 @@ import CoreLocation
 struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
-    @State private var selectedFilter: TripFilter = .all
+    @State private var selectedFilter: TripFilter = .upcoming
     @State private var showingError = false
     
     enum TripFilter {
-        case all, current, upcoming, delivered
+        case upcoming, delivered
     }
     
     var body: some View {
         VStack(spacing: 0) {
             // Filter Picker
             Picker("Filter", selection: $selectedFilter) {
-                Text("All").tag(TripFilter.all)
-                Text("Current").tag(TripFilter.current)
                 Text("Upcoming").tag(TripFilter.upcoming)
                 Text("Delivered").tag(TripFilter.delivered)
             }
@@ -92,10 +90,6 @@ struct TripsView: View {
     
     private var emptyStateIcon: String {
         switch selectedFilter {
-        case .all:
-            return "car.circle"
-        case .current:
-            return "car.circle.fill"
         case .upcoming:
             return "clock.arrow.circlepath"
         case .delivered:
@@ -105,10 +99,6 @@ struct TripsView: View {
     
     private var emptyStateTitle: String {
         switch selectedFilter {
-        case .all:
-            return "No Trips Found"
-        case .current:
-            return "No Current Trips"
         case .upcoming:
             return "No Upcoming Trips"
         case .delivered:
@@ -118,10 +108,6 @@ struct TripsView: View {
     
     private var emptyStateMessage: String {
         switch selectedFilter {
-        case .all:
-            return "There are no trips assigned to you at the moment."
-        case .current:
-            return "You don't have any trips in progress."
         case .upcoming:
             return "You don't have any upcoming trips scheduled."
         case .delivered:
@@ -131,30 +117,6 @@ struct TripsView: View {
     
     private var filteredTrips: [Trip] {
         switch selectedFilter {
-        case .all:
-            var allTrips: [Trip] = []
-            if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                allTrips.append(currentTrip)
-            }
-            
-            // Only include upcoming trips if driver is available
-            if availabilityManager.isAvailable {
-                allTrips.append(contentsOf: tripController.upcomingTrips)
-            }
-            
-            // Add delivered trips
-            allTrips.append(contentsOf: tripController.recentDeliveries.map { delivery in
-                createTripFromDelivery(delivery)
-            })
-            
-            return allTrips
-        case .current:
-            if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                return [currentTrip]
-            }
-            return []
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
@@ -227,7 +189,10 @@ struct TripsView: View {
 
 struct TripCard: View {
     let trip: Trip
+    @StateObject private var tripController = TripDataController.shared
     @State private var showingDetails = false
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -249,56 +214,86 @@ struct TripCard: View {
                 }
             }
             
-            Text(trip.name)
+            Text(trip.destination)
                 .font(.title3)
                 .fontWeight(.semibold)
             
-            HStack(spacing: 4) {
-                Image(systemName: "mappin.circle.fill")
-                    .foregroundColor(.red)
-                    .font(.system(size: 14))
-                
-                Text(trip.destination)
+            if let pickup = trip.pickup {
+                Text(pickup)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.gray)
             }
             
-            if !trip.distance.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "ruler.fill")
-                        .foregroundColor(.blue)
-                        .font(.system(size: 14))
-                    
-                    Text(trip.distance)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                // Cargo Type
+                if let notes = trip.notes,
+                   let cargoType = notes.components(separatedBy: "Cargo Type:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "shippingbox")
+                            .foregroundColor(.orange)
+                            .font(.system(size: 14))
+                        Text("Cargo Type:")
+                            .foregroundColor(.gray)
+                        Text(cargoType)
+                    }
+                    .font(.subheadline)
+                }
+                
+                // Distance
+                if !trip.distance.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.left.and.right")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 14))
+                        Text("Distance:")
+                            .foregroundColor(.gray)
+                        Text(trip.distance)
+                    }
+                    .font(.subheadline)
+                }
+                
+                // Pickup
+                if let pickup = trip.pickup {
+                    HStack(spacing: 4) {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(.red)
+                            .font(.system(size: 14))
+                        Text("Pickup:")
+                            .foregroundColor(.gray)
+                        Text(pickup)
+                    }
+                    .font(.subheadline)
                 }
             }
             
-            // Additional information for delivered trips
-            if trip.status == .delivered {
-                Divider()
-                
+            // Action buttons based on status
+            if trip.status != .delivered {
                 HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Vehicle:")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text(trip.vehicleDetails.licensePlate)
+                    Button(action: { showingDetails = true }) {
+                        Text("View Details")
                             .font(.subheadline)
+                            .foregroundColor(.blue)
                     }
                     
                     Spacer()
                     
-                    Button(action: { showingDetails = true }) {
-                        Text("Details")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                    Button(action: {
+                        Task {
+                            do {
+                                try await tripController.startTrip(trip: trip)
+                            } catch {
+                                alertMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
+                                showingAlert = true
+                            }
+                        }
+                    }) {
+                        Text("Start Trip")
+                            .font(.system(.subheadline, weight: .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .background(Color.blue)
-                            .cornerRadius(8)
+                            .cornerRadius(20)
                     }
                 }
             } else {
@@ -315,6 +310,11 @@ struct TripCard: View {
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .sheet(isPresented: $showingDetails) {
             TripDetailsView(trip: trip)
+        }
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
         }
     }
     
@@ -495,8 +495,3 @@ struct TripDetailRow: View {
     }
 }
 
-#Preview {
-    NavigationView {
-        TripsView()
-    }
-} 

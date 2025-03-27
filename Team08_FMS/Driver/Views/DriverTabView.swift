@@ -139,26 +139,68 @@ struct DriverTabView: View {
             NavigationView {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 24) {
-                        // ... existing content ...
-                        ActionButton(
-                            title: "Mark Delivered",
-                            icon: "checkmark.circle.fill",
-                            color: .green
-                        ) {
-                            if !trip.hasCompletedPreTrip {
-                                alertMessage = "Please complete pre-trip inspection before marking as delivered"
-                                showingAlert = true
-                            } else if trip.hasCompletedPostTrip {
-                                // Already completed post-trip
-                                // Use Task to handle the async call
-                                Task {
-                                    await MainActor.run {
-                                        markCurrentTripDelivered()
+                        if let trip = currentTrip {
+                            // Vehicle Details Section
+                            NavigationLink(destination: VehicleDetailsView(vehicle: trip.vehicleDetails)) {
+                                VehicleDetailsCard(vehicle: trip.vehicleDetails)
+                            }
+                            
+                            // Trip Details
+                            TripDetailsCard(trip: trip)
+                            
+                            // Action Buttons
+                            HStack(spacing: 16) {
+                                ActionButton(
+                                    title: "Start Navigation",
+                                    icon: "location.fill",
+                                    color: trip.hasCompletedPreTrip ? .blue : .gray
+                                ) {
+                                    if !trip.hasCompletedPreTrip {
+                                        alertMessage = "Please complete pre-trip inspection before starting navigation"
+                                        showingAlert = true
+                                    } else {
+                                        // Handle navigation start
                                     }
                                 }
-                            } else {
-                                showingPostTripInspection = true
+                                
+                                ActionButton(
+                                    title: "Pre-Trip Inspection",
+                                    icon: "checklist",
+                                    color: trip.hasCompletedPreTrip ? .gray : .orange
+                                ) {
+                                    if !trip.hasCompletedPreTrip {
+                                        showingPreTripInspection = true
+                                    }
+                                }
                             }
+                            
+                            // Show SOS button only after pre-trip inspection is completed
+                            if trip.hasCompletedPreTrip {
+                                SOSButton()
+                                    .padding(.horizontal)
+                            }
+                            
+                            ActionButton(
+                                title: "Mark Delivered",
+                                icon: "checkmark.circle.fill",
+                                color: .green
+                            ) {
+                                if !trip.hasCompletedPreTrip {
+                                    alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                                    showingAlert = true
+                                } else if trip.hasCompletedPostTrip {
+                                    Task {
+                                        await MainActor.run {
+                                            markCurrentTripDelivered()
+                                        }
+                                    }
+                                } else {
+                                    showingPostTripInspection = true
+                                }
+                            }
+                        } else {
+                            // No active trip view
+                            NoActiveTripsView()
                         }
                     }
                     .padding(.top, 8)

@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import Supabase
+import Combine
 
 enum TripError: Error, Equatable {
     case fetchError(String)
@@ -27,6 +28,11 @@ class TripDataController: ObservableObject {
     @Published var recentDeliveries: [DeliveryDetails] = []
     @Published var error: TripError?
     @Published var isLoading = false
+    @Published var isInSourceRegion = false
+    @Published var isInDestinationRegion = false
+    
+    private var locationManager = CLLocationManager()
+    private let geofenceRadius: CLLocationDistance = 100.0 // 100 meters
     private var driverId: UUID?
     private var allTrips: [Trip] = []
     
@@ -36,6 +42,91 @@ class TripDataController: ObservableObject {
         // Start fetching data immediately
         Task {
             await refreshTrips()
+        }
+    }
+    
+    private func setupLocationManager() {
+        //        locationManager.delegate = self
+        locationManager.requestAlwaysAuthorization()
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.distanceFilter = 50 // Update only when moving 50m
+        locationManager.pausesLocationUpdatesAutomatically = true
+        locationManager.activityType = .automotiveNavigation
+    }
+    
+    func startMonitoringRegions() {
+        stopMonitoringRegions() // Clean up before starting new regions
+        guard let currentTrip = currentTrip else { return }
+        
+        if CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) {
+            
+            let sourceRegion = CLCircularRegion(
+                center: currentTrip.sourceCoordinate,
+                radius: geofenceRadius,
+                identifier: "sourceRegion"
+            )
+            
+            let destinationRegion = CLCircularRegion(
+                center: currentTrip.destinationCoordinate,
+                radius: geofenceRadius,
+                identifier: "destinationRegion"
+            )
+            
+            [sourceRegion, destinationRegion].forEach { region in
+                if !locationManager.monitoredRegions.contains(where: { $0.identifier == region.identifier }) {
+                    locationManager.startMonitoring(for: region)
+                    print("Started monitoring: \(region.identifier)")
+                }
+            }
+            
+            locationManager.startUpdatingLocation()
+        }
+        else {
+            print("Geofencing is not supported on this device.")
+        }
+    }
+    
+    func stopMonitoringRegions() {
+        locationManager.monitoredRegions.forEach { region in
+            locationManager.stopMonitoring(for: region)
+        }
+        print("Stopped monitoring all regions.")
+    }
+    
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .authorizedAlways:
+            startMonitoringRegions()
+        case .denied:
+            print("Location permissions denied. Please enable it in settings.")
+        case .notDetermined:
+            manager.requestAlwaysAuthorization()
+        case .restricted:
+            print("Location permissions are restricted.")
+        default:
+            stopMonitoringRegions()
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Location error: \(error.localizedDescription)")
+        if (error as NSError).code == CLError.denied.rawValue {
+            print("Location access denied. Ask the user to enable permissions.")
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
+        guard let circularRegion = region as? CLCircularRegion else { return }
+        switch circularRegion.identifier {
+        case "sourceRegion":
+            isInSourceRegion = true
+            print("Entered source region")
+            //        case "destinationRegion":
+            //            isInDestinationRegion = true
+            //            print("Entered destination region")
+            //            markTripAsDelivered(trip: currentTrip)
+        default:
+            print("Entered unknown region: \(circularRegion.identifier)")
         }
     }
     
@@ -376,7 +467,8 @@ class TripDataController: ObservableObject {
                           let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
                         return "N/A"
                     }
-                    return String(notes[fuelRange.upperBound..<endRange.lowerBound])
+                    let dist = (Double(parsedDistance) ?? 0)*0.5
+                    return "\(dist) $"
                 }
             }
             

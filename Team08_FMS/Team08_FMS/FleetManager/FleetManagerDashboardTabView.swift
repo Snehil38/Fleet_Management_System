@@ -32,9 +32,11 @@ struct FleetManagerDashboardTabView: View {
     private var totalMonthlySalaries: Double {
         dataManager.totalSalaryExpenses
     }
-
+    private var totalFuelExpenses: Double {
+        dataManager.totalFuelExpenses
+    }
     private var totalExpenses: Double {
-        totalMonthlySalaries  // Now total expenses is just the salary expenses
+        totalMonthlySalaries + totalFuelExpenses  // Now total expenses is just the salary expenses
     }
 
     private var totalRevenue: Double {
@@ -792,7 +794,7 @@ struct AddTripView: View {
             let costPerKm = 5.0 // $5 per km as requested
             
             self.tripCost = self.distance * costPerKm
-            self.fuelCost = self.tripCost * fuelRatio
+            self.fuelCost = (self.distance * 0.8) + 50.0
             
             // Calculate estimated travel time and update delivery date
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
@@ -814,8 +816,8 @@ struct AddTripView: View {
         let fuelRatio = 0.2 // 20% of cost is fuel
         let costPerKm = 5.0 // $5 per km as requested
         
-        tripCost = distance * costPerKm
-        fuelCost = tripCost * fuelRatio
+        tripCost = (distance * 0.8) + 50.0
+        fuelCost = (distance * 0.8) + 50.0
         
         // Calculate estimated travel time and update delivery date
         let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
@@ -831,8 +833,7 @@ struct AddTripView: View {
         Task {
             guard let vehicle = selectedVehicle else { return }
             
-//            let tripName = "TRP-\(UUID().uuidString.prefix(8))"
-            let estimatedHours = distance / 40.0 // Convert to hours
+            let estimatedHours = distance / 40.0
             
             do {
                 let success = try await supabaseDataController.createTrip(
@@ -1024,14 +1025,24 @@ struct MapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         mapView.region = region
         
-        // Enhanced map with maximum detail
-        mapView.mapType = .mutedStandard // Using muted standard for a cleaner look with all details
-        mapView.pointOfInterestFilter = .includingAll
+        // Set map type to standard for better visibility of buildings and blocks
+        mapView.mapType = .standard
+        
+        // Configure map features
         mapView.showsBuildings = true
         mapView.showsTraffic = true
-        mapView.showsPointsOfInterest = true
-        mapView.showsCompass = true
-        mapView.showsScale = true
+        mapView.pointOfInterestFilter = .includingAll
+        
+        // Apply custom map styling for better building and block visibility
+        let mapConfiguration = MKStandardMapConfiguration()
+        mapConfiguration.pointOfInterestFilter = .includingAll
+        mapConfiguration.showsTraffic = true
+        
+        // Set emphasis style to muted for better building visibility
+        mapConfiguration.emphasisStyle = .muted
+        
+        // Enable all map features for maximum detail
+        mapView.preferredConfiguration = mapConfiguration
         
         return mapView
     }
