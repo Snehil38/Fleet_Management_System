@@ -4,6 +4,8 @@ import UserNotifications
 
 class AppDelegate: NSObject, UIApplicationDelegate, CLLocationManagerDelegate, UNUserNotificationCenterDelegate {
     let locationManager = CLLocationManager()
+    var window: UIWindow?
+    let fleetManager = FleetManagerTabView() // FleetManager class manages event listening
     
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -23,7 +25,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, CLLocationManagerDelegate, U
             } else if let error = error {
                 print("Notification permission error: \(error.localizedDescription)")
             }
-        }
+        } // Start listening as soon as the app launches
         
         return true
     }

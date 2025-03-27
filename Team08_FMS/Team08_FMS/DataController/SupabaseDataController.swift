@@ -409,6 +409,21 @@ class SupabaseDataController: ObservableObject {
         return userID
     }
     
+    func subscribeToGeofenceEvents() {
+        Task {
+            let myChannel = supabase.channel("db-changes")
+            let changes = myChannel.postgresChange(AnyAction.self, schema: "public", table: "geofence_events")
+            await myChannel.subscribe()
+            for await change in changes {
+              switch change {
+              case .insert(let action): print(action)
+              case .update(let action): print(action)
+              case .delete(let action): print(action)
+              }
+            }
+        }
+    }
+    
     // MARK: - Fetch User Role
     private func fetchUserRole(userID: UUID) async {
         do {

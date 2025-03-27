@@ -46,7 +46,12 @@ struct FleetManagerTabView: View {
         .task {
             vehicleManager.loadVehicles()
             CrewDataController.shared.update()
+            listenForGeofenceEvents()
         }
+    }
+    
+    func listenForGeofenceEvents() {
+        SupabaseDataController.shared.subscribeToGeofenceEvents()
     }
 }
 

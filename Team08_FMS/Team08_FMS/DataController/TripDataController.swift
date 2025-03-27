@@ -385,11 +385,6 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     func startTrip(trip: Trip) async throws {
         print("Starting trip \(trip.id)")
         
-        // Check if we can start the trip
-        guard isInSourceRegion else {
-            throw TripError.locationError("Cannot start trip: Vehicle must be in the source region")
-        }
-        
         // Check if there's already a trip in progress
         if let currentTrip = self.currentTrip {
             throw TripError.updateError("Cannot start a new trip while another trip is in progress")
@@ -423,11 +418,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 upcomingTrips.remove(at: index)
             }
             
-            // Start monitoring regions for the new trip
-            startMonitoringRegions()
-            
             // Refresh trips to ensure everything is in sync with server
             try await fetchTrips()
+            startMonitoringRegions()
             print("Trips refreshed after starting trip")
         } catch {
             print("Error starting trip: \(error)")
