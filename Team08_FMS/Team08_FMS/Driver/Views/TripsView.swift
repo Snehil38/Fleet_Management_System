@@ -4,19 +4,17 @@ import CoreLocation
 struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
-    @State private var selectedFilter: TripFilter = .all
+    @State private var selectedFilter: TripFilter = .upcoming
     @State private var showingError = false
     
     enum TripFilter {
-        case all, current, upcoming, delivered
+        case upcoming, delivered
     }
     
     var body: some View {
         VStack(spacing: 0) {
             // Filter Picker
             Picker("Filter", selection: $selectedFilter) {
-                Text("All").tag(TripFilter.all)
-                Text("Current").tag(TripFilter.current)
                 Text("Upcoming").tag(TripFilter.upcoming)
                 Text("Delivered").tag(TripFilter.delivered)
             }
@@ -99,10 +97,6 @@ struct TripsView: View {
     
     private var emptyStateIcon: String {
         switch selectedFilter {
-        case .all:
-            return "car.circle"
-        case .current:
-            return "car.circle.fill"
         case .upcoming:
             return "clock.arrow.circlepath"
         case .delivered:
@@ -112,10 +106,6 @@ struct TripsView: View {
     
     private var emptyStateTitle: String {
         switch selectedFilter {
-        case .all:
-            return "No Trips Found"
-        case .current:
-            return "No Current Trips"
         case .upcoming:
             return "No Upcoming Trips"
         case .delivered:
@@ -125,10 +115,6 @@ struct TripsView: View {
     
     private var emptyStateMessage: String {
         switch selectedFilter {
-        case .all:
-            return "There are no trips assigned to you at the moment."
-        case .current:
-            return "You don't have any trips in progress."
         case .upcoming:
             return "You don't have any upcoming trips scheduled."
         case .delivered:
@@ -138,30 +124,6 @@ struct TripsView: View {
     
     private var filteredTrips: [Trip] {
         switch selectedFilter {
-        case .all:
-            var allTrips: [Trip] = []
-            if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                allTrips.append(currentTrip)
-            }
-            
-            // Only include upcoming trips if driver is available
-            if availabilityManager.isAvailable {
-                allTrips.append(contentsOf: tripController.upcomingTrips)
-            }
-            
-            // Add delivered trips
-            allTrips.append(contentsOf: tripController.recentDeliveries.map { delivery in
-                createTripFromDelivery(delivery)
-            })
-            
-            return allTrips
-        case .current:
-            if let currentTrip = tripController.currentTrip,
-               currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                return [currentTrip]
-            }
-            return []
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
