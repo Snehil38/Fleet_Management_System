@@ -5,7 +5,7 @@ struct FleetManagerProfileView: View {
     @State private var fleetManager: FleetManager?
     @State private var showAlert = false
     @Environment(\.presentationMode) private var presentationMode
-
+    
     var body: some View {
         Group {
             if let fm = fleetManager {
@@ -15,6 +15,7 @@ struct FleetManagerProfileView: View {
                         personalInfo(for: fm)
                         contactInfo(for: fm)
                         workInfo()
+                        resetPasswordButton
                         logoutButton
                     }
                     .padding()
@@ -41,7 +42,9 @@ struct FleetManagerProfileView: View {
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { backButton }
-        .task { await loadFleetManagerData() }
+        .task {
+            await loadFleetManagerData()
+        }
     }
     
     // MARK: - View Components
@@ -124,6 +127,25 @@ struct FleetManagerProfileView: View {
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+    }
+    
+    /// New Reset Password button that navigates to ResetPasswordView.
+    private var resetPasswordButton: some View {
+        NavigationLink(destination: ResetPasswordView()) {
+            HStack {
+                Image(systemName: "lock.rotation")
+                    .foregroundColor(.blue)
+                Text("Reset Password")
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                Spacer()
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            .padding(.horizontal)
         }
     }
     

@@ -128,6 +128,7 @@ class SupabaseDataController: ObservableObject {
             await fetchUserRole(userID: session!.user.id)
             await MainActor.run {
                 self.isAuthenticated = true
+                userID = supabase.auth.currentUser?.id
             }
             print("Auto-login successful")
         } catch {
@@ -135,7 +136,6 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
-    
     func checkSession() async {
         do {
             let session = try await supabase.auth.session
@@ -465,6 +465,7 @@ class SupabaseDataController: ObservableObject {
                 .from("user_roles")
                 .select("role_id")
                 .eq("user_id", value: userID)
+                .eq("isDeleted", value: false)
                 .execute()
             
             struct UserRoleID: Codable {
@@ -939,15 +940,21 @@ class SupabaseDataController: ObservableObject {
     
     func softDeleteDriver(for userID: UUID) async {
         do {
-        let response = try await supabase
+            let response = try await supabase
             .from("driver")
             .update(["isDeleted": true])
             .eq("id", value: userID)
             .execute()
+            
+            let response2 = try await supabase
+                .from("user_roles")
+                .update(["isDeleted": true])
+                .eq("user_id", value: userID)
+                .execute()
         
-        let data = response.data
-        let jsonString = String(data: data, encoding: .utf8)
-        print("Update response data: \(jsonString ?? "")")
+            let data = response.data
+            let jsonString = String(data: data, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")")
         } catch {
             print("Exception updating driver status: \(error.localizedDescription)")
         }
@@ -959,6 +966,12 @@ class SupabaseDataController: ObservableObject {
                 .from("maintenance_personnel")
                 .update(["isDeleted": true])
                 .eq("id", value: userID)
+                .execute()
+            
+            let response2 = try await supabase
+                .from("user_roles")
+                .update(["isDeleted": true])
+                .eq("user_id", value: userID)
                 .execute()
             
             let data = response.data

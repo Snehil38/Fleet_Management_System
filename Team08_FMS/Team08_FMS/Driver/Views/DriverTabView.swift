@@ -101,9 +101,23 @@ struct DriverTabView: View {
 
                                     // Upcoming Trips Section
                                     VStack(alignment: .leading, spacing: 20) {
-                                        Text("Upcoming Trips")
-                                            .font(.system(size: 24, weight: .bold))
-                                            .padding(.horizontal)
+                                        HStack {
+                                            Text("Upcoming Trips")
+                                                .font(.system(size: 24, weight: .bold))
+                                            
+                                            if !tripController.upcomingTrips.isEmpty {
+                                                Text("\(tripController.upcomingTrips.count)")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 4)
+                                                    .background(Color.blue)
+                                                    .cornerRadius(12)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal)
 
                                         if tripController.upcomingTrips.isEmpty {
                                             emptyUpcomingTripsView
@@ -882,52 +896,103 @@ struct UpcomingTripRow: View {
     @EnvironmentObject var tripController: TripDataController
     @State private var showingAlert = false
     @State private var errorMessage = ""
+    @State private var showingDetails = false
     
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text(trip.destination)
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with destination and start button
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(trip.destination)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.primary)
+                    if let pickup = trip.pickup {
+                        Text(pickup)
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                    }
+                }
                 Spacer()
                 Button(action: {
                     Task {
                         do {
                             try await tripController.startTrip(trip: trip)
                         } catch {
-                            errorMessage = error.localizedDescription
+                            errorMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
                             showingAlert = true
                         }
                     }
                 }) {
                     Text("Start Trip")
+                        .font(.system(.subheadline, weight: .medium))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(Color.blue)
-                        .cornerRadius(8)
+                        .cornerRadius(20)
                 }
             }
             
-            if let notes = trip.notes {
-                Text(notes)
+            VStack(alignment: .leading, spacing: 8) {
+                // Cargo Type
+                if let notes = trip.notes,
+                   let cargoType = notes.components(separatedBy: "Cargo Type:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "shippingbox")
+                            .foregroundColor(.orange)
+                            .font(.system(size: 14))
+                        Text("Cargo Type:")
+                            .foregroundColor(.gray)
+                        Text(cargoType)
+                    }
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                }
+                
+                // Distance
+                if !trip.distance.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.left.and.right")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 14))
+                        Text("Distance:")
+                            .foregroundColor(.gray)
+                        Text(trip.distance)
+                    }
+                    .font(.subheadline)
+                }
+                
+                // Pickup
+                if let pickup = trip.pickup {
+                    HStack(spacing: 4) {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(.red)
+                            .font(.system(size: 14))
+                        Text("Pickup:")
+                            .foregroundColor(.gray)
+                        Text(pickup)
+                    }
+                    .font(.subheadline)
+                }
             }
             
-            if let pickup = trip.pickup {
-                Text("Pickup: \(pickup)")
+            // View Details button
+            Button(action: { showingDetails = true }) {
+                Text("View Details")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.blue)
             }
         }
         .padding()
         .background(Color(.systemBackground))
-        .cornerRadius(10)
-        .shadow(radius: 2)
-        .alert("Error", isPresented: $showingAlert) {
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+        .sheet(isPresented: $showingDetails) {
+            TripDetailsView(trip: trip)
         }
     }
 }
@@ -1197,7 +1262,7 @@ struct QueuedTripRow: View {
                             try await tripController.startTrip(trip: trip)
                             onStart()
                         } catch {
-                            alertMessage = error.localizedDescription
+                            alertMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
                             showingAlert = true
                         }
                     }
@@ -1237,7 +1302,7 @@ struct QueuedTripRow: View {
                 secondaryButton: .cancel()
             )
         }
-        .alert("Error", isPresented: $showingAlert) {
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)

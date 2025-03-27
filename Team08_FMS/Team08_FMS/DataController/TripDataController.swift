@@ -788,7 +788,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                           let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
                         return "N/A"
                     }
-                    return String(notes[fuelRange.upperBound..<endRange.lowerBound])
+                    let dist = (Double(parsedDistance) ?? 0)*0.5
+                    return "\(dist) $"
                 }
             }
             
