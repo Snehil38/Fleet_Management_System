@@ -895,6 +895,7 @@ struct UpcomingTripRow: View {
     @EnvironmentObject var tripController: TripDataController
     @State private var showingAlert = false
     @State private var errorMessage = ""
+    @State private var showingDetails = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -916,7 +917,7 @@ struct UpcomingTripRow: View {
                         do {
                             try await tripController.startTrip(trip: trip)
                         } catch {
-                            errorMessage = error.localizedDescription
+                            errorMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
                             showingAlert = true
                         }
                     }
@@ -931,48 +932,53 @@ struct UpcomingTripRow: View {
                 }
             }
             
-            // Trip details with icons
-            VStack(alignment: .leading, spacing: 12) {
-                if let notes = trip.notes {
-                    // Extract and display cargo type
-                    if notes.contains("Cargo Type:") {
-                        let cargoType = notes.components(separatedBy: "Cargo Type:")[1]
-                            .components(separatedBy: "\n")[0]
-                            .trimmingCharacters(in: .whitespaces)
-                        HStack {
-                            Image(systemName: "shippingbox")
-                                .foregroundColor(.orange)
-                            Text("Cargo Type:")
-                                .foregroundColor(.gray)
-                            Text(cargoType)
-                                .foregroundColor(.black)
-                        }
+            VStack(alignment: .leading, spacing: 8) {
+                // Cargo Type
+                if let notes = trip.notes,
+                   let cargoType = notes.components(separatedBy: "Cargo Type:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "shippingbox")
+                            .foregroundColor(.orange)
+                            .font(.system(size: 14))
+                        Text("Cargo Type:")
+                            .foregroundColor(.gray)
+                        Text(cargoType)
                     }
+                    .font(.subheadline)
                 }
                 
                 // Distance
                 if !trip.distance.isEmpty {
-                    HStack {
+                    HStack(spacing: 4) {
                         Image(systemName: "arrow.left.and.right")
                             .foregroundColor(.blue)
+                            .font(.system(size: 14))
                         Text("Distance:")
                             .foregroundColor(.gray)
                         Text(trip.distance)
-                            .foregroundColor(.black)
                     }
+                    .font(.subheadline)
                 }
                 
-                // Pickup location
+                // Pickup
                 if let pickup = trip.pickup {
-                    HStack {
+                    HStack(spacing: 4) {
                         Image(systemName: "location.fill")
                             .foregroundColor(.red)
+                            .font(.system(size: 14))
                         Text("Pickup:")
                             .foregroundColor(.gray)
                         Text(pickup)
-                            .foregroundColor(.black)
                     }
+                    .font(.subheadline)
                 }
+            }
+            
+            // View Details button
+            Button(action: { showingDetails = true }) {
+                Text("View Details")
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
             }
         }
         .padding()
@@ -982,7 +988,10 @@ struct UpcomingTripRow: View {
         .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip.")
+            Text(errorMessage)
+        }
+        .sheet(isPresented: $showingDetails) {
+            TripDetailsView(trip: trip)
         }
     }
 }
