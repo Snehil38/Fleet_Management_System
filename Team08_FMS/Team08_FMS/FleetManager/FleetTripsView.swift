@@ -218,6 +218,7 @@ struct TripCardView: View {
     let trip: Trip
     @State private var showingDetails = false
     @StateObject private var crewController = CrewDataController.shared
+    @State var showingDeleteAlert = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -302,13 +303,26 @@ struct TripCardView: View {
         .onTapGesture {
             showingDetails = true
         }
+        .alert(isPresented: $showingDeleteAlert) {
+            Alert(
+                title: Text("Alert"),
+                message: Text("Are you sure you want to delete this trip?"),
+                primaryButton: .destructive(Text("Yes")) {
+                    Task {
+                        SupabaseDataController.shared.deleteTrip(tripID: trip.id)
+                        try await TripDataController.shared.fetchAllTrips()
+                    }
+                },
+                secondaryButton: .cancel()
+            )
+        }
         .sheet(isPresented: $showingDetails) {
             TripDetailView(trip: trip)
         }
         .contextMenu {
             if trip.status == .pending || trip.status == .assigned {
                 Button(role: .destructive) {
-    //                showingDeleteAlert = true
+                    showingDeleteAlert = true
                 } label: {
                     Label("Delete Trip", systemImage: "trash")
                 }

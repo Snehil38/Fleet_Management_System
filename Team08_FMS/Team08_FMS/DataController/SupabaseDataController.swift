@@ -1149,6 +1149,20 @@ class SupabaseDataController: ObservableObject {
             return false
         }
     }
+    
+    func deleteTrip(tripID: UUID) {
+        Task {
+            do {
+                let response = try await supabase
+                    .from("trips")
+                    .delete()
+                    .eq("id", value: tripID)
+                    .execute()
+                
+                print("Trip deleted successfully: \(response)")
+            }
+        }
+    }
 
     // Optimized function to fetch a single vehicle with all details including documents
     func fetchVehicleDetails(vehicleId: UUID) async throws -> Vehicle? {
