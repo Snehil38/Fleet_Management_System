@@ -969,6 +969,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             try await supabaseController.updateTrip(id: trip.id, status: "delivered")
             print("Updated trip status to 'delivered'")
             
+            await supabaseController.updateVehichleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+            
             // Update end time in Supabase
             let response = try await supabaseController.databaseFrom("trips")
                 .update(["end_time": Date()])

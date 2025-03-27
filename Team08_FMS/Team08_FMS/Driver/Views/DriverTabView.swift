@@ -28,6 +28,7 @@ struct DriverTabView: View {
     @State private var selectedDelivery: DeliveryDetails?
     @State private var isCurrentTripDeclined = false
     @State private var tripQueue: [Trip] = []
+    @State private var showingSosModal = false
     
     // Route Information
     @State private var availableRoutes: [RouteOption] = [
@@ -205,14 +206,6 @@ struct DriverTabView: View {
                     ToolbarItemGroup(placement: .navigationBarTrailing) {
                         HStack(spacing: 16) {
                             Button(action: {
-                                showingChatBot = true
-                            }) {
-                                Image(systemName: "message.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            Button(action: {
                                 showingProfileView = true
                             }) {
                                 Image(systemName: "person.circle.fill")
@@ -296,6 +289,9 @@ struct DriverTabView: View {
             if let currentTrip = tripController.currentTrip {
                 VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
             }
+        }
+        .sheet(isPresented: $showingSosModal) {
+            SOSModalView(isPresented: $showingSosModal)
         }
         .alert(isPresented: $showingAlert) {
             Alert(
@@ -620,24 +616,35 @@ struct DriverTabView: View {
                     }
                 }
                 
-                ActionButton(
-                    title: "Mark Delivered",
-                    icon: "checkmark.circle.fill",
-                    color: .green
-                ) {
-                    if !trip.hasCompletedPreTrip {
-                        alertMessage = "Please complete pre-trip inspection before marking as delivered"
-                        showingAlert = true
-                    } else if trip.hasCompletedPostTrip {
-                        // Already completed post-trip
-                        // Use Task to handle the async call
-                        Task {
-                            await MainActor.run {
-                                markCurrentTripDelivered()
+                HStack(spacing: 10) {
+                    ActionButton(
+                        title: "Mark Delivered",
+                        icon: "checkmark.circle.fill",
+                        color: .green
+                    ) {
+                        if !trip.hasCompletedPreTrip {
+                            alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                            showingAlert = true
+                        } else if trip.hasCompletedPostTrip {
+                            // Already completed post-trip
+                            // Use Task to handle the async call
+                            Task {
+                                await MainActor.run {
+                                    markCurrentTripDelivered()
+                                }
                             }
+                        } else {
+                            showingPostTripInspection = true
                         }
-                    } else {
-                        showingPostTripInspection = true
+                    }
+                    
+                    ActionButton(
+                        title: "SOS",
+                        icon: "exclamationmark.triangle.fill",
+                        color: .red
+                    ) {
+                        // Show the SOS modal instead of an alert
+                        showingSosModal = true
                     }
                 }
             }
@@ -1321,6 +1328,185 @@ struct MapPolyline: View {
             }
             .stroke(strokeColor, lineWidth: lineWidth)
         }
+    }
+}
+
+struct SOSModalView: View {
+    @Binding var isPresented: Bool
+    @StateObject private var profileManager = ProfileManager.shared
+    @State private var emergencySubject: String = ""
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                // Emergency icon and header
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.red)
+                    
+                    Text("Emergency Assistance")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("Describe your emergency situation")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding(.top, 20)
+                
+                // Emergency subject text field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Emergency Subject")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Enter emergency details", text: $emergencySubject)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                }
+                .padding(.horizontal)
+                .padding(.top, 20)
+                
+                // Fleet manager contact information
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Fleet Manager Contact")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(profileManager.fleetManagerName.isEmpty ? "Fleet Manager" : profileManager.fleetManagerName)
+                                .font(.headline)
+                            
+                            Text(profileManager.fleetManagerPhone.isEmpty ? "+1 (555) 123-4567" : profileManager.fleetManagerPhone)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                }
+                
+                Spacer()
+                
+                // Contact button
+                Button(action: {
+                    if emergencySubject.isEmpty {
+                        // Show alert if no subject entered
+                        alertMessage = "Please enter a description of your emergency"
+                        showingAlert = true
+                    } else {
+                        // Open phone dialer with fleet manager number
+                        contactFleetManager()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "phone.fill")
+                        Text("Contact Fleet Manager")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(emergencySubject.isEmpty ? Color.gray : Color.red)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                    .shadow(color: Color.black.opacity(0.1), radius: 5)
+                }
+                .disabled(emergencySubject.isEmpty)
+                .padding(.horizontal)
+                .padding(.bottom, 30)
+            }
+            .alert(isPresented: $showingAlert) {
+                Alert(
+                    title: Text("Missing Information"),
+                    message: Text(alertMessage),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+            .navigationTitle("SOS Emergency")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func contactFleetManager() {
+        // Get the fleet manager's phone number
+        let phoneNumber = profileManager.fleetManagerPhone.isEmpty ? "+15551234567" : profileManager.fleetManagerPhone
+        
+        // Clean the phone number (remove non-numeric characters except +)
+        let cleanedNumber = phoneNumber.components(separatedBy: CharacterSet(charactersIn: "+0123456789").inverted).joined()
+        
+        // Create the URL for the phone
+        if let url = URL(string: "tel://\(cleanedNumber)") {
+            // Open the URL
+            UIApplication.shared.open(url)
+            
+            // Log the emergency call
+            Task {
+                try? await logEmergencyCall(subject: emergencySubject, phoneNumber: cleanedNumber)
+            }
+            
+            // Dismiss the sheet after initiating the call
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                isPresented = false
+            }
+        }
+    }
+    
+    private func logEmergencyCall(subject: String, phoneNumber: String) async throws {
+        // In a real implementation, this would log the emergency call to a database
+        // For now, we'll just print to the console
+        print("Emergency call logged: \(subject) to \(phoneNumber)")
+        
+        // This could be a call to SupabaseDataController to log the emergency
+        // await SupabaseDataController.shared.logEmergencyCall(subject: subject, phoneNumber: phoneNumber)
+    }
+}
+
+class ProfileManager: ObservableObject {
+    static let shared = ProfileManager()
+    
+    @Published var fleetManagerName: String = "John Smith"
+    @Published var fleetManagerPhone: String = "+1 (555) 123-4567"
+    
+    private init() {
+        // Load fleet manager details from local storage or fetch from server
+        Task {
+            await loadFleetManagerDetails()
+        }
+    }
+    
+    private func loadFleetManagerDetails() async {
+        // This would typically fetch the fleet manager's contact information from a database
+        // For now, we'll use hardcoded values
+        
+        // In a real implementation, you might fetch this data from Supabase
+        // let fleetManagerData = try await SupabaseDataController.shared.getFleetManagerProfile()
+        // await MainActor.run {
+        //     self.fleetManagerName = fleetManagerData.name
+        //     self.fleetManagerPhone = fleetManagerData.phone
+        // }
     }
 }
 

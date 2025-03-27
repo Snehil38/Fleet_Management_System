@@ -34,12 +34,6 @@ struct MaintenancePersonnelTabView: View {
                     Spacer()
                     HStack(spacing: 15) {
                         Button(action: {
-                            showingContact = true
-                        }) {
-                            Image(systemName: "message.fill")
-                                .font(.title2)
-                        }
-                        Button(action: {
                             showingProfile = true
                         }) {
                             Image(systemName: "person.circle.fill")
