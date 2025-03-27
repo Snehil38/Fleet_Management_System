@@ -13,6 +13,7 @@ struct FleetManagerDashboardTabView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
+    @StateObject private var tripController = TripDataController.shared
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
     
@@ -29,16 +30,53 @@ struct FleetManagerDashboardTabView: View {
         vehicleManager.vehicles.filter { $0.status == .underMaintenance }.count
     }
 
+    private var activeTripsCount: Int {
+        // Only count trips that are in progress
+        tripController.getAllTrips().filter { $0.status == .inProgress }.count
+    }
+
     private var totalMonthlySalaries: Double {
         dataManager.totalSalaryExpenses
     }
 
+    private var totalFuelCost: Double {
+        // Calculate total fuel cost from all trips
+        tripController.getAllTrips().reduce(0) { total, trip in
+            // Extract numeric value from distance string
+            let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                .joined()
+            
+            if let distance = Double(numericDistance) {
+                // Calculate fuel cost ($0.5 per km)
+                return total + (distance * 0.5)
+            }
+            return total
+        }
+    }
+
+    private var totalTripRevenue: Double {
+        // Calculate total revenue from all trips
+        tripController.getAllTrips().reduce(0) { total, trip in
+            // Extract numeric value from distance string
+            let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                .joined()
+            
+            if let distance = Double(numericDistance) {
+                // Total Revenue = Fuel Cost + ($0.25 × Distance) + $50
+                let fuelCost = distance * 0.5
+                let distanceRevenue = distance * 0.25
+                return total + (fuelCost + distanceRevenue + 50.0)
+            }
+            return total
+        }
+    }
+
     private var totalExpenses: Double {
-        totalMonthlySalaries  // Now total expenses is just the salary expenses
+        totalMonthlySalaries + totalFuelCost
     }
 
     private var totalRevenue: Double {
-        -totalExpenses  // Revenue is negative of expenses
+        totalTripRevenue - totalExpenses
     }
 
     var body: some View {
@@ -79,7 +117,7 @@ struct FleetManagerDashboardTabView: View {
                             icon: "arrow.triangle.turn.up.right.diamond.fill",
                             iconColor: .purple,
                             title: "Active Trips",
-                            value: "0"
+                            value: "\(activeTripsCount)"
                         )
                     }
                     .padding(.horizontal)
