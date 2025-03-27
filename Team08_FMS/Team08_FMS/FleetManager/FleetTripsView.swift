@@ -135,11 +135,11 @@ struct FleetTripsView: View {
             .onChange(of: tripController.error) { error, _ in
                 showingError = error != nil
             }
-            .onAppear {
-                Task {
-                    await tripController.refreshAllTrips()
-                }
-            }
+//            .onAppear {
+//                Task {
+//                    await tripController.refreshAllTrips()
+//                }
+//            }
         }
     }
     

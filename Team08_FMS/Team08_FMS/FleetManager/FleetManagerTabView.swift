@@ -46,6 +46,7 @@ struct FleetManagerTabView: View {
         .task {
             vehicleManager.loadVehicles()
             CrewDataController.shared.update()
+            await TripDataController.shared.refreshAllTrips()
         }
     }
 }
