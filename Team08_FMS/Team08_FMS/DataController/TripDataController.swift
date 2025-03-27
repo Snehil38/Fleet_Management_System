@@ -38,7 +38,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published var estimatedArrivalTime: Date?
     
     private var locationManager = CLLocationManager()
-    private let geofenceRadius: CLLocationDistance = 100.0 // 100 meters
+    private let geofenceRadius: CLLocationDistance = 50.0 // 100 meters
     private var driverId: UUID?
     private var allTrips: [Trip] = []
     private var tripTimer: Timer?
@@ -94,7 +94,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     }
     
     func startMonitoringRegions() {
-        stopMonitoringRegions() // Clean up before starting new regions
+//        stopMonitoringRegions() // Clean up before starting new regions
         
         // Filter out trips that are in progress from your data source (e.g., allTrips)
         guard let currentTrip = currentTrip else {
@@ -255,8 +255,11 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             manager.requestAlwaysAuthorization()
         case .restricted:
             print("Location permissions are restricted.")
+        case .authorizedWhenInUse:
+            startMonitoringRegions()
         default:
-            stopMonitoringRegions()
+//            stopMonitoringRegions()
+            print("Error")
         }
     }
     
