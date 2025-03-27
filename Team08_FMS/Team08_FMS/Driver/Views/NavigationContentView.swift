@@ -25,6 +25,9 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let updateThreshold: TimeInterval = 0.5 // Update every half second for smoother tracking
     private let locationHistoryLimit = 5 // Keep last 5 locations for smooth animation
     
+    // Add a force route recalculation flag
+    private var shouldRecalculateRoute = false
+    
     // Vehicle specifications
     enum VehicleType {
         case truck(height: Double, weight: Double, length: Double)
@@ -128,17 +131,27 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     // MARK: - Route Updates
     
-    private func updateRoute(from location: CLLocation) {
-        // Only update route if we don't have one yet or if we've moved significantly
+    private func updateRoute(from location: CLLocation, forceRecalculation: Bool = false) {
+        // Only update route if we don't have one yet or if we've moved significantly 
+        // or if we're forcing recalculation due to deviation
         if route == nil || lastLocation == nil || 
-           (lastLocation != nil && location.distance(from: lastLocation!) > 200) {
+           (lastLocation != nil && location.distance(from: lastLocation!) > 200) || 
+           forceRecalculation {
+            
             lastLocation = location
             
             let request = MKDirections.Request()
             
-            // Use provided source coordinate if available, otherwise use current location
-            let sourceCoordinate = _sourceCoordinate ?? location.coordinate
-            request.source = MKMapItem(placemark: MKPlacemark(coordinate: sourceCoordinate))
+            // Always use current location for recalculations on deviation
+            if forceRecalculation {
+                print("Recalculating route due to deviation")
+                request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
+            } else {
+                // Use provided source coordinate if available, otherwise use current location
+                let sourceCoordinate = _sourceCoordinate ?? location.coordinate
+                request.source = MKMapItem(placemark: MKPlacemark(coordinate: sourceCoordinate))
+            }
+            
             request.destination = MKMapItem(placemark: MKPlacemark(coordinate: _destination))
             request.transportType = vehicleType.routingPreference
             
@@ -157,10 +170,8 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 }
                 
                 if let primaryRoute = response.routes.first {
-                    // Only replace route if we don't have one, or if it's significantly different
-                    if self.route == nil || 
-                       abs(self.route!.expectedTravelTime - primaryRoute.expectedTravelTime) > 60 ||
-                       abs(self.route!.distance - primaryRoute.distance) > 1000 {
+                    // When recalculating due to deviation, always update the route
+                    if forceRecalculation {
                         self.route = primaryRoute
                         
                         // Set default values for current step
@@ -171,6 +182,23 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                             // Calculate estimated time and distance
                             self.remainingDistance = primaryRoute.distance
                             self.remainingTime = primaryRoute.expectedTravelTime
+                        }
+                    } else {
+                        // Only replace route if we don't have one, or if it's significantly different
+                        if self.route == nil || 
+                           abs(self.route!.expectedTravelTime - primaryRoute.expectedTravelTime) > 60 ||
+                           abs(self.route!.distance - primaryRoute.distance) > 1000 {
+                            self.route = primaryRoute
+                            
+                            // Set default values for current step
+                            if !primaryRoute.steps.isEmpty {
+                                self.currentStep = primaryRoute.steps[0]
+                                self.nextStepDistance = 0
+                                
+                                // Calculate estimated time and distance
+                                self.remainingDistance = primaryRoute.distance
+                                self.remainingTime = primaryRoute.expectedTravelTime
+                            }
                         }
                     }
                 }
@@ -534,6 +562,14 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
         }
     }
+    
+    // Add force recalculation method
+    func recalculateRoute() {
+        if let location = lastLocation {
+            print("Forcing route recalculation from current location")
+            updateRoute(from: location, forceRecalculation: true)
+        }
+    }
 }
 
 struct RealTimeNavigationView: View {
@@ -547,6 +583,7 @@ struct RealTimeNavigationView: View {
     @State private var alertMessage = ""
     @State private var showingAlternativeRoutes = false
     @State private var isRouteCompleted = false  // Add state for route completion
+    @State private var isDeviationAlertShown = false  // Add state for deviation alert
     
     init(destination: CLLocationCoordinate2D, destinationName: String, address: String, sourceCoordinate: CLLocationCoordinate2D?, onDismiss: @escaping () -> Void) {
         self.destination = destinationName
@@ -569,7 +606,7 @@ struct RealTimeNavigationView: View {
                 route: $navigationManager.route,
                 userHeading: $navigationManager.userHeading,
                 followsUserLocation: isFollowingUser,
-                isRouteCompleted: $isRouteCompleted,  // Add the binding
+                isRouteCompleted: $isRouteCompleted,
                 onLocationUpdate: { location in
                     navigationManager.updateNavigation(from: location)
                     
@@ -586,6 +623,12 @@ struct RealTimeNavigationView: View {
                             isRouteCompleted = true
                         }
                     }
+                },
+                onRouteDeviation: {
+                    // Handle route deviation
+                    isDeviationAlertShown = true
+                    // Force recalculation
+                    navigationManager.recalculateRoute()
                 }
             )
             .ignoresSafeArea()
@@ -750,6 +793,13 @@ struct RealTimeNavigationView: View {
             Alert(
                 title: Text("Navigation Alert"),
                 message: Text(alertMessage),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .alert(isPresented: $isDeviationAlertShown) {
+            Alert(
+                title: Text("Route Deviation Detected"),
+                message: Text("Recalculating route to destination..."),
                 dismissButton: .default(Text("OK"))
             )
         }

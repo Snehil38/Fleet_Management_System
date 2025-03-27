@@ -11,6 +11,10 @@ struct NavigationMapView: UIViewRepresentable {
     
     // For updating ETA and distance
     var onLocationUpdate: ((CLLocation) -> Void)?
+    var onRouteDeviation: (() -> Void)?  // Add callback for route deviation
+    
+    // Add variables for route deviation detection
+    private let routeDeviationThreshold: Double = 50.0  // Meters
     
     class MapAnnotation: NSObject, MKAnnotation {
         let coordinate: CLLocationCoordinate2D
@@ -84,10 +88,17 @@ struct NavigationMapView: UIViewRepresentable {
         if isRouteCompleted {
             mapView.removeOverlays(mapView.overlays)
             context.coordinator.currentRouteId = nil
+            context.coordinator.remainingPolyline = nil
         } else if let route = route {
             let currentRouteId = route.polyline.hash
             if context.coordinator.currentRouteId != currentRouteId {
                 mapView.removeOverlays(mapView.overlays)
+                
+                // Reset tracking state when route changes
+                context.coordinator.remainingPolyline = nil
+                context.coordinator.completedPathCoordinates = []
+                
+                // Add the full route initially
                 mapView.addOverlay(route.polyline)
                 context.coordinator.currentRouteId = currentRouteId
                 
@@ -116,6 +127,15 @@ struct NavigationMapView: UIViewRepresentable {
         
         // Update user location and camera
         if let userLocation = userLocation {
+            // Check for route deviation and trigger recalculation
+            if let route = route, !isRouteCompleted {
+                let location = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                if context.coordinator.checkRouteDeviation(userLocation: location, route: route) {
+                    // Notify parent about deviation to recalculate route
+                    onRouteDeviation?()
+                }
+            }
+            
             if followsUserLocation && !context.coordinator.isUpdatingCamera {
                 context.coordinator.queueCameraUpdate {
                     let camera = MKMapCamera(
@@ -157,6 +177,9 @@ struct NavigationMapView: UIViewRepresentable {
         var isUpdatingCamera: Bool = false
         var updateTimer: Timer?
         var pendingCameraUpdate: (() -> Void)?
+        var lastRouteDeviation: Date?  // Track last time route was recalculated
+        var completedPathCoordinates: [CLLocationCoordinate2D] = []
+        var remainingPolyline: MKPolyline?
         
         init(_ parent: NavigationMapView) {
             self.parent = parent
@@ -340,6 +363,86 @@ struct NavigationMapView: UIViewRepresentable {
             if lastLocation?.distance(from: location) ?? 0 > 5 { // Only update if moved more than 5 meters
                 lastLocation = location
                 parent.onLocationUpdate?(location)
+                
+                // Update the completed path
+                if !parent.isRouteCompleted, let route = parent.route {
+                    updateCompletedPath(currentLocation: location, route: route, mapView: mapView)
+                }
+            }
+        }
+        
+        // Add method to update completed path segments
+        func updateCompletedPath(currentLocation: CLLocation, route: MKRoute, mapView: MKMapView) {
+            let polyline = route.polyline
+            let pointCount = polyline.pointCount
+            let points = polyline.points()
+            
+            // Find the closest point on the route
+            var closestPointIndex = 0
+            var closestDistance = Double.greatestFiniteMagnitude
+            
+            for i in 0..<pointCount {
+                let polylinePoint = points[i]
+                let coordinate = CLLocationCoordinate2D(
+                    latitude: CLLocationDegrees(polylinePoint.x),
+                    longitude: CLLocationDegrees(polylinePoint.y)
+                )
+                
+                let routeLocation = CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                
+                let distance = currentLocation.distance(from: routeLocation)
+                if distance < closestDistance {
+                    closestDistance = distance
+                    closestPointIndex = i
+                }
+            }
+            
+            // Only update if we're close to the route
+            if closestDistance <= parent.routeDeviationThreshold {
+                // Create array of remaining coordinates (from closest point to end)
+                var remainingCoordinates: [CLLocationCoordinate2D] = []
+                
+                // Add current point plus all remaining points
+                for i in closestPointIndex..<pointCount {
+                    let point = points[i]
+                    let coordinate = CLLocationCoordinate2D(
+                        latitude: CLLocationDegrees(point.x),
+                        longitude: CLLocationDegrees(point.y)
+                    )
+                    remainingCoordinates.append(coordinate)
+                }
+                
+                // Create new polyline for remaining route
+                if remainingCoordinates.count >= 2 {
+                    // Remove old polyline
+                    if let oldPolyline = remainingPolyline {
+                        mapView.removeOverlay(oldPolyline)
+                    }
+                    
+                    // Create and add new polyline
+                    let newPolyline = MKPolyline(coordinates: remainingCoordinates, count: remainingCoordinates.count)
+                    remainingPolyline = newPolyline
+                    
+                    // Remove all overlays and add the new one
+                    mapView.removeOverlays(mapView.overlays)
+                    mapView.addOverlay(newPolyline)
+                    
+                    print("Updated route: \(pointCount - closestPointIndex) points remaining")
+                }
+                
+                // Store completed coordinates for potential rendering
+                completedPathCoordinates = []
+                for i in 0..<closestPointIndex {
+                    let point = points[i]
+                    let coordinate = CLLocationCoordinate2D(
+                        latitude: CLLocationDegrees(point.x),
+                        longitude: CLLocationDegrees(point.y)
+                    )
+                    completedPathCoordinates.append(coordinate)
+                }
             }
         }
         
@@ -359,6 +462,54 @@ struct NavigationMapView: UIViewRepresentable {
             print("Center coordinate: \(mapView.region.center)")
             print("Camera altitude: \(mapView.camera.altitude)")
             print("-------------------")
+        }
+        
+        // Add method to check for route deviation
+        func checkRouteDeviation(userLocation: CLLocation, route: MKRoute) -> Bool {
+            // Don't check too frequently - at most once every 10 seconds
+            if let lastDeviation = lastRouteDeviation, 
+               Date().timeIntervalSince(lastDeviation) < 10 {
+                return false
+            }
+            
+            // Find the closest point on the route
+            var closestDistance = Double.greatestFiniteMagnitude
+            
+            // Sample points from the route polyline
+            let polyline = route.polyline
+            let pointCount = polyline.pointCount
+            
+            // Get the route's point data
+            let points = polyline.points()
+            
+            // Check distance to each point on the route
+            for i in 0..<pointCount {
+                let polylinePoint = points[i]
+                let coordinate = CLLocationCoordinate2D(
+                    latitude: CLLocationDegrees(polylinePoint.x),
+                    longitude: CLLocationDegrees(polylinePoint.y)
+                )
+                
+                let routeLocation = CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                
+                let distance = userLocation.distance(from: routeLocation)
+                if distance < closestDistance {
+                    closestDistance = distance
+                }
+            }
+            
+            // If we're more than threshold distance from the route, consider it a deviation
+            let hasDeviated = closestDistance > parent.routeDeviationThreshold
+            
+            if hasDeviated {
+                lastRouteDeviation = Date()
+                print("Route deviation detected: \(closestDistance) meters from route")
+            }
+            
+            return hasDeviated
         }
     }
 } 

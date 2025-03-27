@@ -47,6 +47,7 @@ struct FleetManagerTabView: View {
             vehicleManager.loadVehicles()
             CrewDataController.shared.update()
             listenForGeofenceEvents()
+            await TripDataController.shared.refreshAllTrips()
         }
     }
     

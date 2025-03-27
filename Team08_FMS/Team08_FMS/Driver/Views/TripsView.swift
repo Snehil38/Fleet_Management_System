@@ -15,8 +15,8 @@ struct TripsView: View {
         VStack(spacing: 0) {
             // Filter Picker
             Picker("Filter", selection: $selectedFilter) {
-                Text("Upcoming").tag(TripFilter.upcoming)
-                Text("Delivered").tag(TripFilter.delivered)
+                Text("Upcoming (\(tripController.upcomingTrips.count))").tag(TripFilter.upcoming)
+                Text("Delivered (\(tripController.recentDeliveries.count))").tag(TripFilter.delivered)
             }
             .pickerStyle(.segmented)
             .padding()
@@ -276,12 +276,6 @@ struct TripCard: View {
             // Action buttons based on status
             if trip.status != .delivered {
                 HStack {
-                    Button(action: { showingDetails = true }) {
-                        Text("View Details")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                    }
-                    
                     Spacer()
                     
                     Button(action: {
@@ -303,18 +297,15 @@ struct TripCard: View {
                             .cornerRadius(20)
                     }
                 }
-            } else {
-                Button(action: { showingDetails = true }) {
-                    Text("View Details")
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                }
             }
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .onTapGesture {
+            showingDetails = true
+        }
         .sheet(isPresented: $showingDetails) {
             TripDetailsView(trip: trip)
         }

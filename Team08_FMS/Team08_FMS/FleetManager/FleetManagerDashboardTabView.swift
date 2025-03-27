@@ -13,6 +13,7 @@ struct FleetManagerDashboardTabView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
+    @StateObject private var tripController = TripDataController.shared
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
     
@@ -29,18 +30,53 @@ struct FleetManagerDashboardTabView: View {
         vehicleManager.vehicles.filter { $0.status == .underMaintenance }.count
     }
 
+    private var activeTripsCount: Int {
+        // Only count trips that are in progress
+        tripController.getAllTrips().filter { $0.status == .inProgress }.count
+    }
+
     private var totalMonthlySalaries: Double {
         dataManager.totalSalaryExpenses
     }
-    private var totalFuelExpenses: Double {
-        dataManager.totalFuelExpenses
+
+    private var totalFuelCost: Double {
+        // Calculate total fuel cost from all trips
+        tripController.getAllTrips().reduce(0) { total, trip in
+            // Extract numeric value from distance string
+            let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                .joined()
+            
+            if let distance = Double(numericDistance) {
+                // Calculate fuel cost ($0.5 per km)
+                return total + (distance * 0.5)
+            }
+            return total
+        }
     }
+
+    private var totalTripRevenue: Double {
+        // Calculate total revenue from all trips
+        tripController.getAllTrips().reduce(0) { total, trip in
+            // Extract numeric value from distance string
+            let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                .joined()
+            
+            if let distance = Double(numericDistance) {
+                // Total Revenue = Fuel Cost + ($0.25 × Distance) + $50
+                let fuelCost = distance * 0.5
+                let distanceRevenue = distance * 0.25
+                return total + (fuelCost + distanceRevenue + 50.0)
+            }
+            return total
+        }
+    }
+
     private var totalExpenses: Double {
-        totalMonthlySalaries + totalFuelExpenses  // Now total expenses is just the salary expenses
+        totalMonthlySalaries + totalFuelCost
     }
 
     private var totalRevenue: Double {
-        -totalExpenses  // Revenue is negative of expenses
+        totalTripRevenue - totalExpenses
     }
 
     var body: some View {
@@ -81,7 +117,7 @@ struct FleetManagerDashboardTabView: View {
                             icon: "arrow.triangle.turn.up.right.diamond.fill",
                             iconColor: .purple,
                             title: "Active Trips",
-                            value: "0"
+                            value: "\(activeTripsCount)"
                         )
                     }
                     .padding(.horizontal)
@@ -794,7 +830,7 @@ struct AddTripView: View {
             let costPerKm = 5.0 // $5 per km as requested
             
             self.tripCost = self.distance * costPerKm
-            self.fuelCost = (self.distance * 0.8) + 50.0
+            self.fuelCost = self.tripCost * fuelRatio
             
             // Calculate estimated travel time and update delivery date
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
@@ -816,8 +852,8 @@ struct AddTripView: View {
         let fuelRatio = 0.2 // 20% of cost is fuel
         let costPerKm = 5.0 // $5 per km as requested
         
-        tripCost = (distance * 0.8) + 50.0
-        fuelCost = (distance * 0.8) + 50.0
+        tripCost = distance * costPerKm
+        fuelCost = tripCost * fuelRatio
         
         // Calculate estimated travel time and update delivery date
         let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
@@ -1025,24 +1061,14 @@ struct MapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         mapView.region = region
         
-        // Set map type to standard for better visibility of buildings and blocks
-        mapView.mapType = .standard
-        
-        // Configure map features
+        // Enhanced map with maximum detail
+        mapView.mapType = .mutedStandard // Using muted standard for a cleaner look with all details
+        mapView.pointOfInterestFilter = .includingAll
         mapView.showsBuildings = true
         mapView.showsTraffic = true
-        mapView.pointOfInterestFilter = .includingAll
-        
-        // Apply custom map styling for better building and block visibility
-        let mapConfiguration = MKStandardMapConfiguration()
-        mapConfiguration.pointOfInterestFilter = .includingAll
-        mapConfiguration.showsTraffic = true
-        
-        // Set emphasis style to muted for better building visibility
-        mapConfiguration.emphasisStyle = .muted
-        
-        // Enable all map features for maximum detail
-        mapView.preferredConfiguration = mapConfiguration
+        mapView.showsPointsOfInterest = true
+        mapView.showsCompass = true
+        mapView.showsScale = true
         
         return mapView
     }
