@@ -25,20 +25,38 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
                 
                 // Action Buttons
                 VStack(spacing: 12) {
-                    Button(action: {
-                        dataStore.updateServiceRequestStatus(request, newStatus: .inProgress)
-                        alertMessage = "Service request marked as in progress"
-                        showingAlert = true
-                    }) {
-                        HStack {
-                            Image(systemName: "play.fill")
-                            Text("Start Maintenance")
+                    if request.status == .pending {
+                        Button(action: {
+                            dataStore.updateServiceRequestStatus(request, newStatus: .inProgress)
+                            alertMessage = "Service request marked as in progress"
+                            showingAlert = true
+                        }) {
+                            HStack {
+                                Image(systemName: "play.fill")
+                                Text("Start Maintenance")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                    } else if request.status == .inProgress {
+                        Button(action: {
+                            dataStore.updateServiceRequestStatus(request, newStatus: .completed)
+                            alertMessage = "Service request marked as completed"
+                            showingAlert = true
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Complete Maintenance")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
                     }
                     
                     Button(action: {

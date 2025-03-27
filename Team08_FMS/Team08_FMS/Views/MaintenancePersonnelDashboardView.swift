@@ -4,19 +4,19 @@ struct MaintenancePersonnelDashboardView: View {
     @StateObject private var dataStore = MaintenancePersonnelDataStore()
     @State private var selectedTab = 0
     @State private var showingNewRequest = false
-    @State private var showingContactManager = false
+    @State private var showingProfile = false
     
     var body: some View {
         NavigationView {
             TabView(selection: $selectedTab) {
-                // Service Requests Tab
+                // Dashboard Tab
                 NavigationView {
                     ServiceRequestListView(dataStore: dataStore)
-                        .navigationTitle("Service Requests")
+                        .navigationTitle("Dashboard")
                         .toolbar {
                             ToolbarItem(placement: .navigationBarTrailing) {
-                                Button(action: { showingNewRequest = true }) {
-                                    Image(systemName: "plus.circle.fill")
+                                Button(action: { showingProfile = true }) {
+                                    Image(systemName: "person.circle.fill")
                                         .font(.title2)
                                         .foregroundColor(.blue)
                                 }
@@ -24,39 +24,34 @@ struct MaintenancePersonnelDashboardView: View {
                         }
                 }
                 .tabItem {
-                    Label("Requests", systemImage: "wrench.and.screwdriver.fill")
+                    Label("Dashboard", systemImage: "wrench.and.screwdriver.fill")
                 }
                 .tag(0)
-                
-                // Safety Checks Tab
-                NavigationView {
-                    MaintenancePersonnelSafetyChecksView(dataStore: dataStore)
-                        .navigationTitle("Safety Checks")
-                }
-                .tabItem {
-                    Label("Safety", systemImage: "checkmark.shield.fill")
-                }
-                .tag(1)
-                
-                // Service History Tab
-                NavigationView {
-                    MaintenancePersonnelServiceHistoryView(dataStore: dataStore)
-                        .navigationTitle("Service History")
-                }
-                .tabItem {
-                    Label("History", systemImage: "clock.fill")
-                }
-                .tag(2)
                 
                 // Upcoming Services Tab
                 NavigationView {
                     MaintenancePersonnelUpcomingServicesView(dataStore: dataStore)
                         .navigationTitle("Upcoming Services")
+                        .toolbar {
+                            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                                Button(action: { showingNewRequest = true }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.blue)
+                                }
+                                
+                                Button(action: { showingProfile = true }) {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
                 }
                 .tabItem {
                     Label("Schedule", systemImage: "calendar")
                 }
-                .tag(3)
+                .tag(1)
             }
             .sheet(isPresented: $showingNewRequest) {
                 NavigationView {
@@ -67,15 +62,9 @@ struct MaintenancePersonnelDashboardView: View {
                         })
                 }
             }
-//            .sheet(isPresented: $showingContactManager) {
-//                NavigationView {
-//                    ContactFleetManagerView()
-//                        .navigationTitle("Contact Fleet Manager")
-//                        .navigationBarItems(trailing: Button("Cancel") {
-//                            showingContactManager = false
-//                        })
-//                }
-//            }
+            .sheet(isPresented: $showingProfile) {
+                MaintenancePersonnelProfileView()
+            }
         }
     }
 }
@@ -86,6 +75,8 @@ struct ServiceRequestListView: View {
     @State private var selectedStatus: ServiceRequestStatus?
     @State private var selectedRequest: MaintenanceServiceRequest?
     @State private var showingDetail = false
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
     
     var filteredRequests: [MaintenanceServiceRequest] {
         var requests = dataStore.serviceRequests
@@ -118,7 +109,7 @@ struct ServiceRequestListView: View {
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(ServiceRequestStatus.allCases, id: \.self) { status in
+                        ForEach([ServiceRequestStatus.pending, .inProgress, .completed], id: \.self) { status in
                             StatusFilterButton(
                                 status: status,
                                 isSelected: selectedStatus == status,
@@ -146,15 +137,12 @@ struct ServiceRequestListView: View {
                     Text("No service requests found")
                         .font(.headline)
                         .foregroundColor(.gray)
-                    Text("Try adjusting your search or filters")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
                 }
                 .frame(maxHeight: .infinity)
                 .padding()
             } else {
                 List(filteredRequests) { request in
-                    ServiceRequestRow(request: request)
+                    ServiceRequestRow(request: request, dataStore: dataStore)
                         .contentShape(Rectangle())
                         .onTapGesture {
                             selectedRequest = request
@@ -168,37 +156,24 @@ struct ServiceRequestListView: View {
             if let request = selectedRequest {
                 NavigationView {
                     MaintenancePersonnelServiceRequestDetailView(request: request, dataStore: dataStore)
-                        .navigationTitle("Service Request Details")
+                        .navigationTitle("Request Details")
                         .navigationBarItems(trailing: Button("Done") {
                             showingDetail = false
                         })
                 }
             }
         }
-    }
-}
-
-struct StatusFilterButton: View {
-    let status: ServiceRequestStatus
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(status.rawValue)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(isSelected ? Color.blue : Color(.systemGray6))
-                .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(20)
+        .alert("Status Updated", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
         }
     }
 }
 
 struct ServiceRequestRow: View {
     let request: MaintenanceServiceRequest
+    @ObservedObject var dataStore: MaintenancePersonnelDataStore
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -225,8 +200,35 @@ struct ServiceRequestRow: View {
                     .font(.caption)
                     .foregroundColor(priorityColor)
             }
+            
+            // Action Button based on status
+            if request.status == .pending {
+                Button(action: {
+                    dataStore.updateServiceRequestStatus(request, newStatus: .inProgress)
+                }) {
+                    Text("Start Maintenance")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+            } else if request.status == .inProgress {
+                Button(action: {
+                    dataStore.updateServiceRequestStatus(request, newStatus: .completed)
+                }) {
+                    Text("Complete Maintenance")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+            }
         }
-        .padding(.vertical, 8)
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
     }
     
     private var priorityColor: Color {
@@ -235,6 +237,25 @@ struct ServiceRequestRow: View {
         case .medium: return .orange
         case .high: return .red
         case .urgent: return .purple
+        }
+    }
+}
+
+struct StatusFilterButton: View {
+    let status: ServiceRequestStatus
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(status.rawValue)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(isSelected ? Color.blue : Color(.systemGray6))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(20)
         }
     }
 }
