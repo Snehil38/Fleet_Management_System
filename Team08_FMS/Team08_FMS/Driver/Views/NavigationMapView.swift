@@ -36,19 +36,32 @@ struct NavigationMapView: UIViewRepresentable {
         mapView.showsUserLocation = true
         mapView.userTrackingMode = followsUserLocation ? .followWithHeading : .none
         
-        // Enhanced map settings for modern look
-        mapView.mapType = .mutedStandard
+        // Set map type to standard for better visibility of buildings and blocks
+        mapView.mapType = .standard
+        
+        // Configure map features
         mapView.showsBuildings = true
         mapView.showsTraffic = true
-        mapView.showsCompass = true
-        mapView.showsScale = true
+        mapView.pointOfInterestFilter = .includingAll
         
-        // Apply custom map styling
-        mapView.preferredConfiguration = MKStandardMapConfiguration()
+        // Apply custom map styling for better building and block visibility
+        let mapConfiguration = MKStandardMapConfiguration()
+        mapConfiguration.pointOfInterestFilter = .includingAll
+        mapConfiguration.showsTraffic = true
         
-        // Camera settings for immersive experience
-        mapView.camera.altitude = 500
-        mapView.camera.pitch = 60
+        // Set emphasis style to muted for better building visibility
+        mapConfiguration.emphasisStyle = .muted
+        
+        // Enable all map features for maximum detail
+        mapView.preferredConfiguration = mapConfiguration
+        
+        // Adjust camera settings for better building visibility
+        let camera = MKMapCamera()
+        camera.centerCoordinate = destination
+        camera.centerCoordinateDistance = 500 // Lower altitude for more detail
+        camera.pitch = 0 // Set to 0 for top-down view like in screenshot
+        camera.heading = 0 // Reset heading
+        mapView.camera = camera
         
         // Add destination annotation with animation
         let destinationAnnotation = MapAnnotation(

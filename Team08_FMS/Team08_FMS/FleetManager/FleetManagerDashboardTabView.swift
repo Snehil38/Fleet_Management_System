@@ -1025,14 +1025,24 @@ struct MapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         mapView.region = region
         
-        // Enhanced map with maximum detail
-        mapView.mapType = .mutedStandard // Using muted standard for a cleaner look with all details
-        mapView.pointOfInterestFilter = .includingAll
+        // Set map type to standard for better visibility of buildings and blocks
+        mapView.mapType = .standard
+        
+        // Configure map features
         mapView.showsBuildings = true
         mapView.showsTraffic = true
-        mapView.showsPointsOfInterest = true
-        mapView.showsCompass = true
-        mapView.showsScale = true
+        mapView.pointOfInterestFilter = .includingAll
+        
+        // Apply custom map styling for better building and block visibility
+        let mapConfiguration = MKStandardMapConfiguration()
+        mapConfiguration.pointOfInterestFilter = .includingAll
+        mapConfiguration.showsTraffic = true
+        
+        // Set emphasis style to muted for better building visibility
+        mapConfiguration.emphasisStyle = .muted
+        
+        // Enable all map features for maximum detail
+        mapView.preferredConfiguration = mapConfiguration
         
         return mapView
     }
