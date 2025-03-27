@@ -60,7 +60,7 @@ struct MaintenancePersonnelNewServiceRequestView: View {
     
     private func createServiceRequest() {
         let request = MaintenanceServiceRequest(
-            id: UUID(),
+            //id: UUID(),
             vehicleId: UUID(), // In a real app, this would come from vehicle selection
             vehicleName: vehicleName,
             serviceType: serviceType,
@@ -70,8 +70,8 @@ struct MaintenancePersonnelNewServiceRequestView: View {
             dueDate: dueDate,
             status: .pending,
             notes: notes,
-            issueType: issueType.isEmpty ? nil : issueType,
-            safetyChecks: []
+            issueType: issueType.isEmpty ? nil : issueType
+           // safetyChecks: []
         )
         dataStore.serviceRequests.append(request)
         dismiss()

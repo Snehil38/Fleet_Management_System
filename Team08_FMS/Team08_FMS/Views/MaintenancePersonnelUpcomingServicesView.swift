@@ -2,158 +2,362 @@ import SwiftUI
 
 struct MaintenancePersonnelUpcomingServicesView: View {
     @ObservedObject var dataStore: MaintenancePersonnelDataStore
-    @State private var searchText = ""
-    @State private var selectedServiceType: ServiceType?
-    @State private var selectedSchedule: MaintenancePersonnelRoutineSchedule?
-    @State private var showingDetail = false
-    
-    var filteredSchedules: [MaintenancePersonnelRoutineSchedule] {
-        var schedules = dataStore.routineSchedules
-        
-        if let serviceType = selectedServiceType {
-            schedules = schedules.filter { $0.serviceType == serviceType }
-        }
-        
-        if !searchText.isEmpty {
-            schedules = schedules.filter {
-                $0.vehicleName.localizedCaseInsensitiveContains(searchText) ||
-                $0.notes.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-        
-        return schedules.sorted { $0.nextServiceDate < $1.nextServiceDate }
-    }
+    @State private var selectedTab = 0
     
     var body: some View {
         VStack(spacing: 0) {
-            // Search and Filter Bar
-            VStack(spacing: 12) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-                    TextField("Search schedules...", text: $searchText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
-                .padding(.horizontal)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(ServiceType.allCases, id: \.self) { type in
-                            ServiceTypeFilterButton(
-                                type: type,
-                                isSelected: selectedServiceType == type,
-                                action: {
-                                    withAnimation {
-                                        selectedServiceType = selectedServiceType == type ? nil : type
-                                    }
-                                }
-                            )
+            // Header
+            Text("Driver Inspection Reports")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.top)
+            
+            // Segmented Control for Pre/Post Trip
+            Picker("Inspection Type", selection: $selectedTab) {
+                Text("Pre-Trip (\(preTripCount))").tag(0)
+                Text("Post-Trip (\(postTripCount))").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding()
+            
+            // List of Requests
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    ForEach(selectedTab == 0 ? preTripRequests : postTripRequests) { request in
+                        NavigationLink(destination: InspectionRequestDetailView(request: request)) {
+                            InspectionRequestCard(request: request)
                         }
                     }
-                    .padding(.horizontal)
                 }
-            }
-            .padding(.vertical, 8)
-            .background(Color(.systemBackground))
-            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-            
-            if filteredSchedules.isEmpty {
-                ServicesEmptyStateView(
-                    icon: "calendar",
-                    title: "No Upcoming Services",
-                    message: "There are no upcoming service schedules to display."
-                )
-            } else {
-                List {
-                    ForEach(filteredSchedules) { schedule in
-                        UpcomingServiceRow(schedule: schedule)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedSchedule = schedule
-                                showingDetail = true
-                            }
-                    }
-                }
-                .listStyle(PlainListStyle())
+                .padding()
             }
         }
-        .sheet(isPresented: $showingDetail) {
-            if let schedule = selectedSchedule {
-                NavigationView {
-                    UpcomingServiceDetailView(schedule: schedule)
-                        .navigationTitle("Service Schedule Details")
-                        .navigationBarItems(trailing: Button("Done") {
-                            showingDetail = false
-                        })
-                }
-            }
-        }
+        .background(Color(.systemGroupedBackground))
+    }
+    
+    private var preTripRequests: [InspectionRequest] {
+        dataStore.inspectionRequests.filter { $0.type == .preTrip }
+    }
+    
+    private var postTripRequests: [InspectionRequest] {
+        dataStore.inspectionRequests.filter { $0.type == .postTrip }
+    }
+    
+    private var preTripCount: Int {
+        preTripRequests.count
+    }
+    
+    private var postTripCount: Int {
+        postTripRequests.count
     }
 }
 
-struct UpcomingServiceRow: View {
-    let schedule: MaintenancePersonnelRoutineSchedule
+struct InspectionRequestCard: View {
+    let request: InspectionRequest
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
             HStack {
-                Text(schedule.vehicleName)
-                    .font(.headline)
-                Spacer()
-                ServiceTypeBadge(type: schedule.serviceType)
-            }
-            
-            Text(schedule.notes)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-            
-            HStack {
-                Label("Next Service", systemImage: "calendar")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(request.vehicleName)
+                        .font(.headline)
+                    
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .foregroundColor(.blue)
+                        Text(request.driverName)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
                 
                 Spacer()
                 
-                Text(schedule.nextServiceDate.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.blue)
+                StatusBadge(status: request.status)
             }
             
-            if schedule.nextServiceDate < Date().addingTimeInterval(86400 * 7) {
+            Divider()
+            
+            // Details
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text("Due within 7 days")
+                    Image(systemName: request.type == .preTrip ? "sunrise.fill" : "sunset.fill")
+                        .foregroundColor(request.type == .preTrip ? .orange : .purple)
+                    Text(request.description)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    Image(systemName: "clock.fill")
+                        .foregroundColor(.gray)
+                    Text(request.date.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if !request.issues.isEmpty {
+                Divider()
+                
+                // Issues Preview
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text("Issues Reported")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    
+                    ForEach(request.issues.prefix(2)) { issue in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(severityColor(issue.severity))
+                                .frame(width: 8, height: 8)
+                                .padding(.top, 6)
+                            
+                            Text(issue.description)
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    if request.issues.count > 2 {
+                        Text("+ \(request.issues.count - 2) more issues")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 16)
+                    }
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+    
+    private func severityColor(_ severity: IssueSeverity) -> Color {
+        switch severity {
+        case .low: return .green
+        case .medium: return .orange
+        case .high: return .red
+        case .critical: return .purple
+        }
     }
 }
 
-struct UpcomingServiceDetailView: View {
-    let schedule: MaintenancePersonnelRoutineSchedule
+struct InspectionRequestDetailView: View {
+    let request: InspectionRequest
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    @State private var showingMaintenanceSheet = false
+    @State private var showingExpenseSheet = false
+    @State private var selectedDate = Date()
+    @State private var maintenanceNotes = ""
+    @State private var maintenanceStatus: MaintenanceStatus = .scheduled
+    @State private var expenses: [MaintenanceExpense] = []
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Vehicle Info Card
-                MaintenanceVehicleScheduleInfoCard(schedule: schedule)
+                InspectionVehicleInfoCard(request: request)
+                    .padding(.horizontal)
                 
-                // Service Schedule Card
-                ServiceScheduleCard(schedule: schedule)
+                // Driver Info Card
+                InspectionDriverInfoCard(request: request)
+                    .padding(.horizontal)
+                
+                // Issues Card
+                if !request.issues.isEmpty {
+                    InspectionIssuesCard(issues: request.issues)
+                        .padding(.horizontal)
+                    
+                    // Priority Warning
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text("Priority Maintenance Required")
+                            .font(.headline)
+                            .foregroundColor(.red)
+                    }
+                    .padding(.horizontal)
+                }
+                
+                // Maintenance Status Card
+                if maintenanceStatus != .notScheduled {
+                    MaintenanceStatusCard(status: maintenanceStatus, date: selectedDate)
+                        .padding(.horizontal)
+                }
+                
+                // Expenses Card
+                if !expenses.isEmpty {
+                    MaintenanceExpensesCard(expenses: expenses)
+                        .padding(.horizontal)
+                }
+                
+                // Action Buttons
+                VStack(spacing: 12) {
+                    if maintenanceStatus == .notScheduled && !request.issues.isEmpty {
+                        Button(action: {
+                            showingMaintenanceSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "wrench.and.screwdriver.fill")
+                                Text("Schedule Maintenance")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                    }
+                    
+                    if maintenanceStatus == .scheduled {
+                        Button(action: {
+                            maintenanceStatus = .inProgress
+                        }) {
+                            HStack {
+                                Image(systemName: "play.circle.fill")
+                                Text("Start Maintenance")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                    }
+                    
+                    if maintenanceStatus == .inProgress {
+                        Button(action: {
+                            showingExpenseSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "dollarsign.circle.fill")
+                                Text("Add Expense")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                        
+                        Button(action: {
+                            if !expenses.isEmpty {
+                                maintenanceStatus = .completed
+                            } else {
+                                alertMessage = "Please add at least one expense before marking as completed"
+                                showingAlert = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Mark as Completed")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                    }
+                    
+                    Button(action: {
+                        alertMessage = "Inspection marked as reviewed"
+                        showingAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Mark as Reviewed")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                }
+                .padding(.horizontal)
             }
             .padding(.vertical)
         }
+        .navigationTitle("Inspection Details")
+        .navigationBarTitleDisplayMode(.large)
+        .alert("Success", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
+        }
+        .sheet(isPresented: $showingMaintenanceSheet) {
+            NavigationView {
+                Form {
+                    Section(header: Text("Maintenance Details")) {
+                        DatePicker("Schedule Date", selection: $selectedDate, displayedComponents: [.date, .hourAndMinute])
+                        
+                        TextEditor(text: $maintenanceNotes)
+                            .frame(height: 100)
+                    }
+                    
+                    Section(header: Text("Issues to Address")) {
+                        ForEach(request.issues) { issue in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Circle()
+                                        .fill(severityColor(issue.severity))
+                                        .frame(width: 8, height: 8)
+                                    Text(issue.severity.rawValue)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                                Text(issue.description)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("Schedule Maintenance")
+                .navigationBarItems(
+                    leading: Button("Cancel") {
+                        showingMaintenanceSheet = false
+                    },
+                    trailing: Button("Schedule") {
+                        scheduleMaintenance()
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: $showingExpenseSheet) {
+            NavigationView {
+                ExpenseFormView(expenses: $expenses)
+            }
+        }
+    }
+    
+    private func severityColor(_ severity: IssueSeverity) -> Color {
+        switch severity {
+        case .low: return .green
+        case .medium: return .orange
+        case .high: return .red
+        case .critical: return .purple
+        }
+    }
+    
+    private func scheduleMaintenance() {
+        maintenanceStatus = .scheduled
+        alertMessage = "Maintenance scheduled for \(selectedDate.formatted(date: .abbreviated, time: .shortened))"
+        showingAlert = true
+        showingMaintenanceSheet = false
     }
 }
 
-struct MaintenanceVehicleScheduleInfoCard: View {
-    let schedule: MaintenancePersonnelRoutineSchedule
+struct InspectionVehicleInfoCard: View {
+    let request: InspectionRequest
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -162,52 +366,76 @@ struct MaintenanceVehicleScheduleInfoCard: View {
             
             Divider()
             
-            InfoRow(title: "Vehicle", value: schedule.vehicleName, icon: "car.fill")
-            InfoRow(title: "Service Type", value: schedule.serviceType.rawValue, icon: "wrench.fill")
-            InfoRow(title: "Interval", value: "\(schedule.interval) days", icon: "clock.fill")
+            InfoRow(title: "Vehicle", value: request.vehicleName, icon: "car.fill")
+            InfoRow(title: "Inspection Type", value: request.type.rawValue, icon: request.type == .preTrip ? "sunrise.fill" : "sunset.fill")
+            InfoRow(title: "Date", value: request.date.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .padding(.horizontal)
     }
 }
 
-struct ServiceScheduleCard: View {
-    let schedule: MaintenancePersonnelRoutineSchedule
+struct InspectionDriverInfoCard: View {
+    let request: InspectionRequest
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Service Schedule")
+            Text("Driver Information")
                 .font(.headline)
             
             Divider()
             
-            VStack(alignment: .leading, spacing: 16) {
-                ScheduleRow(
-                    title: "Last Service",
-                    date: schedule.lastServiceDate,
-                    icon: "checkmark.circle.fill",
-                    color: .green
-                )
+            InfoRow(title: "Driver", value: request.driverName, icon: "person.fill")
+            if !request.notes.isEmpty {
+                Text("Notes")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .padding(.top, 4)
                 
-                ScheduleRow(
-                    title: "Next Service",
-                    date: schedule.nextServiceDate,
-                    icon: "calendar",
-                    color: .blue
-                )
-                
-                if !schedule.notes.isEmpty {
-                    Text("Notes")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .padding(.top, 4)
+                Text(request.notes)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct InspectionIssuesCard: View {
+    let issues: [InspectionIssue]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Reported Issues")
+                .font(.headline)
+            
+            Divider()
+            
+            ForEach(issues) { issue in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Circle()
+                            .fill(severityColor(issue.severity))
+                            .frame(width: 8, height: 8)
+                        
+                        Text(issue.severity.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
                     
-                    Text(schedule.notes)
+                    Text(issue.description)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+                
+                if issue.id != issues.last?.id {
+                    Divider()
                 }
             }
         }
@@ -215,46 +443,188 @@ struct ServiceScheduleCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .padding(.horizontal)
+    }
+    
+    private func severityColor(_ severity: IssueSeverity) -> Color {
+        switch severity {
+        case .low: return .green
+        case .medium: return .orange
+        case .high: return .red
+        case .critical: return .purple
+        }
     }
 }
 
-struct ScheduleRow: View {
-    let title: String
+struct MaintenanceStatusCard: View {
+    let status: MaintenanceStatus
     let date: Date
-    let icon: String
-    let color: Color
     
     var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(color)
-                .frame(width: 24)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Maintenance Status")
+                .font(.headline)
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            Divider()
+            
+            HStack {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 12, height: 12)
                 
-                Text(date.formatted(date: .long, time: .omitted))
+                Text(status.rawValue)
                     .font(.subheadline)
                     .fontWeight(.medium)
-            }
-            
-            Spacer()
-            
-            if title == "Next Service" && date < Date().addingTimeInterval(86400 * 7) {
-                Text("Due Soon")
+                
+                Spacer()
+                
+                Text(date.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.2))
-                    .foregroundColor(.orange)
-                    .cornerRadius(8)
+                    .foregroundColor(.secondary)
             }
         }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
+    
+    private var statusColor: Color {
+        switch status {
+        case .scheduled: return .orange
+        case .inProgress: return .blue
+        case .completed: return .green
+        case .notScheduled: return .gray
+        }
+    }
+}
+
+struct MaintenanceExpensesCard: View {
+    let expenses: [MaintenanceExpense]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Maintenance Expenses")
+                .font(.headline)
+            
+            Divider()
+            
+            ForEach(expenses) { expense in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(expense.description)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        
+                        Spacer()
+                        
+                        Text("$\(String(format: "%.2f", expense.amount))")
+                            .font(.subheadline)
+                    }
+                    
+                    Text(expense.date.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+                
+                if expense.id != expenses.last?.id {
+                    Divider()
+                }
+            }
+            
+            Divider()
+            
+            HStack {
+                Text("Total")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                Text("$\(String(format: "%.2f", totalExpenses))")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+    
+    private var totalExpenses: Double {
+        expenses.reduce(0) { $0 + $1.amount }
+    }
+}
+
+struct ExpenseFormView: View {
+    @Binding var expenses: [MaintenanceExpense]
+    @Environment(\.dismiss) var dismiss
+    @State private var description = ""
+    @State private var amount = ""
+    @State private var date = Date()
+    
+    var body: some View {
+        Form {
+            Section(header: Text("Expense Details")) {
+                TextField("Description", text: $description)
+                TextField("Amount", text: $amount)
+                    .keyboardType(.decimalPad)
+                DatePicker("Date", selection: $date, displayedComponents: [.date])
+            }
+        }
+        .navigationTitle("Add Expense")
+        .navigationBarItems(
+            leading: Button("Cancel") {
+                dismiss()
+            },
+            trailing: Button("Add") {
+                if let amountDouble = Double(amount), !description.isEmpty {
+                    let expense = MaintenanceExpense(
+                        id: UUID(),
+                        description: description,
+                        amount: amountDouble,
+                        date: date
+                    )
+                    expenses.append(expense)
+                    dismiss()
+                }
+            }
+            .disabled(description.isEmpty || amount.isEmpty)
+        )
+    }
+}
+
+enum InspectionType: String, Codable {
+    case preTrip = "Pre-Trip"
+    case postTrip = "Post-Trip"
+}
+
+struct InspectionIssue: Identifiable, Codable {
+    let id: UUID
+    let description: String
+    let severity: IssueSeverity
+}
+
+enum IssueSeverity: String, Codable {
+    case low = "Low"
+    case medium = "Medium"
+    case high = "High"
+    case critical = "Critical"
+}
+
+struct InspectionRequest: Identifiable, Codable {
+    let id: UUID
+    let vehicleId: UUID
+    let vehicleName: String
+    let driverId: UUID
+    let driverName: String
+    let type: InspectionType
+    let description: String
+    let date: Date
+    var status: ServiceRequestStatus
+    let issues: [InspectionIssue]
+    var notes: String
 }
 
 #Preview {

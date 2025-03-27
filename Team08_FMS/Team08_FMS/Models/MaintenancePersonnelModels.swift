@@ -29,6 +29,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
     @Published var serviceRequests: [MaintenanceServiceRequest] = []
     @Published var serviceHistory: [MaintenancePersonnelServiceHistory] = []
     @Published var routineSchedules: [MaintenancePersonnelRoutineSchedule] = []
+    @Published var inspectionRequests: [InspectionRequest] = []
     
     init() {
         // Initialize with sample data
@@ -39,7 +40,6 @@ class MaintenancePersonnelDataStore: ObservableObject {
         // Sample service requests
         serviceRequests = [
             MaintenanceServiceRequest(
-                id: UUID(),
                 vehicleId: UUID(),
                 vehicleName: "Truck 001",
                 serviceType: .routine,
@@ -49,11 +49,9 @@ class MaintenancePersonnelDataStore: ObservableObject {
                 dueDate: Date().addingTimeInterval(86400 * 7),
                 status: .pending,
                 notes: "Regular maintenance required",
-                issueType: nil,
-                safetyChecks: []
+                issueType: nil
             ),
             MaintenanceServiceRequest(
-                id: UUID(),
                 vehicleId: UUID(),
                 vehicleName: "Van 002",
                 serviceType: .repair,
@@ -63,8 +61,54 @@ class MaintenancePersonnelDataStore: ObservableObject {
                 dueDate: Date().addingTimeInterval(86400 * 2),
                 status: .inProgress,
                 notes: "Urgent brake system inspection needed",
-                issueType: "Brake System",
-                safetyChecks: []
+                issueType: "Brake System"
+            )
+        ]
+        
+        // Sample inspection requests
+        inspectionRequests = [
+            InspectionRequest(
+                id: UUID(),
+                vehicleId: UUID(),
+                vehicleName: "Truck 003",
+                driverId: UUID(),
+                driverName: "John Doe",
+                type: .preTrip,
+                description: "Pre-trip inspection required",
+                date: Date(),
+                status: .pending,
+                issues: [
+                    InspectionIssue(
+                        id: UUID(),
+                        description: "Low tire pressure",
+                        severity: .medium
+                    ),
+                    InspectionIssue(
+                        id: UUID(),
+                        description: "Check engine light on",
+                        severity: .high
+                    )
+                ],
+                notes: "Driver reported multiple issues"
+            ),
+            InspectionRequest(
+                id: UUID(),
+                vehicleId: UUID(),
+                vehicleName: "Van 004",
+                driverId: UUID(),
+                driverName: "Jane Smith",
+                type: .postTrip,
+                description: "Post-trip inspection completed",
+                date: Date(),
+                status: .pending,
+                issues: [
+                    InspectionIssue(
+                        id: UUID(),
+                        description: "Brake noise",
+                        severity: .high
+                    )
+                ],
+                notes: "Driver reported brake issues"
             )
         ]
         
@@ -103,6 +147,25 @@ class MaintenancePersonnelDataStore: ObservableObject {
         if let index = serviceRequests.firstIndex(where: { $0.id == request.id }) {
             var updatedRequest = request
             updatedRequest.status = newStatus
+            
+            switch newStatus {
+            case .inProgress:
+                updatedRequest.startDate = Date()
+            case .completed:
+                updatedRequest.completionDate = Date()
+            default:
+                break
+            }
+            
+            serviceRequests[index] = updatedRequest
+        }
+    }
+    
+    func addExpense(to request: MaintenanceServiceRequest, expense: Expense) {
+        if let index = serviceRequests.firstIndex(where: { $0.id == request.id }) {
+            var updatedRequest = request
+            updatedRequest.expenses.append(expense)
+            updatedRequest.totalCost = updatedRequest.expenses.reduce(0) { $0 + $1.amount }
             serviceRequests[index] = updatedRequest
         }
     }

@@ -167,7 +167,7 @@ struct MaintenanceVehicleInfoCard: View {
     }
 }
 
-struct InfoRow: View {
+struct RInfoRow: View {
     let title: String
     let value: String
     let icon: String

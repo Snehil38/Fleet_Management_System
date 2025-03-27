@@ -3,178 +3,207 @@ import SwiftUI
 struct MaintenancePersonnelDashboardView: View {
     @StateObject private var dataStore = MaintenancePersonnelDataStore()
     @State private var selectedTab = 0
+    @State private var selectedStatus: ServiceRequestStatus = .pending
     @State private var showingNewRequest = false
-    @State private var showingContactManager = false
+    @State private var showingProfile = false
     
     var body: some View {
         NavigationView {
             TabView(selection: $selectedTab) {
-                // Service Requests Tab
-                NavigationView {
-                    ServiceRequestListView(dataStore: dataStore)
-                        .navigationTitle("Service Requests")
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button(action: { showingNewRequest = true }) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                        }
-                }
-                .tabItem {
-                    Label("Requests", systemImage: "wrench.and.screwdriver.fill")
-                }
-                .tag(0)
+                serviceRequestsTab
+                    .tabItem {
+                        Label("Service Requests", systemImage: "wrench.fill")
+                    }
+                    .tag(0)
                 
-                // Safety Checks Tab
-                NavigationView {
-                    MaintenancePersonnelSafetyChecksView(dataStore: dataStore)
-                        .navigationTitle("Safety Checks")
-                }
-                .tabItem {
-                    Label("Safety", systemImage: "checkmark.shield.fill")
-                }
-                .tag(1)
-                
-                // Service History Tab
-                NavigationView {
-                    MaintenancePersonnelServiceHistoryView(dataStore: dataStore)
-                        .navigationTitle("Service History")
-                }
-                .tabItem {
-                    Label("History", systemImage: "clock.fill")
-                }
-                .tag(2)
-                
-                // Upcoming Services Tab
-                NavigationView {
-                    MaintenancePersonnelUpcomingServicesView(dataStore: dataStore)
-                        .navigationTitle("Upcoming Services")
-                }
-                .tabItem {
-                    Label("Schedule", systemImage: "calendar")
-                }
-                .tag(3)
+                upcomingServicesTab
+                    .tabItem {
+                        Label("Inspection", systemImage: "checklist")
+                    }
+                    .tag(1)
             }
             .sheet(isPresented: $showingNewRequest) {
-                NavigationView {
-                    MaintenancePersonnelNewServiceRequestView(dataStore: dataStore)
-                        .navigationTitle("New Service Request")
-                        .navigationBarItems(trailing: Button("Cancel") {
-                            showingNewRequest = false
-                        })
+                newRequestSheet
+            }
+            .sheet(isPresented: $showingProfile) {
+                profileSheet
+            }
+            .onChange(of: dataStore.serviceRequests) { _ in
+                checkForCompletedRequests()
+            }
+        }
+    }
+    
+    private var serviceRequestsTab: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                statusFilter
+                serviceRequestsList
+            }
+            .navigationTitle("Service Requests")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showingProfile = true }) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.title2)
+                    }
                 }
             }
-//            .sheet(isPresented: $showingContactManager) {
-//                NavigationView {
-//                    ContactFleetManagerView()
-//                        .navigationTitle("Contact Fleet Manager")
-//                        .navigationBarItems(trailing: Button("Cancel") {
-//                            showingContactManager = false
-//                        })
-//                }
-//            }
         }
+    }
+    
+    private var statusFilter: some View {
+        Picker("Status", selection: $selectedStatus) {
+            Text("Pending (\(pendingCount))").tag(ServiceRequestStatus.pending)
+            Text("In Progress (\(inProgressCount))").tag(ServiceRequestStatus.inProgress)
+            Text("Completed (\(completedCount))").tag(ServiceRequestStatus.completed)
+        }
+        .pickerStyle(.segmented)
+        .padding()
+    }
+    
+    private var serviceRequestsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(filteredRequests) { request in
+                    NavigationLink(destination: MaintenancePersonnelServiceRequestDetailView(request: request, dataStore: dataStore)) {
+                        ServiceRequestCard(request: request)
+                    }
+                }
+            }
+            .padding()
+        }
+    }
+    
+    private var toolbarButtons: some View {
+        Button(action: { showingProfile = true }) {
+            Image(systemName: "person.circle.fill")
+                .font(.title2)
+        }
+    }
+    
+    private var upcomingServicesTab: some View {
+        MaintenancePersonnelUpcomingServicesView(dataStore: dataStore)
+            .navigationTitle("Inspection")
+            .navigationBarTitleDisplayMode(.inline)
+    }
+    
+    private var newRequestSheet: some View {
+        NavigationView {
+            MaintenancePersonnelNewServiceRequestView(dataStore: dataStore)
+                .navigationTitle("New Service Request")
+                .navigationBarItems(trailing: Button("Cancel") {
+                    showingNewRequest = false
+                })
+        }
+    }
+    
+    private var profileSheet: some View {
+        NavigationView {
+            MaintenancePersonnelProfileView()
+                .navigationTitle("Profile")
+                .navigationBarItems(trailing: Button("Done") {
+                    showingProfile = false
+                })
+        }
+    }
+    
+    private var filteredRequests: [MaintenanceServiceRequest] {
+        dataStore.serviceRequests.filter { $0.status == selectedStatus }
+    }
+    
+    private func checkForCompletedRequests() {
+        if let completedRequest = dataStore.serviceRequests.first(where: { 
+            $0.status == .completed && 
+            $0.completionDate?.timeIntervalSinceNow ?? 0 > -1 
+        }) {
+            selectedStatus = .completed
+        }
+    }
+    
+    private var pendingCount: Int {
+        dataStore.serviceRequests.filter { $0.status == .pending }.count
+    }
+    
+    private var inProgressCount: Int {
+        dataStore.serviceRequests.filter { $0.status == .inProgress }.count
+    }
+    
+    private var completedCount: Int {
+        dataStore.serviceRequests.filter { $0.status == .completed }.count
     }
 }
 
-struct ServiceRequestListView: View {
-    @ObservedObject var dataStore: MaintenancePersonnelDataStore
-    @State private var searchText = ""
-    @State private var selectedStatus: ServiceRequestStatus?
-    @State private var selectedRequest: MaintenanceServiceRequest?
-    @State private var showingDetail = false
-    
-    var filteredRequests: [MaintenanceServiceRequest] {
-        var requests = dataStore.serviceRequests
-        
-        if let status = selectedStatus {
-            requests = requests.filter { $0.status == status }
-        }
-        
-        if !searchText.isEmpty {
-            requests = requests.filter {
-                $0.vehicleName.localizedCaseInsensitiveContains(searchText) ||
-                $0.description.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-        
-        return requests
-    }
+struct ServiceRequestCard: View {
+    let request: MaintenanceServiceRequest
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Search and Filter Bar
-            VStack(spacing: 12) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-                    TextField("Search requests...", text: $searchText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(request.vehicleName)
+                        .font(.headline)
+                    
+                    Text(request.serviceType.rawValue)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-                .padding(.horizontal)
                 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(ServiceRequestStatus.allCases, id: \.self) { status in
-                            StatusFilterButton(
-                                status: status,
-                                isSelected: selectedStatus == status,
-                                action: {
-                                    withAnimation {
-                                        selectedStatus = selectedStatus == status ? nil : status
-                                    }
-                                }
-                            )
+                Spacer()
+                
+                StatusBadge(status: request.status)
+            }
+            
+            Divider()
+            
+            // Details
+            VStack(alignment: .leading, spacing: 8) {
+                Text(request.description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                
+                if request.status == .inProgress {
+                    Label("\(request.expenses.count) Expenses", systemImage: "dollarsign.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+            }
+            
+            if request.status == .inProgress && !request.expenses.isEmpty {
+                Divider()
+                
+                // Recent Expenses Preview
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Recent Expenses")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    
+                    ForEach(request.expenses.prefix(2)) { expense in
+                        HStack {
+                            Text(expense.description)
+                                .font(.caption)
+                            Spacer()
+                            Text("$\(expense.amount, specifier: "%.2f")")
+                                .font(.caption)
+                                .foregroundColor(.green)
                         }
                     }
-                    .padding(.horizontal)
-                }
-            }
-            .padding(.vertical, 8)
-            .background(Color(.systemBackground))
-            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-            
-            // Requests List
-            if filteredRequests.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 50))
-                        .foregroundColor(.gray)
-                    Text("No service requests found")
-                        .font(.headline)
-                        .foregroundColor(.gray)
-                    Text("Try adjusting your search or filters")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                .frame(maxHeight: .infinity)
-                .padding()
-            } else {
-                List(filteredRequests) { request in
-                    ServiceRequestRow(request: request)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedRequest = request
-                            showingDetail = true
-                        }
-                }
-                .listStyle(PlainListStyle())
-            }
-        }
-        .sheet(isPresented: $showingDetail) {
-            if let request = selectedRequest {
-                NavigationView {
-                    MaintenancePersonnelServiceRequestDetailView(request: request, dataStore: dataStore)
-                        .navigationTitle("Service Request Details")
-                        .navigationBarItems(trailing: Button("Done") {
-                            showingDetail = false
-                        })
+                    
+                    if request.expenses.count > 2 {
+                        Text("+ \(request.expenses.count - 2) more")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
 

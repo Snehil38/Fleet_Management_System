@@ -22,7 +22,7 @@ enum ServiceRequestPriority: String, CaseIterable, Codable {
     case urgent = "Urgent"
 }
 
-struct SafetyCheck: Identifiable, Codable {
+struct SafetyCheck: Identifiable, Codable, Equatable {
     let id: UUID
     let item: String
     var isChecked: Bool
@@ -36,7 +36,7 @@ struct SafetyCheck: Identifiable, Codable {
     }
 }
 
-struct MaintenanceServiceRequest: Identifiable, Codable {
+struct MaintenanceServiceRequest: Identifiable, Codable, Equatable {
     let id: UUID
     let vehicleId: UUID
     let vehicleName: String
@@ -46,9 +46,72 @@ struct MaintenanceServiceRequest: Identifiable, Codable {
     let date: Date
     let dueDate: Date
     var status: ServiceRequestStatus
-    let notes: String
+    var notes: String
     let issueType: String?
     var safetyChecks: [SafetyCheck]
+    var expenses: [Expense]
+    var totalCost: Double
+    var startDate: Date?
+    var completionDate: Date?
+    
+    init(vehicleId: UUID, vehicleName: String, serviceType: ServiceType, description: String, priority: ServiceRequestPriority, date: Date, dueDate: Date, status: ServiceRequestStatus, notes: String, issueType: String? = nil) {
+        self.id = UUID()
+        self.vehicleId = vehicleId
+        self.vehicleName = vehicleName
+        self.serviceType = serviceType
+        self.description = description
+        self.priority = priority
+        self.date = date
+        self.dueDate = dueDate
+        self.status = status
+        self.notes = notes
+        self.issueType = issueType
+        self.safetyChecks = []
+        self.expenses = []
+        self.totalCost = 0.0
+    }
+    
+    static func == (lhs: MaintenanceServiceRequest, rhs: MaintenanceServiceRequest) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.vehicleId == rhs.vehicleId &&
+        lhs.vehicleName == rhs.vehicleName &&
+        lhs.serviceType == rhs.serviceType &&
+        lhs.description == rhs.description &&
+        lhs.priority == rhs.priority &&
+        lhs.date == rhs.date &&
+        lhs.dueDate == rhs.dueDate &&
+        lhs.status == rhs.status &&
+        lhs.notes == rhs.notes &&
+        lhs.issueType == rhs.issueType &&
+        lhs.safetyChecks == rhs.safetyChecks &&
+        lhs.expenses == rhs.expenses &&
+        lhs.totalCost == rhs.totalCost &&
+        lhs.startDate == rhs.startDate &&
+        lhs.completionDate == rhs.completionDate
+    }
+}
+
+struct Expense: Identifiable, Codable, Equatable {
+    let id: UUID
+    let description: String
+    let amount: Double
+    let date: Date
+    let category: ExpenseCategory
+    
+    init(description: String, amount: Double, date: Date, category: ExpenseCategory) {
+        self.id = UUID()
+        self.description = description
+        self.amount = amount
+        self.date = date
+        self.category = category
+    }
+}
+
+enum ExpenseCategory: String, Codable, CaseIterable {
+    case parts = "Parts"
+    case labor = "Labor"
+    case supplies = "Supplies"
+    case other = "Other"
 }
 
 struct ServiceHistory: Identifiable, Codable {
