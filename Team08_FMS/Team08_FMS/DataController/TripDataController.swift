@@ -31,19 +31,20 @@ class TripDataController: ObservableObject {
     @Published var isInSourceRegion = false
     @Published var isInDestinationRegion = false
     
+    @Published var allTrips: [Trip] = []
+    
     private var locationManager = CLLocationManager()
     private let geofenceRadius: CLLocationDistance = 100.0 // 100 meters
     private var driverId: UUID?
-    private var allTrips: [Trip] = []
     
     private let supabaseController = SupabaseDataController.shared
     
-    private init() {
-        // Start fetching data immediately
-        Task {
-            await refreshTrips()
-        }
-    }
+//    private init() {
+//        // Start fetching data immediately
+//        Task {
+//            await refreshTrips()
+//        }
+//    }
     
     private func setupLocationManager() {
         //        locationManager.delegate = self
@@ -159,7 +160,7 @@ class TripDataController: ObservableObject {
     
     // Fetch all trips without driver filtering
     @MainActor
-    private func fetchAllTrips() async throws {
+    func fetchAllTrips() async throws {
         print("Fetching all trips...")
         do {
             // Create a decoder with custom date decoding strategy
@@ -648,7 +649,11 @@ class TripDataController: ObservableObject {
             try await supabaseController.updateTrip(id: trip.id, status: "delivered")
             print("Updated trip status to 'delivered'")
             
-            await supabaseController.updateVehichleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+            Task {
+                let id = await supabaseController.getUserID()
+                await supabaseController.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+                await supabaseController.updateDriverStatus(newStatus: .available, userID: id, id: nil)
+            }
             
             // Update end time in Supabase
             let response = try await supabaseController.databaseFrom("trips")
@@ -733,6 +738,11 @@ class TripDataController: ObservableObject {
             }
             
             // Refresh trips to ensure everything is in sync with server
+            Task {
+                let id = await supabaseController.getUserID()
+                await supabaseController.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+                await supabaseController.updateDriverStatus(newStatus: .available, userID: id, id: nil)
+            }
             try await fetchTrips()
             print("Trips refreshed after starting trip")
         } catch {

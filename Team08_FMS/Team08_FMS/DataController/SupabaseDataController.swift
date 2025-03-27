@@ -1084,7 +1084,7 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    func updateVehichleStatus(newStatus: VehicleStatus, vehicleID: UUID) async {
+    func updateVehicleStatus(newStatus: VehicleStatus, vehicleID: UUID) async {
         do {
             // 6. Update the payload in Supabase by filtering with the vehicle's `id`
             let response = try await supabase
@@ -1226,4 +1226,65 @@ class SupabaseDataController: ObservableObject {
             throw error
         }
     }
+    
+    func fetchAvailableVehicles(startDate: Date, endDate: Date) async throws -> [Vehicle] {
+        let vehicles = try await fetchVehicles()
+        let trips = TripDataController.shared.getAllTrips()
+        
+        // Filter trips that overlap with the given date range.
+        // This assumes each trip has an `endTime` property.
+        let filteredTrips = trips.filter { trip in
+            if let startTime = trip.startTime, let endTime = trip.endTime {
+                return startTime < endDate && endTime > startDate
+            } else {
+                return false
+            }
+        }
+        
+        var availableVehicles: [Vehicle] = []
+        
+        // Add vehicles that are not used in any of the overlapping trips.
+        for vehicle in vehicles {
+            let isUsed = filteredTrips.contains { trip in
+                trip.vehicleDetails.id == vehicle.id
+            }
+            if !isUsed && vehicle.status != .underMaintenance {
+                availableVehicles.append(vehicle)
+            }
+        }
+        
+        print(filteredTrips)
+        print("\n\(availableVehicles)")
+        
+        return availableVehicles
+    }
+    
+    func fetchAvailableDrivers(startDate: Date, endDate: Date) async throws -> [Driver] {
+        let drivers = try await fetchDrivers()
+        let trips = TripDataController.shared.getAllTrips()
+        
+        // Filter trips that overlap with the given date range.
+        let filteredTrips = trips.filter { trip in
+            if let startTime = trip.startTime, let endTime = trip.endTime {
+                return startTime < endDate && endTime > startDate
+            } else {
+                return false
+            }
+        }
+        
+        var availableDrivers: [Driver] = []
+        
+        // Add drivers that are not used in any of the overlapping trips.
+        for driver in drivers {
+            let isUsed = filteredTrips.contains { trip in
+                trip.driverId == driver.id
+            }
+            if !isUsed && driver.status != .offDuty {
+                availableDrivers.append(driver)
+            }
+        }
+        
+        return availableDrivers
+    }
+
 }

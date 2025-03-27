@@ -113,7 +113,7 @@ private struct VehicleCard: View {
             if vehicle.status == .underMaintenance {
                 Button {
                     Task {
-                        await SupabaseDataController.shared.updateVehichleStatus(newStatus: VehicleStatus.available, vehicleID: vehicle.id)
+                        await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.available, vehicleID: vehicle.id)
                     }
                     if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
                         DispatchQueue.main.async {
@@ -129,7 +129,7 @@ private struct VehicleCard: View {
                 Button {
                     Task {
                         // Update on the server
-                        await SupabaseDataController.shared.updateVehichleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
+                        await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
                         
                         // Update the local state immediately
                         if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
