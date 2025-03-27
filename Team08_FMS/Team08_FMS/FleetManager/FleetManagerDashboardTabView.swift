@@ -448,7 +448,7 @@ struct AddTripView: View {
     }
     
     var availableVehicles: [Vehicle] {
-        vehicleManager.vehicles.filter { $0.status == .available }
+        vehicleManager.vehicles.filter { $0.status == .available && $0.status != .inService }
     }
     
     var body: some View {
@@ -890,6 +890,7 @@ struct AddTripView: View {
                 )
                 
                 if success {
+                    await supabaseDataController.updateVehichleStatus(newStatus: .inService, vehicleID: vehicle.id)
                     dismiss()
                 } else {
                     alertMessage = "Failed to create trip. Please try again."
