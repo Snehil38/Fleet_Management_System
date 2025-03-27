@@ -34,7 +34,8 @@ struct NavigationMapView: UIViewRepresentable {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
-        mapView.userTrackingMode = followsUserLocation ? .followWithHeading : .none
+        // Disable automatic tracking - we'll handle it manually
+        mapView.userTrackingMode = .none
         
         // Set map type to standard for better visibility of buildings and blocks
         mapView.mapType = .standard
@@ -48,34 +49,26 @@ struct NavigationMapView: UIViewRepresentable {
         let mapConfiguration = MKStandardMapConfiguration()
         mapConfiguration.pointOfInterestFilter = .includingAll
         mapConfiguration.showsTraffic = true
-        
-        // Set emphasis style to muted for better building visibility
         mapConfiguration.emphasisStyle = .muted
-        
-        // Enable all map features for maximum detail
         mapView.preferredConfiguration = mapConfiguration
         
-        // Adjust camera settings for better building visibility
+        // Initial camera setup
         let camera = MKMapCamera()
         camera.centerCoordinate = destination
-        camera.centerCoordinateDistance = 500 // Lower altitude for more detail
-        camera.pitch = 0 // Set to 0 for top-down view like in screenshot
-        camera.heading = 0 // Reset heading
+        camera.centerCoordinateDistance = 500
+        camera.pitch = 0
+        camera.heading = 0
         mapView.camera = camera
         
-        // Add destination annotation with animation
+        // Add destination annotation
         let destinationAnnotation = MapAnnotation(
             coordinate: destination,
             title: "Destination",
             subtitle: "Your delivery point",
             type: .destination
         )
+        mapView.addAnnotation(destinationAnnotation)
         
-        UIView.animate(withDuration: 0.5, delay: 0.2, options: .curveEaseInOut) {
-            mapView.addAnnotation(destinationAnnotation)
-        }
-        
-        // For simulator testing
         #if targetEnvironment(simulator)
         let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
         mapView.addGestureRecognizer(panGesture)
@@ -85,7 +78,7 @@ struct NavigationMapView: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: MKMapView, context: Context) {
-        // Update route overlay with animation
+        // Update route overlay
         if let route = route {
             let currentRouteId = route.polyline.hash
             if context.coordinator.currentRouteId != currentRouteId {
@@ -93,13 +86,25 @@ struct NavigationMapView: UIViewRepresentable {
                 mapView.addOverlay(route.polyline)
                 context.coordinator.currentRouteId = currentRouteId
                 
-                // If not following user, show the entire route
-                if !followsUserLocation {
-                    mapView.setVisibleMapRect(
-                        route.polyline.boundingMapRect,
-                        edgePadding: UIEdgeInsets(top: 100, left: 100, bottom: 100, right: 100),
-                        animated: true
+                // Show entire route if not following user
+                if !followsUserLocation && !context.coordinator.isUpdatingCamera {
+                    let routeRect = route.polyline.boundingMapRect
+                    // Add padding to the route rect
+                    let paddedRect = routeRect.insetBy(
+                        dx: -routeRect.width * 0.1,
+                        dy: -routeRect.height * 0.1
                     )
+                    let region = mapView.regionThatFits(
+                        MKCoordinateRegion(paddedRect)
+                    )
+                    
+                    context.coordinator.queueCameraUpdate {
+                        UIView.animate(withDuration: 1.0) {
+                            mapView.setRegion(region, animated: false)
+                        } completion: { _ in
+                            context.coordinator.isUpdatingCamera = false
+                        }
+                    }
                 }
             }
         } else {
@@ -107,27 +112,26 @@ struct NavigationMapView: UIViewRepresentable {
             context.coordinator.currentRouteId = nil
         }
         
-        // Update user tracking mode with smooth transition
-        if mapView.userTrackingMode != (followsUserLocation ? .followWithHeading : .none) {
-            UIView.animate(withDuration: 0.3) {
-                mapView.userTrackingMode = followsUserLocation ? .followWithHeading : .none
-            }
-        }
-        
-        // Update user location with animation
+        // Update user location and camera
         if let userLocation = userLocation {
-            // Update camera position for 3D effect when following user
-            if followsUserLocation {
-                let camera = MKMapCamera(
-                    lookingAtCenter: userLocation,
-                    fromDistance: 300, // Closer distance for better detail
-                    pitch: 45, // Less aggressive tilt
-                    heading: userHeading
-                )
-                mapView.setCamera(camera, animated: true)
+            if followsUserLocation && !context.coordinator.isUpdatingCamera {
+                context.coordinator.queueCameraUpdate {
+                    let camera = MKMapCamera(
+                        lookingAtCenter: userLocation,
+                        fromDistance: 500,
+                        pitch: 45,
+                        heading: userHeading
+                    )
+                    
+                    UIView.animate(withDuration: 1.0, delay: 0, options: .curveEaseInOut) {
+                        mapView.camera = camera
+                    } completion: { _ in
+                        context.coordinator.isUpdatingCamera = false
+                    }
+                }
             }
             
-            // Update source annotation with animation
+            // Update source annotation
             context.coordinator.updateSourceAnnotation(
                 at: userLocation,
                 on: mapView,
@@ -145,10 +149,37 @@ struct NavigationMapView: UIViewRepresentable {
         var lastLocation: CLLocation?
         var currentRouteId: Int?
         var sourceAnnotation: MapAnnotation?
-        var simulatedSpeed: Double = 5.0 // 5 meters per second (walking speed)
+        var simulatedSpeed: Double = 5.0
+        var updateCount: Int = 0
+        var lastUpdateTime: Date = Date()
+        var isUpdatingCamera: Bool = false
+        var updateTimer: Timer?
+        var pendingCameraUpdate: (() -> Void)?
         
         init(_ parent: NavigationMapView) {
             self.parent = parent
+            super.init()
+            setupUpdateTimer()
+        }
+        
+        deinit {
+            updateTimer?.invalidate()
+        }
+        
+        private func setupUpdateTimer() {
+            // Increase update interval to 3 seconds
+            updateTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                if !self.isUpdatingCamera, let pendingUpdate = self.pendingCameraUpdate {
+                    self.isUpdatingCamera = true
+                    pendingUpdate()
+                    self.pendingCameraUpdate = nil
+                }
+            }
+        }
+        
+        func queueCameraUpdate(_ update: @escaping () -> Void) {
+            pendingCameraUpdate = update
         }
         
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -302,6 +333,24 @@ struct NavigationMapView: UIViewRepresentable {
                 lastLocation = location
                 parent.onLocationUpdate?(location)
             }
+        }
+        
+        // Add map region change monitoring with stricter timing
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let now = Date()
+            // Increase minimum time between updates to 2 seconds
+            if now.timeIntervalSince(lastUpdateTime) < 2.0 {
+                return
+            }
+            lastUpdateTime = now
+            
+            updateCount += 1
+            let span = mapView.region.span
+            print("Map Update #\(updateCount)")
+            print("New zoom levels - Latitude span: \(span.latitudeDelta), Longitude span: \(span.longitudeDelta)")
+            print("Center coordinate: \(mapView.region.center)")
+            print("Camera altitude: \(mapView.camera.altitude)")
+            print("-------------------")
         }
     }
 } 
