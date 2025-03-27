@@ -266,6 +266,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             return
         }
         
+        guard let currentTrip = currentTrip else { return }
+        
         print("DEBUG: Entered region: \(circularRegion.identifier)")
         print("DEBUG: Current location: \(manager.location?.coordinate.latitude ?? 0), \(manager.location?.coordinate.longitude ?? 0)")
         print("DEBUG: Distance from region center: \(manager.location?.distance(from: CLLocation(latitude: circularRegion.center.latitude, longitude: circularRegion.center.longitude)) ?? 0) meters")
@@ -274,6 +276,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "sourceRegion":
             isInSourceRegion = true
             print("DEBUG: Entered source region")
+            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) entered source region"
+            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            supabaseController.insertIntoGeofenceEvents(event: event)
             checkTripStartEligibility()
             
             if !upcomingTrips.isEmpty {
@@ -286,6 +291,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "destinationRegion":
             isInDestinationRegion = true
             print("DEBUG: Entered destination region")
+            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) entered destination region"
+            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
             tripTimer?.invalidate()
             tripTimer = nil
             
@@ -294,14 +301,12 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let durationString = formatTimeRemaining(duration)
                 
                 Task {
-                    await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip?.name ?? "Unknown"). Trip duration: \(durationString)")
+                    await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip.name). Trip duration: \(durationString)")
                 }
             }
             
-            if let trip = currentTrip {
-                Task {
-                    try? await markTripAsDelivered(trip: trip)
-                }
+            Task {
+                try? await markTripAsDelivered(trip: currentTrip)
             }
             
         default:

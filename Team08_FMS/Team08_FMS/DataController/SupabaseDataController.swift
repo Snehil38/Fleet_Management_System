@@ -3,6 +3,11 @@ import Supabase
 import Combine
 import SwiftSMTP
 
+struct GeofenceEvents: Codable {
+    var tripId: UUID
+    var message: String
+}
+
 class SupabaseDataController: ObservableObject {
     static let shared = SupabaseDataController()
     
@@ -416,10 +421,39 @@ class SupabaseDataController: ObservableObject {
             await myChannel.subscribe()
             for await change in changes {
               switch change {
-              case .insert(let action): print(action)
-              case .update(let action): print(action)
-              case .delete(let action): print(action)
+              case .insert(let action):
+                  print(action)
+              case .update(let action):
+                  print(action)
+              case .delete(let action):
+                  print(action)
               }
+            }
+        }
+    }
+    
+    func insertIntoGeofenceEvents(event: GeofenceEvents) {
+        Task {
+            do {
+                let response = try await supabase
+                    .from("geofence_events")
+                    .insert(event)
+                    .execute()
+                print(response)
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    func deleteFromGeofenceEvents(event: GeofenceEvents) {
+        Task {
+            do {
+                let response = supabase
+                    .from("geofence_events")
+                    .delete()
+                    .eq("tripId", value: event.tripId)
+                print(response)
             }
         }
     }
