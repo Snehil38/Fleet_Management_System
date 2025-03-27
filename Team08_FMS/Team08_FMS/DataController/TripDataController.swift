@@ -320,6 +320,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             return
         }
         
+        guard let currentTrip = currentTrip else { return }
+        
         print("DEBUG: Exited region: \(circularRegion.identifier)")
         print("DEBUG: Current location: \(manager.location?.coordinate.latitude ?? 0), \(manager.location?.coordinate.longitude ?? 0)")
         print("DEBUG: Distance from region center: \(manager.location?.distance(from: CLLocation(latitude: circularRegion.center.latitude, longitude: circularRegion.center.longitude)) ?? 0) meters")
@@ -328,11 +330,17 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "sourceRegion":
             isInSourceRegion = false
             print("DEBUG: Exited source region")
+            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) exited source region"
+            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            supabaseController.insertIntoGeofenceEvents(event: event)
             checkTripStartEligibility()
             
         case "destinationRegion":
             isInDestinationRegion = false
             print("DEBUG: Exited destination region")
+            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) exited destination region"
+            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            supabaseController.insertIntoGeofenceEvents(event: event)
             
         default:
             print("DEBUG: Exited unknown region: \(circularRegion.identifier)")
