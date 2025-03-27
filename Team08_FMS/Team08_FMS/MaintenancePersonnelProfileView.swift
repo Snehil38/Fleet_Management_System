@@ -18,6 +18,7 @@ struct MaintenancePersonnelProfileView: View {
                             statusToggle(for: personnel)
                             contactInformation(for: personnel)
                             experienceDetails(for: personnel)
+                            resetPasswordButton
                             logoutButton
                         }
                         .padding()
@@ -176,6 +177,24 @@ struct MaintenancePersonnelProfileView: View {
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+    }
+    
+    private var resetPasswordButton: some View {
+        NavigationLink(destination: ResetPasswordView(userID: supabaseDataController.userID!)) {
+            HStack {
+                Image(systemName: "lock.rotation")
+                    .foregroundColor(.blue)
+                Text("Reset Password")
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                Spacer()
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            .padding(.horizontal)
         }
     }
     
