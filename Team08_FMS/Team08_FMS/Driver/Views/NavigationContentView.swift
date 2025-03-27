@@ -546,6 +546,7 @@ struct RealTimeNavigationView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var showingAlternativeRoutes = false
+    @State private var isRouteCompleted = false  // Add state for route completion
     
     init(destination: CLLocationCoordinate2D, destinationName: String, address: String, sourceCoordinate: CLLocationCoordinate2D?, onDismiss: @escaping () -> Void) {
         self.destination = destinationName
@@ -568,8 +569,23 @@ struct RealTimeNavigationView: View {
                 route: $navigationManager.route,
                 userHeading: $navigationManager.userHeading,
                 followsUserLocation: isFollowingUser,
+                isRouteCompleted: $isRouteCompleted,  // Add the binding
                 onLocationUpdate: { location in
                     navigationManager.updateNavigation(from: location)
+                    
+                    // Check if we've reached the destination
+                    if let route = navigationManager.route {
+                        // Calculate distance to the actual destination coordinates
+                        let destinationLocation = CLLocation(
+                            latitude: navigationManager.destination.latitude,
+                            longitude: navigationManager.destination.longitude
+                        )
+                        let distance = location.distance(from: destinationLocation)
+                        
+                        if distance < 50 { // Within 50 meters of destination
+                            isRouteCompleted = true
+                        }
+                    }
                 }
             )
             .ignoresSafeArea()
