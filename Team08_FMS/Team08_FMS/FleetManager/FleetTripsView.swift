@@ -1,6 +1,15 @@
 import SwiftUI
 import CoreLocation
 import MapKit
+import Foundation
+
+// Custom null value that conforms to Encodable
+struct EncodableNull: Encodable {
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encodeNil()
+    }
+}
 
 struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
@@ -11,6 +20,7 @@ struct FleetTripsView: View {
     @State private var editedAddress: String = ""
     @State private var editedNotes: String = ""
     @State private var calculatedDistance: String = ""
+    @State private var selectedDriverId: UUID? = nil
     // Define tab types
     enum TabType: Int, CaseIterable {
         case current = 0
@@ -407,6 +417,7 @@ struct TripDetailView: View {
     @State private var editedAddress: String = ""
     @State private var editedNotes: String = ""
     @State private var calculatedDistance: String = ""
+    @State private var selectedDriverId: UUID? = nil
     
     // Location search state
     @State private var searchResults: [MKLocalSearchCompletion] = []
@@ -473,7 +484,7 @@ struct TripDetailView: View {
     var body: some View {
         NavigationView {
             List {
-                // Trip Information Section
+                // Trip Information Section with driver assignment
                 Section(header: Text("TRIP INFORMATION")) {
                     if isEditing {
                         // Editable Trip ID (non-editable)
@@ -543,12 +554,78 @@ struct TripDetailView: View {
                                     .foregroundColor(calculatedDistance != trip.distance ? .blue : .primary)
                             }
                         }
+                        
+                        // Driver assignment
+                        HStack {
+                            Text("Driver")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            
+                            Menu {
+                                // Option to unassign driver
+                                Button(action: {
+                                    selectedDriverId = nil
+                                }) {
+                                    HStack {
+                                        Text("Unassign driver")
+                                            .foregroundColor(.red)
+                                        Spacer()
+                                        if selectedDriverId == nil {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                                
+                                Divider()
+                                
+                                // Available drivers
+                                ForEach(CrewDataController.shared.drivers.filter { $0.status == .available }, id: \.userID) { driver in
+                                    Button(action: {
+                                        selectedDriverId = driver.userID
+                                    }) {
+                                        HStack {
+                                            Text(driver.name)
+                                            Spacer()
+                                            if selectedDriverId == driver.userID {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    if let driverId = selectedDriverId,
+                                       let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+                                        Text(driver.name)
+                                            .foregroundColor(.primary)
+                                    } else {
+                                        Text("Unassigned")
+                                            .foregroundColor(.gray)
+                                    }
+                                    Image(systemName: "chevron.down")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .onAppear {
+                                // Ensure crew data is updated when menu appears
+                                CrewDataController.shared.update()
+                            }
+                        }
                     } else {
                         TripDetailRow(icon: "number", title: "Trip ID", value: trip.name)
                         TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
                         TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
                         if !trip.distance.isEmpty {
                             TripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
+                        }
+                        
+                        // Driver information
+                        if let driverId = trip.driverId,
+                           let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+                            TripDetailRow(icon: "person.fill", title: "Driver", value: driver.name)
+                        } else {
+                            TripDetailRow(icon: "person.fill", title: "Driver", value: "Unassigned")
                         }
                     }
                 }
@@ -610,13 +687,32 @@ struct TripDetailView: View {
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
                             if let notes = trip.notes {
-                                Text("Trip: \(trip.name)")
-                                Text("From: \(trip.startingPoint)")
-                                Text("Cargo Type: General Goods")
-                                Text("Distance: \(trip.distance)")
-                                let (fuelCostString, fuelCostValue) = calculateFuelCost(from: trip.distance)
-                                Text("Estimated Fuel Cost: \(fuelCostString)")
-                                Text("Total Revenue: \(calculateTotalRevenue(distance: trip.distance, fuelCost: fuelCostValue))")
+                                Text("Trip Details")
+                                    .font(.headline)
+                                    .padding(.bottom, 4)
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Trip: \(trip.name)")
+                                    Text("From: \(trip.address)")
+                                    Text("To: \(trip.destination)")
+                                    
+                                    if !trip.distance.isEmpty {
+                                        Text("Distance: \(trip.distance)")
+                                    }
+                                    
+                                    // Display driver information if available
+                                    if let driverId = trip.driverId,
+                                       let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+                                        Text("Driver: \(driver.name)")
+                                    } else {
+                                        Text("Driver: Unassigned")
+                                    }
+                                    
+                                    let (fuelCostString, fuelCostValue) = calculateFuelCost(from: trip.distance)
+                                    Text("Estimated Fuel Cost: \(fuelCostString)")
+                                    Text("Total Revenue: \(calculateTotalRevenue(distance: trip.distance, fuelCost: fuelCostValue))")
+                                }
+                                .foregroundColor(.primary)
                             }
                         }
                         .font(.body)
@@ -689,9 +785,6 @@ struct TripDetailView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingAssignSheet) {
-                AssignDriverView(trip: trip)
-            }
             .alert("Delete Trip", isPresented: $showingDeleteAlert) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) {
@@ -705,6 +798,9 @@ struct TripDetailView: View {
             } message: {
                 Text("Trip details have been updated successfully.")
             }
+            .sheet(isPresented: $showingAssignSheet) {
+                AssignDriverView(trip: trip)
+            }
         }
     }
     
@@ -713,6 +809,7 @@ struct TripDetailView: View {
         editedAddress = trip.address
         editedNotes = trip.notes ?? ""
         calculatedDistance = trip.distance
+        selectedDriverId = trip.driverId
         
         destinationEdited = false
         addressEdited = false
@@ -836,22 +933,61 @@ struct TripDetailView: View {
         updatedTrip.destination = editedDestination
         updatedTrip.address = editedAddress
         
-        if notesEdited {
-            updatedTrip.notes = editedNotes
+        // Update notes with the latest information including destination, distance, and assigned driver
+        let driverInfo: String
+        if let driverId = selectedDriverId,
+           let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+            driverInfo = "Driver: \(driver.name)"
+        } else {
+            driverInfo = "Driver: Unassigned"
         }
+        
+        let updatedNotes = """
+        Trip: \(trip.name)
+        From: \(editedAddress)
+        To: \(editedDestination)
+        Distance: \(calculatedDistance)
+        \(driverInfo)
+        """
+        updatedTrip.notes = updatedNotes
         
         // Update distance if it has changed
         let hasDistanceChanged = calculatedDistance != trip.distance && !calculatedDistance.isEmpty
         
+        // Check if driver assignment has changed
+        let hasDriverChanged = selectedDriverId != trip.driverId
+        
         Task {
             do {
+                // First update trip details
                 try await SupabaseDataController.shared.updateTripDetails(
                     id: trip.id,
                     destination: editedDestination,
                     address: editedAddress,
-                    notes: editedNotes,
+                    notes: updatedNotes,
                     distance: hasDistanceChanged ? calculatedDistance : nil
                 )
+                
+                // If driver assignment has changed, update it
+                if hasDriverChanged {
+                    if let driverId = selectedDriverId {
+                        try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
+                        
+                        // If trip is in pending state and being assigned a driver, update status to assigned
+                        if trip.status == .pending {
+                            try await SupabaseDataController.shared.updateTrip(id: trip.id, status: "assigned")
+                        }
+                    } else {
+                        // If driver is being unassigned, reset to pending status
+                        try await SupabaseDataController.shared.updateTrip(id: trip.id, status: "pending")
+                        
+                        // Reset driver ID to null using EncodableNull instead of NSNull
+                        let response = try await SupabaseDataController.shared.databaseFrom("trips")
+                            .update(["driver_id": EncodableNull()])
+                            .eq("id", value: trip.id)
+                            .execute()
+                    }
+                }
                 
                 await tripController.refreshAllTrips()
                 
@@ -1115,9 +1251,9 @@ struct DriverRow: View {
         HStack {
             VStack(alignment: .leading) {
                 Text(driver.name)
-                    .font(.headline)
+                    .fontWeight(.medium)
                 Text(driver.email)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundColor(.gray)
             }
             
