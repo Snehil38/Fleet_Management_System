@@ -883,10 +883,19 @@ struct UpcomingTripRow: View {
     @State private var errorMessage = ""
     
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text(trip.destination)
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with destination and start button
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(trip.destination)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.primary)
+                    if let pickup = trip.pickup {
+                        Text(pickup)
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                    }
+                }
                 Spacer()
                 Button(action: {
                     Task {
@@ -899,30 +908,76 @@ struct UpcomingTripRow: View {
                     }
                 }) {
                     Text("Start Trip")
+                        .font(.system(.subheadline, weight: .medium))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(Color.blue)
-                        .cornerRadius(8)
+                        .cornerRadius(20)
                 }
             }
             
-            if let notes = trip.notes {
-                Text(notes)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            
-            if let pickup = trip.pickup {
-                Text("Pickup: \(pickup)")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
+            // Trip details with icons
+            VStack(alignment: .leading, spacing: 12) {
+                if let notes = trip.notes {
+                    // Extract and display cargo type
+                    if notes.contains("Cargo Type:") {
+                        let cargoType = notes.components(separatedBy: "Cargo Type:")[1]
+                            .components(separatedBy: "\n")[0]
+                            .trimmingCharacters(in: .whitespaces)
+                        HStack {
+                            Image(systemName: "shippingbox")
+                                .foregroundColor(.orange)
+                            Text("Cargo Type:")
+                                .foregroundColor(.gray)
+                            Text(cargoType)
+                                .foregroundColor(.black)
+                        }
+                    }
+                }
+                
+                // Distance
+                if !trip.distance.isEmpty {
+                    HStack {
+                        Image(systemName: "arrow.left.and.right")
+                            .foregroundColor(.blue)
+                        Text("Distance:")
+                            .foregroundColor(.gray)
+                        Text(trip.distance)
+                            .foregroundColor(.black)
+                    }
+                }
+                
+                // Pickup location
+                if let pickup = trip.pickup {
+                    HStack {
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundColor(.red)
+                        Text("Pickup:")
+                            .foregroundColor(.gray)
+                        Text(pickup)
+                            .foregroundColor(.black)
+                    }
+                }
+                
+                // Estimated Fuel Cost
+                if let notes = trip.notes,
+                   let fuelCost = notes.components(separatedBy: "Estimated Fuel Cost:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) {
+                    HStack {
+                        Image(systemName: "fuelpump.fill")
+                            .foregroundColor(.green)
+                        Text("Est. Fuel Cost:")
+                            .foregroundColor(.gray)
+                        Text(fuelCost)
+                            .foregroundColor(.black)
+                    }
+                }
             }
         }
-        .padding()
+        .padding(16)
         .background(Color(.systemBackground))
-        .cornerRadius(10)
-        .shadow(radius: 2)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
         .alert("Error", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
