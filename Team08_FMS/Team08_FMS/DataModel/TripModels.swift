@@ -13,15 +13,15 @@ enum TripStatus: String, Codable {
 struct Trip: Identifiable, Equatable {
     let id: UUID
     let name: String
-    let destination: String
-    let address: String
+    var destination: String
+    var address: String
     var eta: String
     let distance: String
     var status: TripStatus
     var hasCompletedPreTrip: Bool
     var hasCompletedPostTrip: Bool
     let vehicleDetails: Vehicle
-    let notes: String?
+    var notes: String?
     let startTime: Date?
     let endTime: Date?
     let sourceCoordinate: CLLocationCoordinate2D

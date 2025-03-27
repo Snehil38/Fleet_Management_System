@@ -1226,4 +1226,52 @@ class SupabaseDataController: ObservableObject {
             throw error
         }
     }
+    
+    // Soft delete a trip by marking is_deleted as true
+    public func softDeleteTrip(id: UUID) async throws {
+        do {
+            try await databaseFrom("trips")
+                .update(["is_deleted": true])
+                .eq("id", value: id)
+                .execute()
+            print("Trip with id \(id) soft deleted")
+        } catch {
+            print("Error soft deleting trip: \(error)")
+            throw error
+        }
+    }
+    
+    // Update trip details including destination, address, and notes
+    public func updateTripDetails(id: UUID, destination: String, address: String, notes: String, distance: String? = nil) async throws {
+        do {
+            // First update the basic trip info
+            try await databaseFrom("trips")
+                .update([
+                    "destination": destination,
+                    "pickup": address,
+                    "notes": notes
+                ])
+                .eq("id", value: id)
+                .execute()
+            
+            // If distance is provided, update it separately
+            if let distance = distance {
+                // Extract numeric value from distance string
+                let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                    .joined()
+                
+                if let distanceValue = Double(numericDistance) {
+                    try await databaseFrom("trips")
+                        .update(["estimated_distance": distanceValue])
+                        .eq("id", value: id)
+                        .execute()
+                }
+            }
+            
+            print("Trip details updated for id \(id)")
+        } catch {
+            print("Error updating trip details: \(error)")
+            throw error
+        }
+    }
 }

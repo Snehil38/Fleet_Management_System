@@ -807,4 +807,27 @@ class TripDataController: ObservableObject {
             throw TripError.updateError("Failed to update trip inspection status: \(error.localizedDescription)")
         }
     }
+    
+    private func filterTripsByDriver(trips: [Trip]) -> [Trip] {
+        // Filter trips by the current driver ID if set
+        guard let driverId = driverId else {
+            return trips // Return all trips if no driver ID is set
+        }
+        
+        return trips.filter { trip in
+            trip.driverId == driverId
+        }
+    }
+    
+    /// Deletes a trip by its ID (soft delete)
+    /// - Parameter id: The ID of the trip to delete
+    /// - Returns: Void
+    /// - Throws: Error if the deletion fails
+    func deleteTrip(id: UUID) async throws {
+        // Soft delete the trip in the database
+        try await supabaseController.softDeleteTrip(id: id)
+        
+        // Update local data
+        await refreshAllTrips()
+    }
 } 

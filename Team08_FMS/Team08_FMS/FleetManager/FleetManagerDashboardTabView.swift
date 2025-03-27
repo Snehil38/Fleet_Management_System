@@ -412,7 +412,7 @@ struct AddTripView: View {
     @State private var searchResults: [MKLocalSearchCompletion] = []
     @State private var activeTextField: LocationField? = nil
     @State private var searchCompleter = MKLocalSearchCompleter()
-    @State private var searchCompleterDelegate: SearchCompleterDelegate? = nil
+    @State private var searchCompleterDelegate: DashboardSearchCompleterDelegate? = nil
     
     // Trip details state
     @State private var selectedVehicle: Vehicle?
@@ -503,13 +503,9 @@ struct AddTripView: View {
                         )
                         
                         // Search Results if any
-                        if !searchResults.isEmpty {
-                            LocationSearchResults(results: searchResults) { result in
-                                if activeTextField == .pickup {
-                                    searchForLocation(result.title, isPickup: true)
-                                } else {
-                                    searchForLocation(result.title, isPickup: false)
-                                }
+                        if !searchResults.isEmpty && activeTextField != nil {
+                            DashboardLocationSearchResults(results: searchResults) { result in
+                                searchForLocation(result.title, isPickup: activeTextField == .pickup)
                             }
                         }
                         
@@ -722,7 +718,7 @@ struct AddTripView: View {
         )
         
         // Set up the delegate
-        let delegate = SearchCompleterDelegate { results in
+        let delegate = DashboardSearchCompleterDelegate { results in
             // Limit to top 10 results for better performance
             self.searchResults = Array(results.prefix(10))
         }
@@ -905,7 +901,7 @@ struct AddTripView: View {
 }
 
 // Search completer delegate to handle MapKit search results
-class SearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
+class DashboardSearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
     var onResultsUpdated: ([MKLocalSearchCompletion]) -> Void
     
     init(onResultsUpdated: @escaping ([MKLocalSearchCompletion]) -> Void) {
@@ -923,7 +919,7 @@ class SearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
 }
 
 // Location search results component
-struct LocationSearchResults: View {
+struct DashboardLocationSearchResults: View {
     let results: [MKLocalSearchCompletion]
     let onSelect: (MKLocalSearchCompletion) -> Void
     
