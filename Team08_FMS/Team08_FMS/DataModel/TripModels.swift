@@ -139,11 +139,25 @@ struct Trip: Identifiable, Equatable {
         self.driverId = supabaseTrip.driver_id
         
         // Extract distance and ETA from notes
-        if let notes = supabaseTrip.notes,
-           let distanceRange = notes.range(of: "Estimated Distance: "),
-           let endOfDistance = notes[distanceRange.upperBound...].firstIndex(of: " ") {
-            let distanceStr = notes[distanceRange.upperBound..<endOfDistance]
-            self.distance = "\(distanceStr) km"
+        if let notes = supabaseTrip.notes {
+            // Try both "Estimated Distance: " and "Distance: " formats
+            if let distanceRange = notes.range(of: "Estimated Distance: ") {
+                if let endOfDistance = notes[distanceRange.upperBound...].firstIndex(of: " ") {
+                    let distanceStr = notes[distanceRange.upperBound..<endOfDistance]
+                    self.distance = "\(distanceStr) km"
+                } else {
+                    self.distance = "Unknown"
+                }
+            } else if let distanceRange = notes.range(of: "Distance: ") {
+                if let endOfDistance = notes[distanceRange.upperBound...].firstIndex(of: " ") {
+                    let distanceStr = notes[distanceRange.upperBound..<endOfDistance]
+                    self.distance = "\(distanceStr) km"
+                } else {
+                    self.distance = "Unknown"
+                }
+            } else {
+                self.distance = "Unknown"
+            }
         } else {
             self.distance = "Unknown"
         }

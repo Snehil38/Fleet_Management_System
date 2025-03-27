@@ -1211,4 +1211,19 @@ class SupabaseDataController: ObservableObject {
             throw error
         }
     }
+
+    public func updateTrip(id: UUID, secondaryDriverId: UUID) async throws {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .update(["secondary_driver_id": secondaryDriverId])
+                .eq("id", value: id)
+                .execute()
+            
+            print("Trip secondary driver update success: \(response)")
+        } catch {
+            print("Error updating trip secondary driver: \(error)")
+            throw error
+        }
+    }
 }

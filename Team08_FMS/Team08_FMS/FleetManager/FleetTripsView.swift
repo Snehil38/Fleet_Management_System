@@ -6,7 +6,6 @@ struct FleetTripsView: View {
     @ObservedObject private var tripController = TripDataController.shared
     @State private var showingError = false
     @State private var selectedFilter = 1 // Default to Upcoming
-    @State private var showingAddTripView = false
     
     // Define tab types
     enum TabType: Int, CaseIterable {
@@ -81,39 +80,14 @@ struct FleetTripsView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Filter control - matches the UI in screenshot
+                // Filter control with counts
                 Picker("Trip Filter", selection: $selectedFilter) {
                     ForEach(TabType.allCases.map { $0.rawValue }, id: \.self) { index in
-                        Text(TabType(rawValue: index)?.title ?? "")
+                        Text("\(TabType(rawValue: index)?.title ?? "") (\(getTripCount(for: index)))")
                     }
                 }
                 .pickerStyle(.segmented)
                 .padding()
-                
-                // Trip counts
-                HStack(spacing: 16) {
-                    ForEach(0..<3) { index in
-                        let count = getTripCount(for: index)
-                        let label = ["Current", "Upcoming", "Completed"][index]
-                        
-                        VStack {
-                            Text("\(count)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Text(label)
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(selectedFilter == index ? Color.blue.opacity(0.1) : Color.clear)
-                        .cornerRadius(8)
-                        .onTapGesture {
-                            selectedFilter = index
-                        }
-                    }
-                }
-                .padding(.horizontal)
                 
                 // Simple header section
                 HStack {
@@ -121,17 +95,6 @@ struct FleetTripsView: View {
                         .font(.headline)
                     
                     Spacer()
-                    
-                    Button(action: {
-                        showingAddTripView = true
-                    }) {
-                        HStack {
-                            Image(systemName: "plus")
-                            Text("Add Trip")
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(.blue)
-                    }
                 }
                 .padding(.horizontal)
                 .padding(.top)
@@ -176,11 +139,6 @@ struct FleetTripsView: View {
                 Task {
                     await tripController.refreshAllTrips()
                 }
-            }
-            .sheet(isPresented: $showingAddTripView) {
-                // Add Trip View would go here
-                Text("Add Trip View")
-                    .presentationDetents([.medium, .large])
             }
         }
     }
@@ -258,139 +216,126 @@ enum ActiveSheet: Identifiable {
 
 struct TripCardView: View {
     let trip: Trip
-    @State private var activeSheet: ActiveSheet? = nil
+    @State private var showingDetails = false
+    @StateObject private var crewController = CrewDataController.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Trip header
+        VStack(alignment: .leading, spacing: 12) {
+            // Status badge only (removed ETA)
+            HStack {
+                Text(statusText)
+                    .font(.subheadline)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(statusColor.opacity(0.2))
+                    .foregroundColor(statusColor)
+                    .cornerRadius(8)
+                
+                Spacer()
+            }
+            
+            // Trip name
+            Text(trip.name)
+                .font(.title3)
+                .fontWeight(.semibold)
+            
+            // Destination
+            HStack(spacing: 4) {
+                Image(systemName: "mappin.circle.fill")
+                    .foregroundColor(.red)
+                    .font(.system(size: 14))
+                
+                Text(trip.destination)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Distance if available
+            if !trip.distance.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "ruler.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 14))
+                    
+                    Text(trip.distance)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Divider()
+            
+            // Bottom section with vehicle info and driver name
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(trip.destination)
-                        .font(.headline)
-                    
-                    if !trip.eta.isEmpty {
-                        Text("ETA: \(trip.eta)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
+                    Text("Vehicle:")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Text(trip.vehicleDetails.licensePlate)
+                        .font(.subheadline)
                 }
                 
                 Spacer()
                 
-                // Assignment badge
-                if trip.driverId == nil && trip.status != .delivered {
-                    Text("Unassigned")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGray5))
-                        .foregroundColor(.black)
-                        .cornerRadius(8)
+                // Driver information
+                if let driverId = trip.driverId,
+                   let driver = crewController.drivers.first(where: { $0.userID == driverId }) {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Driver:")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        Text(driver.name)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
                 } else {
-                    TripStatusBadge(status: trip.status)
+                    Text("Unassigned")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
                 }
-            }
-            .padding()
-            
-            Divider()
-            
-            // Trip route
-            VStack(spacing: 12) {
-                HStack(alignment: .top) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 12, height: 12)
-                        .padding(.top, 4)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Pickup")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text(trip.startingPoint.isEmpty ? trip.address : trip.startingPoint)
-                            .font(.subheadline)
-                    }
-                    
-                    Spacer()
-                }
-                
-                // Route line
-                HStack {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 1)
-                        .padding(.leading, 5.5)
-                    
-                    Spacer()
-                }
-                .frame(height: 20)
-                
-                HStack(alignment: .top) {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 12, height: 12)
-                        .padding(.top, 4)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Dropoff")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text(trip.destination)
-                            .font(.subheadline)
-                    }
-                    
-                    Spacer()
-                }
-            }
-            .padding()
-            
-            // Show driver assignment section for all trips except completed ones
-            if trip.status != .delivered {
-                Divider()
-                
-                HStack {
-                    if trip.driverId == nil {
-                        Image(systemName: "person.badge.plus")
-                            .foregroundColor(.blue)
-                        Text("Driver Unassigned")
-                            .foregroundColor(.blue)
-                            .fontWeight(.medium)
-                    } else {
-                        Image(systemName: "person.fill")
-                            .foregroundColor(.green)
-                        Text("Driver Assigned")
-                            .foregroundColor(.green)
-                            .fontWeight(.medium)
-                    }
-                    
-                    Spacer()
-                }
-                .padding()
             }
         }
+        .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 5)
-        .contentShape(Rectangle()) // Ensures the entire card is tappable
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .onTapGesture {
-            // If driver is unassigned, show assign sheet; otherwise, show detail sheet
-            if trip.driverId == nil {
-                activeSheet = .assign
-            } else {
-                activeSheet = .detail
-            }
+            showingDetails = true
         }
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-            case .assign:
-                AssignDriverView(trip: trip)
-            case .detail:
-                TripDetailView(trip: trip)
-            }
+        .sheet(isPresented: $showingDetails) {
+            TripDetailView(trip: trip)
+        }
+        .onAppear {
+            crewController.update()
+        }
+    }
+    
+    private var statusText: String {
+        switch trip.status {
+        case .inProgress:
+            return "In Progress"
+        case .pending:
+            return "Pending"
+        case .delivered:
+            return "Completed"
+        case .assigned:
+            return "Assigned"
+        }
+    }
+    
+    private var statusColor: Color {
+        switch trip.status {
+        case .inProgress:
+            return .blue
+        case .pending:
+            return .green
+        case .delivered:
+            return .gray
+        case .assigned:
+            return .yellow
         }
     }
 }
-
 
 // Trip status badge
 struct TripStatusBadge: View {
@@ -398,10 +343,10 @@ struct TripStatusBadge: View {
     
     var body: some View {
         Text(displayText)
-            .font(.caption)
+            .font(.subheadline)
             .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
             .background(backgroundColor)
             .foregroundColor(textColor)
             .cornerRadius(8)
@@ -419,9 +364,9 @@ struct TripStatusBadge: View {
     var backgroundColor: Color {
         switch status {
         case .pending: return Color(.systemGray5)
-        case .assigned: return Color.blue.opacity(0.2)
-        case .inProgress: return Color.orange.opacity(0.2)
-        case .delivered: return Color.green.opacity(0.2)
+        case .assigned: return Color.blue.opacity(0.15)
+        case .inProgress: return Color.orange.opacity(0.15)
+        case .delivered: return Color.green.opacity(0.15)
         }
     }
     
@@ -440,106 +385,136 @@ struct TripDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingAssignSheet = false
     let trip: Trip
+    
+    private func calculateFuelCost(from distance: String) -> (String, Double) {
+        // Extract numeric value from distance string
+        let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .joined()
+        
+        if let distance = Double(numericDistance) {
+            // Calculate fuel cost ($0.5 per km/mile)
+            let fuelCost = distance * 0.5
+            return (String(format: "$%.2f", fuelCost), fuelCost)
+        }
+        return ("N/A", 0.0)
+    }
+    
+    private func calculateTotalRevenue(distance: String, fuelCost: Double) -> String {
+        let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .joined()
+        
+        if let distance = Double(numericDistance) {
+            // Total Revenue = Fuel Cost + ($0.25 × Distance) + $50
+            let distanceRevenue = distance * 0.25
+            let totalRevenue = fuelCost + distanceRevenue + 50.0
+            return String(format: "$%.2f", totalRevenue)
+        }
+        return "N/A"
+    }
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Trip Status Card
-                    VStack {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("Trip Status")
-                                    .font(.subheadline)
+            List {
+                // Trip Information Section
+                Section(header: Text("TRIP INFORMATION")) {
+                    TripDetailRow(icon: "number", title: "Trip ID", value: trip.name)
+                    TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
+                    TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
+                    if !trip.distance.isEmpty {
+                        TripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
+                    }
+                }
+                
+                // Vehicle Information Section
+                Section(header: Text("VEHICLE INFORMATION")) {
+                    TripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.bodyType.rawValue)
+                    TripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
+                }
+                
+                // Delivery Status Section
+                Section(header: Text("DELIVERY STATUS")) {
+                    TripDetailRow(icon: statusIcon, title: "Status", value: statusText)
+                    TripDetailRow(
+                        icon: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "clock.badge.checkmark.fill",
+                        title: "Pre-Trip Inspection",
+                        value: trip.hasCompletedPreTrip ? "Completed" : "Required"
+                    )
+                    TripDetailRow(
+                        icon: trip.hasCompletedPostTrip ? "checkmark.circle.fill" : "checkmark.shield.fill",
+                        title: "Post-Trip Inspection",
+                        value: trip.hasCompletedPostTrip ? "Completed" : "Required"
+                    )
+                }
+                
+                // Proof of Delivery Section (for completed trips)
+                if trip.status == .delivered {
+                    Section(header: Text("PROOF OF DELIVERY")) {
+                        Button(action: {}) {
+                            HStack {
+                                Image(systemName: "doc.text.fill")
+                                    .foregroundColor(.blue)
+                                Text("Delivery Receipt")
+                                Spacer()
+                                Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
-                                
-                                TripStatusBadge(status: trip.status)
-                            }
-                            
-                            Spacer()
-                            
-                            if !trip.eta.isEmpty {
-                                Text(trip.eta)
-                                    .font(.subheadline)
                             }
                         }
-                        .padding()
-                    }
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: Color.black.opacity(0.1), radius: 5)
-                    .padding(.horizontal)
-                    
-                    // Route Information Card
-                    VStack(alignment: .leading) {
-                        Text("Trip Information")
-                            .font(.headline)
-                            .padding(.horizontal)
-                            .padding(.top)
                         
-                        HStack {
-                            VStack(alignment: .leading, spacing: 8) {
-                                LabeledContent(label: "Trip Name", value: trip.name)
-                                
-                                Divider()
-                                
-                                LabeledContent(label: "Pickup", value: trip.address)
-                                
-                                Divider()
-                                
-                                LabeledContent(label: "Destination", value: trip.destination)
-                                
-                                if trip.status != .pending {
-                                    Divider()
-                                    let vehicleDisplayInfo = "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model) (\(trip.vehicleDetails.licensePlate))"
-                                    LabeledContent(label: "Vehicle", value: vehicleDisplayInfo)
-                                }
+                        Button(action: {}) {
+                            HStack {
+                                Image(systemName: "signature")
+                                    .foregroundColor(.blue)
+                                Text("Customer Signature")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
                             }
-                            .padding()
                         }
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
                     }
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: Color.black.opacity(0.1), radius: 5)
-                    .padding(.horizontal)
-                    
-                    // Map Placeholder
-                    MapPlaceholder()
-                        .frame(height: 200)
-                        .cornerRadius(12)
-                        .shadow(color: Color.black.opacity(0.1), radius: 5)
-                        .padding(.horizontal)
-                    
-                    // Action Button
-                    if trip.status == .pending {
+                }
+                
+                // Notes Section
+                Section(header: Text("NOTES")) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let notes = trip.notes {
+                            Text("Trip: \(trip.name)")
+                            Text("From: \(trip.startingPoint)")
+                            Text("Cargo Type: General Goods")
+                            Text("Distance: \(trip.distance)")
+                            let (fuelCostString, fuelCostValue) = calculateFuelCost(from: trip.distance)
+                            Text("Estimated Fuel Cost: \(fuelCostString)")
+                            Text("Total Revenue: \(calculateTotalRevenue(distance: trip.distance, fuelCost: fuelCostValue))")
+                        }
+                    }
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .padding(.vertical, 8)
+                }
+                
+                // Add Assign Driver Button for unassigned trips only
+                if trip.status == .pending && trip.driverId == nil {
+                    Section {
                         Button(action: {
                             showingAssignSheet = true
                         }) {
                             HStack {
                                 Image(systemName: "person.badge.plus")
-                                Text("Assign Driver & Vehicle")
+                                    .foregroundColor(.blue)
+                                Text("Assign Driver")
+                                    .foregroundColor(.blue)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                            .shadow(color: Color.black.opacity(0.1), radius: 3)
+                            .padding(.vertical, 8)
                         }
-                        .padding(.horizontal)
                     }
                 }
-                .padding(.vertical)
             }
-            .navigationTitle(trip.name)
+            .listStyle(InsetGroupedListStyle())
+            .navigationTitle("Trip Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // "Back" button similar to "Cancel" in AssignDriverView
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Back") {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
                         dismiss()
                     }
                 }
@@ -549,8 +524,55 @@ struct TripDetailView: View {
             }
         }
     }
+    
+    private var statusText: String {
+        switch trip.status {
+        case .inProgress:
+            return "In Progress"
+        case .pending:
+            return "Pending"
+        case .delivered:
+            return "Completed"
+        case .assigned:
+            return "Assigned"
+        }
+    }
+    
+    private var statusIcon: String {
+        switch trip.status {
+        case .inProgress:
+            return "car.circle.fill"
+        case .pending:
+            return "clock.fill"
+        case .delivered:
+            return "checkmark.circle.fill"
+        case .assigned:
+            return "person.fill"
+        }
+    }
 }
 
+//struct TripDetailRow: View {
+//    let icon: String
+//    let title: String
+//    let value: String
+//    
+//    var body: some View {
+//        HStack {
+//            Image(systemName: icon)
+//                .foregroundColor(.blue)
+//                .frame(width: 24)
+//            
+//            Text(title)
+//                .foregroundColor(.gray)
+//            
+//            Spacer()
+//            
+//            Text(value)
+//                .foregroundColor(.primary)
+//        }
+//    }
+//}
 
 // Map Placeholder
 struct MapPlaceholder: View {
@@ -599,22 +621,66 @@ struct AssignDriverView: View {
     @StateObject private var tripController = TripDataController.shared
     let trip: Trip
     @State private var selectedDriverId: UUID?
+    @State private var selectedSecondDriverId: UUID?
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var showingError = false
     
+    private var isLongTrip: Bool {
+        // Extract numeric value from distance string
+        let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .joined()
+        
+        if let distance = Double(numericDistance) {
+            return distance > 500
+        }
+        return false
+    }
+    
+    private var availableDrivers: [Driver] {
+        // Filter out drivers who are not available
+        return crewController.drivers.filter { $0.status == .available }
+    }
+    
+    private var availableSecondDrivers: [Driver] {
+        // Filter out the first selected driver from the list of available drivers
+        if let firstDriverId = selectedDriverId {
+            return availableDrivers.filter { $0.userID != firstDriverId }
+        }
+        return availableDrivers
+    }
+    
     var body: some View {
         NavigationView {
             List {
-                if crewController.drivers.isEmpty {
+                if availableDrivers.isEmpty {
                     Text("No available drivers")
                         .foregroundColor(.gray)
                 } else {
-                    ForEach(crewController.drivers) { driver in
-                        DriverRow(driver: driver, isSelected: selectedDriverId == driver.userID)
-                            .onTapGesture {
-                                selectedDriverId = driver.userID
+                    // First Driver Section
+                    Section(header: Text(isLongTrip ? "PRIMARY DRIVER" : "DRIVER")) {
+                        ForEach(availableDrivers) { driver in
+                            DriverRow(driver: driver, isSelected: selectedDriverId == driver.userID)
+                                .onTapGesture {
+                                    selectedDriverId = driver.userID
+                                    // If the second driver is the same as the first, deselect it
+                                    if selectedSecondDriverId == driver.userID {
+                                        selectedSecondDriverId = nil
+                                    }
+                                }
+                        }
+                    }
+                    
+                    // Second Driver Section (only for long trips)
+                    if isLongTrip {
+                        Section(header: Text("SECONDARY DRIVER (Required for trips > 500km)")) {
+                            ForEach(availableSecondDrivers) { driver in
+                                DriverRow(driver: driver, isSelected: selectedSecondDriverId == driver.userID)
+                                    .onTapGesture {
+                                        selectedSecondDriverId = driver.userID
+                                    }
                             }
+                        }
                     }
                 }
             }
@@ -630,7 +696,7 @@ struct AssignDriverView: View {
                     Button("Assign") {
                         assignDriver()
                     }
-                    .disabled(selectedDriverId == nil || isLoading)
+                    .disabled(!canAssign)
                 }
             }
             .onAppear {
@@ -653,6 +719,14 @@ struct AssignDriverView: View {
         }
     }
     
+    private var canAssign: Bool {
+        if isLoading { return false }
+        if isLongTrip {
+            return selectedDriverId != nil && selectedSecondDriverId != nil
+        }
+        return selectedDriverId != nil
+    }
+    
     private func assignDriver() {
         guard let driverId = selectedDriverId else { return }
         isLoading = true
@@ -660,14 +734,22 @@ struct AssignDriverView: View {
         Task {
             do {
                 if trip.status == .pending {
-                    // If trip is pending, we need to update the status to assigned
-                    // In the database, use the raw enum value "assigned" for the trip_status field
+                    // Update trip status to assigned
                     try await SupabaseDataController.shared.updateTrip(id: trip.id, status: "assigned")
-                    // And separately update the driver assignment
+                    
+                    // Update primary driver
                     try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
+                    
+                    // If it's a long trip, update secondary driver
+                    if isLongTrip, let secondDriverId = selectedSecondDriverId {
+                        try await SupabaseDataController.shared.updateTrip(id: trip.id, secondaryDriverId: secondDriverId)
+                    }
                 } else {
-                    // Otherwise, just update the driver
+                    // Just update the driver assignments
                     try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
+                    if isLongTrip, let secondDriverId = selectedSecondDriverId {
+                        try await SupabaseDataController.shared.updateTrip(id: trip.id, secondaryDriverId: secondDriverId)
+                    }
                 }
                 
                 // Refresh the trips to update the UI
@@ -714,3 +796,4 @@ struct DriverRow: View {
         .contentShape(Rectangle())
     }
 } 
+
