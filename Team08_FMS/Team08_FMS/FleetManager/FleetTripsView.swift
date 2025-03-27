@@ -127,7 +127,8 @@ struct FleetTripsView: View {
                     case .fetchError(let message),
                          .decodingError(let message),
                          .vehicleError(let message),
-                         .updateError(let message):
+                         .updateError(let message),
+                         .locationError(let message):
                         Text(message)
                     }
                 }
