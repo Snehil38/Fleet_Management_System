@@ -23,6 +23,7 @@ struct ChatView: View {
     @State private var isShowingEmergencySheet = false
     @FocusState private var isFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
+    @StateObject private var tripController = TripDataController.shared
     
     init(recipientType: RecipientType, recipientId: UUID, recipientName: String) {
         self.recipientType = recipientType
@@ -49,7 +50,7 @@ struct ChatView: View {
                 }
                 .onAppear {
                     scrollProxy = proxy
-                    scrollToBottom()
+                    viewModel.clearMessages() // Clear messages when view appears
                 }
                 .onChange(of: viewModel.messages) { _ in
                     scrollToBottom()
@@ -59,7 +60,7 @@ struct ChatView: View {
                 await viewModel.loadMessages()
             }
             
-            // Message input
+            // Message input with trip details button for drivers
             messageInputView
         }
         .sheet(isPresented: $isShowingEmergencySheet) {
@@ -114,33 +115,82 @@ struct ChatView: View {
     }
     
     private var messageInputView: some View {
-        HStack(spacing: 12) {
-            // Message text field
-            TextField("Type a message...", text: $messageText)
-                .padding(12)
-                .background(Color(.systemGray6))
-                .cornerRadius(20)
-                .focused($isFocused)
-            
-            // Send button
-            Button(action: {
-                sendMessage()
-            }) {
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 20))
+        VStack(spacing: 8) {
+            // Trip details button (only for drivers)
+            if let currentTrip = tripController.currentTrip,
+               recipientType == .maintenance {
+                Button(action: sendTripDetails) {
+                    HStack {
+                        Image(systemName: "car.fill")
+                        Text("Send Trip Details")
+                    }
                     .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(messageText.isEmpty ? Color.gray : ChatThemeColors.primary)
-                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(ChatThemeColors.primary)
+                    .cornerRadius(20)
+                }
+                .padding(.horizontal)
             }
-            .disabled(messageText.isEmpty)
+            
+            HStack(spacing: 12) {
+                // Message text field
+                TextField("Type a message...", text: $messageText)
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(20)
+                    .focused($isFocused)
+                
+                // Send button
+                Button(action: {
+                    sendMessage()
+                }) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(messageText.isEmpty ? Color.gray : ChatThemeColors.primary)
+                        )
+                }
+                .disabled(messageText.isEmpty)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
         .background(Color(.systemBackground))
         .shadow(color: Color.black.opacity(0.05), radius: 5, y: -2)
+    }
+    
+    private func sendTripDetails() {
+        guard let trip = tripController.currentTrip else { return }
+        
+        let tripDetails = """
+        🚗 Trip Details:
+        Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
+        License Plate: \(trip.vehicleDetails.licensePlate)
+        
+        📍 From: \(trip.startingPoint)
+        🎯 To: \(trip.destination)
+        
+        📅 Scheduled: \(formatDate(trip.startTime ?? Date()))
+        🚚 Status: \(trip.status.rawValue)
+        📏 Distance: \(trip.distance)
+        
+        🔍 Additional Info:
+        \(trip.notes ?? "No additional notes")
+        """
+        
+        viewModel.sendMessage(tripDetails)
+        scrollToBottom()
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
     
     private func sendMessage() {

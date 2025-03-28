@@ -33,13 +33,16 @@ class ChatViewModel: ObservableObject {
         self.recipientId = recipientId
         self.recipientType = recipientType
         
-        // Load initial data
+        // Only set up realtime listener and refresh timer
         Task { @MainActor in
-            await loadMessages()
             await setupMessageListener()
             updateUnreadCount()
             setupRefreshTimer()
         }
+    }
+    
+    func clearMessages() {
+        messages = []
     }
     
     private func setupRefreshTimer() {
