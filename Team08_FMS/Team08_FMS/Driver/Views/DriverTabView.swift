@@ -166,18 +166,25 @@ struct DriverTabView: View {
                                     } else {
                                         VStack(spacing: 0) {
                                             ForEach(tripController.recentDeliveries) { delivery in
-                                                Button(action: {
+                                                Button {
                                                     selectedDelivery = delivery
-                                                    showingDeliveryDetails = true
-                                                }) {
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                        showingDeliveryDetails = true
+                                                    }
+                                                } label: {
                                                     DeliveryRow(delivery: delivery)
                                                 }
                                                 .buttonStyle(PlainButtonStyle())
-                                                
+
                                                 if delivery.id != tripController.recentDeliveries.last?.id {
                                                     Divider()
                                                         .padding(.horizontal)
                                                 }
+                                            }
+                                        }
+                                        .onChange(of: selectedDelivery) { _, newValue in
+                                            if newValue != nil {
+                                                showingDeliveryDetails = true
                                             }
                                         }
                                         .background(Color(.systemBackground))
@@ -1139,8 +1146,8 @@ struct DeliveryDetailsView: View {
                 }
                 
                 // Vehicle & Driver Info Section
-                Section(header: Text("Driver & Vehicle")) {
-                    DetailRow(icon: "person.fill", title: "Driver", value: delivery.driver)
+                Section(header: Text("Vehicle")) {
+//                    DetailRow(icon: "person.fill", title: "Driver", value: delivery.driver)
                     DetailRow(icon: "truck.box.fill", title: "Vehicle", value: delivery.vehicle)
                 }
                 
@@ -1159,30 +1166,30 @@ struct DeliveryDetailsView: View {
                 }
                 
                 // Proof of Delivery Section
-                Section(header: Text("Proof of Delivery")) {
-                    HStack {
-                        Image(systemName: "doc.fill")
-                        Text("Delivery Receipt")
-                        Spacer()
-                        Image(systemName: "arrow.down.circle")
-                            .foregroundColor(.blue)
-                    }
-                    
-                    HStack {
-                        Image(systemName: "signature")
-                        Text("Customer Signature")
-                        Spacer()
-                        Image(systemName: "eye")
-                            .foregroundColor(.blue)
-                    }
-                }
+//                Section(header: Text("Proof of Delivery")) {
+//                    HStack {
+//                        Image(systemName: "doc.fill")
+//                        Text("Delivery Receipt")
+//                        Spacer()
+//                        Image(systemName: "arrow.down.circle")
+//                            .foregroundColor(.blue)
+//                    }
+//                    
+//                    HStack {
+//                        Image(systemName: "signature")
+//                        Text("Customer Signature")
+//                        Spacer()
+//                        Image(systemName: "eye")
+//                            .foregroundColor(.blue)
+//                    }
+//                }
             }
             .listStyle(InsetGroupedListStyle())
             .navigationTitle("Delivery Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
