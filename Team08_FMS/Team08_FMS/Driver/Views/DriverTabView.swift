@@ -1336,6 +1336,13 @@ struct SOSModalView: View {
     @State private var emergencySubject: String = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var showingChat = false
+    @State private var selectedOption: SOSOption = .emergency
+    
+    enum SOSOption {
+        case emergency
+        case chat
+    }
     
     var body: some View {
         NavigationView {
@@ -1349,86 +1356,65 @@ struct SOSModalView: View {
                     Text("Emergency Assistance")
                         .font(.title2)
                         .fontWeight(.bold)
-                    
-                    Text("Describe your emergency situation")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
                 }
                 .padding(.top, 20)
                 
-                // Emergency subject text field
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Emergency Subject")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    TextField("Enter emergency details", text: $emergencySubject)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
+                // Option Picker
+                Picker("Select Option", selection: $selectedOption) {
+                    Text("Emergency").tag(SOSOption.emergency)
+                    Text("Chat").tag(SOSOption.chat)
                 }
+                .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
-                .padding(.top, 20)
                 
-                // Fleet manager contact information
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Fleet Manager Contact")
-                        .font(.headline)
-                        .padding(.horizontal)
-                    
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.blue)
+                if selectedOption == .emergency {
+                    // Emergency View
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Emergency Subject")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
                         
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(profileManager.fleetManagerName.isEmpty ? "Fleet Manager" : profileManager.fleetManagerName)
-                                .font(.headline)
-                            
-                            Text(profileManager.fleetManagerPhone.isEmpty ? "+1 (555) 123-4567" : profileManager.fleetManagerPhone)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
+                        TextField("Enter emergency details", text: $emergencySubject)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
                     .padding(.horizontal)
+                    .padding(.top, 20)
+                    
+                    // Contact Fleet Manager Button
+                    Button(action: {
+                        if emergencySubject.isEmpty {
+                            alertMessage = "Please enter emergency details"
+                            showingAlert = true
+                        } else {
+                            // Handle emergency contact
+                            // This would trigger the phone call
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "phone.fill")
+                            Text("Contact Fleet Manager")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(emergencySubject.isEmpty ? Color.gray : Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5)
+                    }
+                    .disabled(emergencySubject.isEmpty)
+                    .padding(.horizontal)
+                    .padding(.top, 20)
+                } else {
+                    // Chat View
+                    ChatView(recipientType: .fleetManager, recipientName: "Fleet Manager")
+                        .frame(maxHeight: .infinity)
                 }
                 
                 Spacer()
-                
-                // Contact button
-                Button(action: {
-                    if emergencySubject.isEmpty {
-                        // Show alert if no subject entered
-                        alertMessage = "Please enter a description of your emergency"
-                        showingAlert = true
-                    } else {
-                        // Open phone dialer with fleet manager number
-                        contactFleetManager()
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: "phone.fill")
-                        Text("Contact Fleet Manager")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(emergencySubject.isEmpty ? Color.gray : Color.red)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                    .shadow(color: Color.black.opacity(0.1), radius: 5)
-                }
-                .disabled(emergencySubject.isEmpty)
-                .padding(.horizontal)
-                .padding(.bottom, 30)
             }
             .alert(isPresented: $showingAlert) {
                 Alert(
@@ -1447,39 +1433,6 @@ struct SOSModalView: View {
                 }
             }
         }
-    }
-    
-    private func contactFleetManager() {
-        // Get the fleet manager's phone number
-        let phoneNumber = profileManager.fleetManagerPhone.isEmpty ? "+15551234567" : profileManager.fleetManagerPhone
-        
-        // Clean the phone number (remove non-numeric characters except +)
-        let cleanedNumber = phoneNumber.components(separatedBy: CharacterSet(charactersIn: "+0123456789").inverted).joined()
-        
-        // Create the URL for the phone
-        if let url = URL(string: "tel://\(cleanedNumber)") {
-            // Open the URL
-            UIApplication.shared.open(url)
-            
-            // Log the emergency call
-            Task {
-                try? await logEmergencyCall(subject: emergencySubject, phoneNumber: cleanedNumber)
-            }
-            
-            // Dismiss the sheet after initiating the call
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                isPresented = false
-            }
-        }
-    }
-    
-    private func logEmergencyCall(subject: String, phoneNumber: String) async throws {
-        // In a real implementation, this would log the emergency call to a database
-        // For now, we'll just print to the console
-        print("Emergency call logged: \(subject) to \(phoneNumber)")
-        
-        // This could be a call to SupabaseDataController to log the emergency
-        // await SupabaseDataController.shared.logEmergencyCall(subject: subject, phoneNumber: phoneNumber)
     }
 }
 
