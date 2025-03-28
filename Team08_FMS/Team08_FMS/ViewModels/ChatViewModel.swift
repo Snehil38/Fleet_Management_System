@@ -31,59 +31,123 @@ class ChatViewModel: ObservableObject {
     init(recipientId: UUID, recipientType: RecipientType) {
         self.recipientId = recipientId
         self.recipientType = recipientType
-        loadMessages()
-        setupMessageListener()
-        updateUnreadCount()
+        
+        // Load initial data
+        Task { @MainActor in
+            await loadMessages()
+            await setupMessageListener()
+            updateUnreadCount()
+        }
     }
     
-    func loadMessages() {
-        isLoading = true
+    private func setupMessageListener() async {
+        // First, cleanup any existing channel
+        if let channel = realtimeChannel {
+            try? await channel.unsubscribe()
+            realtimeChannel = nil
+        }
         
-        Task {
-            do {
-                let currentUserId = try await supabaseDataController.getUserID()
+        do {
+            let channel = supabaseDataController.supabase.realtime
+                .channel("chat_messages")
+            
+            // Set up the channel before subscribing
+            channel.on("postgres_changes", filter: .init(
+                event: "*",
+                schema: "public",
+                table: "chat_messages"
+            )) { [weak self] _ in
+                guard let self = self else { return }
                 
-                let response = try await supabaseDataController.supabase
-                    .from("chat_messages")
-                    .select()
-                    .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
-                    .order("created_at", ascending: true)
-                    .execute()
+                // Dispatch to main thread
+                DispatchQueue.main.async {
+                    Task { @MainActor in
+                        await self.loadMessages()
+                        self.updateUnreadCount()
+                    }
+                }
+            }
+            
+            // Subscribe to the channel
+            try await channel.subscribe()
+            
+            // Store the channel reference
+            await MainActor.run {
+                self.realtimeChannel = channel
+            }
+            
+        } catch {
+            print("Error setting up realtime listener: \(error)")
+            await MainActor.run {
+                self.error = error
+            }
+        }
+    }
+    
+    func loadMessages() async {
+        await MainActor.run {
+            self.isLoading = true
+        }
+        
+        do {
+            let currentUserId = try await supabaseDataController.getUserID()
+            
+            let response = try await supabaseDataController.supabase
+                .from("chat_messages")
+                .select()
+                .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
+                .order("created_at", ascending: true)
+                .execute()
+            
+            let decoder = JSONDecoder()
+            
+            // Create date formatter for the specific format we're receiving
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            
+            decoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateString = try container.decode(String.self)
                 
-                let decoder = JSONDecoder()
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-                dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-                dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-                decoder.dateDecodingStrategy = .formatted(dateFormatter)
+                // Try to parse the date
+                if let date = dateFormatter.date(from: dateString) {
+                    return date
+                }
                 
-                var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
-                
-                // Update isFromCurrentUser and mark messages as read if they're for current user
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Cannot decode date string \(dateString)"
+                )
+            }
+            
+            var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
+            
+            // Update messages on main thread
+            await MainActor.run {
+                // Update isFromCurrentUser for each message
                 for index in fetchedMessages.indices {
                     var message = fetchedMessages[index]
                     message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                    fetchedMessages[index] = message
                     
-                    // If message is for current user and unread, mark it as read
+                    // Mark as read if needed
                     if message.recipient_id == currentUserId && message.status == .sent {
                         Task {
-                            await markMessageAsRead(message.id)
+                            await self.markMessageAsRead(message.id)
                         }
                     }
-                    
-                    fetchedMessages[index] = message
                 }
                 
-                await MainActor.run {
-                    self.messages = fetchedMessages
-                    self.isLoading = false
-                    self.updateUnreadCount()
-                }
-            } catch {
-                await MainActor.run {
-                    self.error = error
-                    self.isLoading = false
-                }
+                self.messages = fetchedMessages
+                self.isLoading = false
+            }
+            
+        } catch {
+            await MainActor.run {
+                self.error = error
+                self.isLoading = false
                 print("Error loading messages: \(error)")
             }
         }
@@ -114,48 +178,8 @@ class ChatViewModel: ObservableObject {
         }
     }
     
-    private func setupMessageListener() {
-        Task {
-            do {
-                // Unsubscribe from any existing channel
-                if let existingChannel = realtimeChannel {
-                    try await existingChannel.unsubscribe()
-                }
-                
-                let currentUserId = try await supabaseDataController.getUserID()
-                
-                let channel = supabaseDataController.supabase.realtime
-                    .channel("chat_messages")
-                
-                channel.on("postgres_changes", filter: .init(
-                    event: "*",
-                    schema: "public",
-                    table: "chat_messages"
-                )) { [weak self] message in
-                    guard let self = self else { return }
-                    
-                    Task { @MainActor in
-                        print("Received realtime message: \(message)")
-                        
-                        // For now, just reload messages to handle any changes
-                        await self.loadMessages()
-                        
-                        // Update unread count
-                        self.updateUnreadCount()
-                    }
-                }
-                
-                try await channel.subscribe()
-                self.realtimeChannel = channel
-                
-            } catch {
-                print("Error setting up realtime listener: \(error)")
-            }
-        }
-    }
-    
     func sendMessage(_ text: String) {
-        Task {
+        Task { @MainActor in
             do {
                 // Get the current user's ID
                 guard let userId = try? await supabaseDataController.getUserID() else {
@@ -195,6 +219,13 @@ class ChatViewModel: ObservableObject {
                 print("Recipient ID: \(messageRecipientId)")
                 print("Recipient Type: \(messageRecipientType)")
                 
+                // Format dates in the same format as we receive them
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+                dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+                let currentDate = dateFormatter.string(from: Date())
+                
                 // Create message payload
                 let message = ChatMessage(
                     id: UUID(),
@@ -219,12 +250,15 @@ class ChatViewModel: ObservableObject {
                 
                 print("Message sent successfully: \(response)")
                 
-                // Add message to local state
-                await MainActor.run {
-                    self.messages.append(message)
-                }
+                // Add message to local state (already on main thread due to @MainActor)
+                self.messages.append(message)
+                
+                // Trigger a message reload to ensure consistency
+                await self.loadMessages()
+                
             } catch {
                 print("Error sending message: \(error)")
+                self.error = error
             }
         }
     }
@@ -288,8 +322,9 @@ class ChatViewModel: ObservableObject {
     }
     
     deinit {
-        Task {
-            if let channel = realtimeChannel {
+        // Cleanup channel on deinit
+        if let channel = realtimeChannel {
+            Task {
                 try? await channel.unsubscribe()
             }
         }
