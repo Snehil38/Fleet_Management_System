@@ -12,14 +12,10 @@ struct ChatBubbleView: View {
         message.isFromCurrentUser ? .white : ChatThemeColors.text
     }
     
-    private var alignment: Alignment {
-        message.isFromCurrentUser ? .trailing : .leading
-    }
-    
     var body: some View {
-        HStack {
+        HStack(alignment: .bottom, spacing: 0) {
             if message.isFromCurrentUser {
-                Spacer(minLength: 50)
+                Spacer(minLength: 60)
             }
             
             VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 2) {
@@ -31,43 +27,47 @@ struct ChatBubbleView: View {
                         RoundedRectangle(cornerRadius: 18)
                             .fill(backgroundColor)
                     )
-                    .overlay(
-                        // Message Status Indicator
+                    .contextMenu {
+                        Button(action: {
+                            UIPasteboard.general.string = message.message_text
+                        }) {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                    }
+                
+                HStack(spacing: 4) {
+                    if message.isFromCurrentUser {
+                        // Message status indicator
                         Group {
-                            if message.isFromCurrentUser {
-                                HStack {
-                                    switch message.status {
-                                    case .sent:
-                                        Image(systemName: "checkmark")
-                                            .font(.caption2)
-                                    case .delivered:
-                                        Image(systemName: "checkmark.circle")
-                                            .font(.caption2)
-                                    case .read:
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.caption2)
-                                    }
-                                }
-                                .foregroundColor(.white.opacity(0.8))
-                                .padding(.trailing, 4)
-                                .offset(x: -4, y: 14)
+                            switch message.status {
+                            case .sent:
+                                Image(systemName: "checkmark")
+                                    .font(.caption2)
+                            case .delivered:
+                                Image(systemName: "checkmark.circle")
+                                    .font(.caption2)
+                            case .read:
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
                             }
                         }
-                    )
-                
-                // Timestamp
-                Text(formatDate(message.created_at))
-                    .font(.caption2)
-                    .foregroundColor(ChatThemeColors.timestamp)
-                    .padding(.horizontal, 4)
+                        .foregroundColor(.gray.opacity(0.8))
+                    }
+                    
+                    // Timestamp
+                    Text(formatDate(message.created_at))
+                        .font(.caption2)
+                        .foregroundColor(ChatThemeColors.timestamp)
+                }
+                .padding(.horizontal, 4)
             }
             
             if !message.isFromCurrentUser {
-                Spacer(minLength: 50)
+                Spacer(minLength: 60)
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .opacity(isAnimating ? 1 : 0)
         .offset(y: isAnimating ? 0 : 20)
         .onAppear {

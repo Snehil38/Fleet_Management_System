@@ -22,6 +22,7 @@ struct ChatView: View {
     @State private var messageText = ""
     @State private var isShowingEmergencySheet = false
     @FocusState private var isFocused: Bool
+    @State private var scrollProxy: ScrollViewProxy?
     
     init(recipientType: RecipientType, recipientId: UUID, recipientName: String) {
         self.recipientType = recipientType
@@ -38,7 +39,7 @@ struct ChatView: View {
             // Messages list
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: 8) {
                         ForEach(viewModel.messages) { message in
                             ChatBubbleView(message: message)
                                 .id(message.id)
@@ -46,13 +47,16 @@ struct ChatView: View {
                     }
                     .padding(.vertical)
                 }
-                .onChange(of: viewModel.messages) { _ in
-                    withAnimation {
-                        if let lastMessage = viewModel.messages.last {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
+                .onAppear {
+                    scrollProxy = proxy
+                    scrollToBottom()
                 }
+                .onChange(of: viewModel.messages) { _ in
+                    scrollToBottom()
+                }
+            }
+            .refreshable {
+                await viewModel.loadMessages()
             }
             
             // Message input
@@ -60,6 +64,14 @@ struct ChatView: View {
         }
         .sheet(isPresented: $isShowingEmergencySheet) {
             EmergencyAssistanceView()
+        }
+    }
+    
+    private func scrollToBottom() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            if let lastMessage = viewModel.messages.last {
+                scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+            }
         }
     }
     
@@ -138,6 +150,9 @@ struct ChatView: View {
         viewModel.sendMessage(messageText)
         messageText = ""
         isFocused = false
+        
+        // Scroll to bottom after sending
+        scrollToBottom()
     }
 }
 
