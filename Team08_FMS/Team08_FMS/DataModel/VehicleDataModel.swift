@@ -167,18 +167,28 @@ struct Route: Codable {
 }
 
 enum MaintenanceStatus: String, Codable {
-    case scheduled
-    case inProgress
-    case completed
+    case notScheduled = "Not Scheduled"
+    case scheduled = "Scheduled"
+    case inProgress = "In Progress"
+    case completed = "Completed"
 }
 
 struct MaintenanceRecord: Identifiable, Codable {
-    var id: String
-    var vehicleID: String
-    var personnelID: String
+    var id: UUID
+    var vehicleID: UUID
+    var personnelID: UUID
     var date: Date
     var description: String
     var status: MaintenanceStatus
+    var expenses: [MaintenanceExpense]
+    var notes: String?
+}
+
+struct MaintenanceExpense: Identifiable, Codable {
+    let id: UUID
+    let description: String
+    let amount: Double
+    let date: Date
 }
 
 enum NotificationType: String, Codable {

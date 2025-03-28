@@ -64,7 +64,7 @@ struct MaintenancePersonnelTabView: View {
                                     .padding(.horizontal)
                                 
                                 ForEach(preTripRequests) { request in
-                                    ServiceRequestCard(request: request)
+                                    RServiceRequestCard(request: request)
                                 }
                             }
                             
@@ -75,7 +75,7 @@ struct MaintenancePersonnelTabView: View {
                                     .padding(.horizontal)
                                 
                                 ForEach(postTripRequests) { request in
-                                    ServiceRequestCard(request: request)
+                                    RServiceRequestCard(request: request)
                                 }
                             }
                         }
@@ -103,7 +103,7 @@ struct MaintenancePersonnelTabView: View {
     }
 }
 
-struct ServiceRequestCard: View {
+struct RServiceRequestCard: View {
     let request: ServiceRequest
     
     var body: some View {
