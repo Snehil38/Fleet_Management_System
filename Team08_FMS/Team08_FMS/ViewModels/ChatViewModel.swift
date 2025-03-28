@@ -46,7 +46,13 @@ class ChatViewModel: ObservableObject {
                     .execute()
                 
                 let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
+                
+                // Custom date formatter for PostgreSQL timestamp format
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+                dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+                decoder.dateDecodingStrategy = .formatted(dateFormatter)
                 
                 var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
                 
@@ -69,6 +75,18 @@ class ChatViewModel: ObservableObject {
                     self.isLoading = false
                 }
                 print("Error loading messages: \(error)")
+                
+                // Print raw response for debugging
+                if let response = try? await supabaseDataController.supabase
+                    .from("chat_messages")
+                    .select()
+                    .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
+                    .order("created_at", ascending: true)
+                    .execute() {
+                    if let responseString = String(data: response.data, encoding: .utf8) {
+                        print("Raw response: \(responseString)")
+                    }
+                }
             }
         }
     }
@@ -90,12 +108,36 @@ class ChatViewModel: ObservableObject {
                     return
                 }
                 
+                // Get the current user's role
+                let userRole = await supabaseDataController.userRole
+                print("Current user role: \(userRole)")
+                
+                // Determine message direction based on user role
+                let (messageFleetManagerId, messageRecipientId, messageRecipientType): (UUID, UUID, String)
+                
+                if userRole == "fleet_manager" {
+                    // Fleet manager sending to driver/maintenance
+                    messageFleetManagerId = userId
+                    messageRecipientId = recipientId
+                    messageRecipientType = recipientType.rawValue
+                } else {
+                    // Driver/maintenance sending to fleet manager
+                    messageFleetManagerId = fleetManagerId
+                    messageRecipientId = userId
+                    messageRecipientType = "driver"
+                }
+                
+                print("Sending message with:")
+                print("Fleet Manager ID: \(messageFleetManagerId)")
+                print("Recipient ID: \(messageRecipientId)")
+                print("Recipient Type: \(messageRecipientType)")
+                
                 // Create message payload
                 let message = ChatMessage(
                     id: UUID(),
-                    fleet_manager_id: fleetManagerId,
-                    recipient_id: userId,  // Current user (driver) is the recipient
-                    recipient_type: "driver",  // Always use "driver" as recipient_type
+                    fleet_manager_id: messageFleetManagerId,
+                    recipient_id: messageRecipientId,
+                    recipient_type: messageRecipientType,
                     message_text: text,
                     status: .sent,
                     created_at: Date(),
