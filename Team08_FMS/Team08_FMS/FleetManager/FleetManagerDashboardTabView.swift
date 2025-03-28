@@ -428,6 +428,8 @@ struct AddTripView: View {
     @State private var activeTextField: LocationField? = nil
     @State private var searchCompleter = MKLocalSearchCompleter()
     @State private var searchCompleterDelegate: SearchCompleterDelegate? = nil
+    @State private var pickupLocationSelected = false
+    @State private var dropoffLocationSelected = false
     
     // Trip details state
     @State private var selectedVehicle: Vehicle?
@@ -501,15 +503,24 @@ struct AddTripView: View {
                             onPickupClear: {
                                 pickupLocation = ""
                                 pickupCoordinate = nil
+                                pickupLocationSelected = false
                                 updateMapRegion()
                             },
                             onDropoffClear: {
                                 dropoffLocation = ""
                                 dropoffCoordinate = nil
+                                dropoffLocationSelected = false
                                 updateMapRegion()
                             },
                             onPickupChange: { newValue in
-                                if newValue.count > 2 {
+                                if pickupLocationSelected && !newValue.isEmpty {
+                                    // If a location was previously selected and user is editing, allow new search
+                                    if newValue != pickupLocation {
+                                        pickupLocationSelected = false
+                                    }
+                                }
+                                
+                                if !pickupLocationSelected && newValue.count > 2 {
                                     searchCompleter.queryFragment = newValue
                                     activeTextField = .pickup
                                 } else {
@@ -517,7 +528,14 @@ struct AddTripView: View {
                                 }
                             },
                             onDropoffChange: { newValue in
-                                if newValue.count > 2 {
+                                if dropoffLocationSelected && !newValue.isEmpty {
+                                    // If a location was previously selected and user is editing, allow new search
+                                    if newValue != dropoffLocation {
+                                        dropoffLocationSelected = false
+                                    }
+                                }
+                                
+                                if !dropoffLocationSelected && newValue.count > 2 {
                                     searchCompleter.queryFragment = newValue
                                     activeTextField = .dropoff
                                 } else {
@@ -530,11 +548,15 @@ struct AddTripView: View {
                             }
                         )
                         
-                        if !searchResults.isEmpty {
+                        if !searchResults.isEmpty && activeTextField != nil && 
+                          ((activeTextField == .pickup && !pickupLocationSelected) || 
+                           (activeTextField == .dropoff && !dropoffLocationSelected)) {
                             LocationSearchResults(results: searchResults) { result in
                                 if activeTextField == .pickup {
+                                    pickupLocationSelected = true
                                     searchForLocation(result.title, isPickup: true)
                                 } else {
+                                    dropoffLocationSelected = true
                                     searchForLocation(result.title, isPickup: false)
                                 }
                             }
@@ -987,6 +1009,7 @@ class SearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
 struct LocationSearchResults: View {
     let results: [MKLocalSearchCompletion]
     let onSelect: (MKLocalSearchCompletion) -> Void
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
@@ -1037,7 +1060,7 @@ struct LocationSearchResults: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
+        .background(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground))
         .cornerRadius(10)
         .shadow(color: Color.black.opacity(0.1), radius: 5)
         .frame(height: min(CGFloat(results.count * 70), 280))

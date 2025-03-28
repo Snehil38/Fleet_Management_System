@@ -439,6 +439,8 @@ struct TripDetailView: View {
     @State private var activeTextField: LocationField? = nil
     @State private var searchCompleter = MKLocalSearchCompleter()
     @State private var searchCompleterDelegate: TripsSearchCompleterDelegate? = nil
+    @State private var destinationSelected = false
+    @State private var addressSelected = false
     
     // Touched states
     @State private var destinationEdited = false
@@ -515,7 +517,16 @@ struct TripDetailView: View {
                             TextField("Destination", text: $editedDestination)
                                 .onChange(of: editedDestination) { _, newValue in 
                                     destinationEdited = true
-                                    if newValue.count > 2 {
+                                    
+                                    // If destination was previously selected and user is editing
+                                    if destinationSelected && !newValue.isEmpty {
+                                        if newValue != editedDestination {
+                                            destinationSelected = false
+                                        }
+                                    }
+                                    
+                                    // Only show search results if not already selected and query has 3+ chars
+                                    if !destinationSelected && newValue.count > 2 {
                                         searchCompleter.queryFragment = newValue
                                         activeTextField = .destination
                                     } else {
@@ -534,7 +545,16 @@ struct TripDetailView: View {
                             TextField("Address", text: $editedAddress)
                                 .onChange(of: editedAddress) { _, newValue in 
                                     addressEdited = true
-                                    if newValue.count > 2 {
+                                    
+                                    // If address was previously selected and user is editing
+                                    if addressSelected && !newValue.isEmpty {
+                                        if newValue != editedAddress {
+                                            addressSelected = false
+                                        }
+                                    }
+                                    
+                                    // Only show search results if not already selected and query has 3+ chars
+                                    if !addressSelected && newValue.count > 2 {
                                         searchCompleter.queryFragment = newValue
                                         activeTextField = .address
                                     } else {
@@ -548,12 +568,16 @@ struct TripDetailView: View {
                             }
                         }
                         
-                        // Search Results if any
-                        if !searchResults.isEmpty {
+                        // Search Results if any - only show when appropriate based on selection state
+                        if !searchResults.isEmpty && activeTextField != nil && 
+                           ((activeTextField == .destination && !destinationSelected) || 
+                            (activeTextField == .address && !addressSelected)) {
                             TripsLocationSearchResults(results: searchResults) { result in
                                 if activeTextField == .destination {
+                                    destinationSelected = true
                                     searchForLocation(result.title, isDestination: true)
                                 } else {
+                                    addressSelected = true
                                     searchForLocation(result.title, isDestination: false)
                                 }
                             }
@@ -890,9 +914,14 @@ struct TripDetailView: View {
                 }
                 
                 // Clear search results
-                self.searchResults = []
+                self.hideSearchResults()
             }
         }
+    }
+    
+    private func hideSearchResults() {
+        searchResults = []
+        activeTextField = nil
     }
     
     private func getCoordinatesForAddress(_ address: String, completion: @escaping (CLLocationCoordinate2D?) -> Void) {
@@ -1308,37 +1337,128 @@ struct DriverRow: View {
 struct TripsLocationSearchResults: View {
     let results: [MKLocalSearchCompletion]
     let onResultSelected: (MKLocalSearchCompletion) -> Void
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(results, id: \.self) { result in
-                Button(action: {
-                    onResultSelected(result)
-                }) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(result.title)
-                            .font(.headline)
-                        
-                        if !result.subtitle.isEmpty {
-                            Text(result.subtitle)
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(results, id: \.self) { result in
+                    Button(action: {
+                        onResultSelected(result)
+                    }) {
+                        HStack(alignment: .top, spacing: 12) {
+                            // Map pin icon with different colors for different types of locations
+                            Image(systemName: iconForResult(result))
+                                .foregroundColor(colorForResult(result))
+                                .font(.headline)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(result.title)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+                                
+                                if !result.subtitle.isEmpty {
+                                    Text(result.subtitle)
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                        .lineLimit(2)
+                                }
+                                
+                                // Display the type of location
+                                if let locationType = getLocationType(result) {
+                                    Text(locationType)
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.blue.opacity(0.1))
+                                        .cornerRadius(4)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal)
                     }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Divider()
+                        .padding(.leading, 40)
                 }
-                .buttonStyle(PlainButtonStyle())
-                
-                Divider()
-                    .padding(.leading, 12)
             }
         }
-        .background(Color(.systemBackground))
+        .background(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground))
         .cornerRadius(10)
-        .shadow(color: Color.black.opacity(0.15), radius: 5, x: 0, y: 5)
-        .padding(.horizontal)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 5)
+        .frame(height: min(CGFloat(results.count * 70), 280))
+    }
+    
+    // Helper function to determine icon based on result type
+    private func iconForResult(_ result: MKLocalSearchCompletion) -> String {
+        if result.subtitle.contains("Restaurant") || result.subtitle.contains("Café") || result.subtitle.contains("Food") {
+            return "fork.knife"
+        } else if result.subtitle.contains("Hotel") || result.subtitle.contains("Resort") {
+            return "bed.double.fill"
+        } else if result.subtitle.contains("Hospital") || result.subtitle.contains("Clinic") {
+            return "cross.fill"
+        } else if result.subtitle.contains("School") || result.subtitle.contains("College") || result.subtitle.contains("University") {
+            return "book.fill"
+        } else if result.subtitle.contains("Park") || result.subtitle.contains("Garden") {
+            return "leaf.fill"
+        } else if result.subtitle.contains("Mall") || result.subtitle.contains("Shop") || result.subtitle.contains("Store") {
+            return "bag.fill"
+        } else {
+            return "mappin.circle.fill"
+        }
+    }
+    
+    // Helper function to determine color based on result type
+    private func colorForResult(_ result: MKLocalSearchCompletion) -> Color {
+        if result.subtitle.contains("Restaurant") || result.subtitle.contains("Café") || result.subtitle.contains("Food") {
+            return .orange
+        } else if result.subtitle.contains("Hotel") || result.subtitle.contains("Resort") {
+            return .blue
+        } else if result.subtitle.contains("Hospital") || result.subtitle.contains("Clinic") {
+            return .red
+        } else if result.subtitle.contains("School") || result.subtitle.contains("College") || result.subtitle.contains("University") {
+            return .green
+        } else if result.subtitle.contains("Park") || result.subtitle.contains("Garden") {
+            return .green
+        } else if result.subtitle.contains("Mall") || result.subtitle.contains("Shop") || result.subtitle.contains("Store") {
+            return .purple
+        } else {
+            return .red
+        }
+    }
+    
+    // Helper function to get location type
+    private func getLocationType(_ result: MKLocalSearchCompletion) -> String? {
+        let subtitle = result.subtitle.lowercased()
+        
+        if subtitle.contains("restaurant") || subtitle.contains("café") || subtitle.contains("cafe") {
+            return "Restaurant"
+        } else if subtitle.contains("hotel") || subtitle.contains("resort") {
+            return "Hotel"
+        } else if subtitle.contains("hospital") || subtitle.contains("clinic") {
+            return "Healthcare"
+        } else if subtitle.contains("school") || subtitle.contains("college") || subtitle.contains("university") {
+            return "Education"
+        } else if subtitle.contains("park") || subtitle.contains("garden") {
+            return "Park"
+        } else if subtitle.contains("mall") || subtitle.contains("shop") || subtitle.contains("store") {
+            return "Shopping"
+        } else if subtitle.contains("airport") || subtitle.contains("station") {
+            return "Transport"
+        } else if subtitle.contains("street") || subtitle.contains("road") {
+            return "Street"
+        } else if subtitle.contains("city") || subtitle.contains("town") {
+            return "City"
+        } else if subtitle.contains("landmark") || subtitle.contains("monument") {
+            return "Landmark"
+        } else {
+            return nil
+        }
     }
 }
 
