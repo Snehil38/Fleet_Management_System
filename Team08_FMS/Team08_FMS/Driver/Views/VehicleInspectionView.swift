@@ -48,143 +48,126 @@ struct VehicleInspectionView: View {
         ])
     }
     
+    private var allItemsChecked: Bool {
+        inspectionItems.allSatisfy { item in
+            if item.isChecked && item.hasIssue {
+                return !item.notes.isEmpty
+            }
+            return true
+        }
+    }
+    
+    private var hasIssues: Bool {
+        inspectionItems.contains { $0.hasIssue }
+    }
+    
     var body: some View {
         NavigationView {
-            ZStack {
-                Color(.systemGroupedBackground)
-                    .edgesIgnoringSafeArea(.all)
-                
-                VStack(spacing: 0) {
-                    // Progress section
-                    VStack(spacing: 8) {
-                        // Progress bar
-                        ProgressView(value: Double(currentSection + 1), total: Double(sections.count))
-                            .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-                            .padding(.horizontal)
-                        
-                        // Section text
-                        HStack {
-                            Text("Section \(currentSection + 1) of \(sections.count)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text("\(sections[currentSection])")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.blue)
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Section tabs
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(Array(sections.enumerated()), id: \.element) { index, section in
+                                Button(action: { currentSection = index }) {
+                                    Text(section)
+                                        .font(.subheadline)
+                                        .fontWeight(currentSection == index ? .semibold : .regular)
+                                        .foregroundColor(currentSection == index ? .blue : .gray)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .fill(currentSection == index ? Color.blue.opacity(0.1) : Color.clear)
+                                        )
+                                }
+                            }
                         }
                         .padding(.horizontal)
                     }
-                    .padding(.vertical, 12)
-                    .background(Color(.systemBackground))
                     
-                    // Inspection items
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            let sectionStart = currentSection * 3
-                            let sectionItems = Array(inspectionItems[sectionStart..<sectionStart+3])
-                            
-                            ForEach(sectionItems) { item in
-                                InspectionItemView(item: binding(for: item))
-                            }
-                            
-                            Spacer().frame(height: 60) // Space for the buttons
+                    // Items for current section
+                    let sectionItems = inspectionItems.filter { item in
+                        switch currentSection {
+                        case 0: // Exterior
+                            return ["Lights", "Tires", "Body Damage"].contains(item.title)
+                        case 1: // Interior
+                            return ["Dashboard", "Seats & Belts", "Controls"].contains(item.title)
+                        case 2: // Mechanical
+                            return ["Engine", "Brakes", "Fluid Levels"].contains(item.title)
+                        case 3: // Safety
+                            return ["Emergency Kit", "Fire Extinguisher", "First Aid Kit"].contains(item.title)
+                        default:
+                            return false
                         }
-                        .padding()
+                    }
+                    
+                    ForEach(sectionItems) { item in
+                        if let index = inspectionItems.firstIndex(where: { $0.id == item.id }) {
+                            InspectionItemView(item: $inspectionItems[index])
+                        }
                     }
                 }
-                
-                // Bottom navigation buttons
-                VStack {
-                    Spacer()
+                .padding(.vertical)
+            }
+            .background(Color(.systemGroupedBackground))
+            .overlay(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    if hasIssues {
+                        Text("Please provide details for all reported issues")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                            .padding(.bottom, 8)
+                    }
                     
-                    HStack(spacing: 16) {
-                        if currentSection > 0 {
-                            Button(action: { currentSection -= 1 }) {
-                                HStack {
-                                    Image(systemName: "chevron.left")
-                                    Text("Previous")
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color(.systemBackground))
-                                .foregroundColor(.blue)
-                                .cornerRadius(10)
-                                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    if currentSection < sections.count - 1 {
+                        Button(action: { currentSection += 1 }) {
+                            HStack {
+                                Text("Next")
+                                Image(systemName: "chevron.right")
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                            .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
                         }
-                        
-                        if currentSection < sections.count - 1 {
-                            Button(action: { currentSection += 1 }) {
-                                HStack {
-                                    Text("Next")
-                                    Image(systemName: "chevron.right")
-                                }
+                    } else {
+                        Button(action: { showingConfirmation = true }) {
+                            Text("Complete Inspection")
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(Color.blue)
+                                .background(allItemsChecked ? Color.green : Color(.systemGray4))
                                 .foregroundColor(.white)
                                 .cornerRadius(10)
                                 .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-                            }
-                        } else {
-                            Button(action: { showingConfirmation = true }) {
-                                Text("Complete Inspection")
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(allItemsChecked ? Color.green : Color(.systemGray4))
-                                    .foregroundColor(.white)
-                                    .cornerRadius(10)
-                                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-                            }
-                            .disabled(!allItemsChecked)
                         }
+                        .disabled(!allItemsChecked)
                     }
-                    .padding()
-                    .background(
-                        Color(.systemBackground)
-                            .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: -3)
-                    )
                 }
+                .padding()
+                .background(
+                    Color(.systemBackground)
+                        .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: -3)
+                )
             }
             .navigationTitle(isPreTrip ? "Pre-Trip Inspection" : "Post-Trip Inspection")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        presentationMode.wrappedValue.dismiss()
-                    }
+            .alert("Complete Inspection", isPresented: $showingConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Confirm") {
+                    onComplete(!hasIssues)
+                    presentationMode.wrappedValue.dismiss()
+                }
+            } message: {
+                if hasIssues {
+                    Text("There are reported issues. Please resolve them before completing the inspection.")
+                } else {
+                    Text("Are you sure you want to complete the inspection?")
                 }
             }
-            .alert(isPresented: $showingConfirmation) {
-                Alert(
-                    title: Text("Confirm Inspection"),
-                    message: Text(allItemsChecked ? 
-                        "Are you sure you want to complete the inspection?" : 
-                        "All items must be checked before completing the inspection."),
-                    primaryButton: .default(Text("Complete")) {
-                        let hasIssues = inspectionItems.contains { $0.hasIssue }
-                        onComplete(!hasIssues)
-                        presentationMode.wrappedValue.dismiss()
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
         }
-    }
-    
-    // Check if all items have been checked
-    private var allItemsChecked: Bool {
-        !inspectionItems.contains { !$0.isChecked }
-    }
-    
-    private func binding(for item: InspectionItem) -> Binding<InspectionItem> {
-        guard let index = inspectionItems.firstIndex(where: { $0.id == item.id }) else {
-            fatalError("Item not found")
-        }
-        return $inspectionItems[index]
     }
 }
 
@@ -276,24 +259,10 @@ struct InspectionItemView: View {
                         .padding(12)
                         .background(Color(.systemGray6))
                         .cornerRadius(8)
-                    
-                    HStack(spacing: 10) {
-                        Image(systemName: "camera.fill")
-                            .foregroundColor(.blue)
-                        
-                        Text("Add Photo")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "arrow.right")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    .padding(12)
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(item.notes.isEmpty ? Color.red : Color.clear, lineWidth: 1)
+                        )
                 }
                 .padding()
                 .background(Color(.systemBackground))
