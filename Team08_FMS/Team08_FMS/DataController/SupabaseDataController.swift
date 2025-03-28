@@ -3,6 +3,32 @@ import Supabase
 import Combine
 import SwiftSMTP
 
+struct GeofenceEvents: Codable, Identifiable {
+    
+    // The ID for the trip
+    let tripId: UUID
+    
+    // The event message
+    let message: String
+    
+    // When the event was created or triggered
+    let timestamp: Date = Date()
+    
+    // Whether the event has been read
+    var isRead: Bool = false
+    
+    // Conformance to Identifiable
+    var id: UUID { tripId }
+    
+    // Map the Swift property names to your database column names
+    enum CodingKeys: String, CodingKey {
+        case tripId
+        case message
+        case timestamp
+        case isRead
+    }
+}
+
 class SupabaseDataController: ObservableObject {
     static let shared = SupabaseDataController()
     
@@ -19,6 +45,7 @@ class SupabaseDataController: ObservableObject {
     @Published var showAlert = false
     @Published var alertMessage = ""
     @Published var session: Session?
+    @Published var geofenceEvents: [GeofenceEvents] = []
     
      let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
@@ -123,6 +150,7 @@ class SupabaseDataController: ObservableObject {
             await fetchUserRole(userID: session!.user.id)
             await MainActor.run {
                 self.isAuthenticated = true
+                userID = supabase.auth.currentUser?.id
             }
             print("Auto-login successful")
         } catch {
@@ -130,7 +158,6 @@ class SupabaseDataController: ObservableObject {
         }
     }
 
-    
     func checkSession() async {
         do {
             let session = try await supabase.auth.session
@@ -409,6 +436,76 @@ class SupabaseDataController: ObservableObject {
         return userID
     }
     
+    func subscribeToGeofenceEvents() {
+        Task {
+            let myChannel = supabase.channel("db-changes")
+            let changes = myChannel.postgresChange(AnyAction.self, schema: "public", table: "geofence_events")
+            await myChannel.subscribe()
+            for await change in changes {
+              switch change {
+              case .insert(let action):
+                  print(action)
+                  await fetchGeofenceEvents()
+              case .update(let action):
+                  print(action)
+                  await fetchGeofenceEvents()
+              case .delete(let action):
+                  print(action)
+                  await fetchGeofenceEvents()
+              }
+            }
+        }
+    }
+    
+    func fetchGeofenceEvents() async {
+        do {
+            // Select all columns; you can also specify columns explicitly
+            let response = try await supabase
+                .from("geofence_events")
+                .select("*")
+                // Optionally, order by timestamp descending
+                .order("timestamp", ascending: false)
+                .execute()
+            
+            // Decode the returned data into an array of GeofenceEvents
+            let events = try JSONDecoder().decode([GeofenceEvents].self, from: response.data)
+            
+            // Update your local array
+            await MainActor.run {
+                self.geofenceEvents = events
+            }
+            
+        } catch {
+            print("Error fetching geofence events: \(error.localizedDescription)")
+        }
+    }
+    
+    func insertIntoGeofenceEvents(event: GeofenceEvents) {
+        Task {
+            do {
+                let response = try await supabase
+                    .from("geofence_events")
+                    .insert(event)
+                    .execute()
+                print(response)
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    func deleteFromGeofenceEvents(event: GeofenceEvents) {
+        Task {
+            do {
+                let response = supabase
+                    .from("geofence_events")
+                    .delete()
+                    .eq("tripId", value: event.tripId)
+                print(response)
+            }
+        }
+    }
+    
     // MARK: - Fetch User Role
     private func fetchUserRole(userID: UUID) async {
         do {
@@ -416,6 +513,7 @@ class SupabaseDataController: ObservableObject {
                 .from("user_roles")
                 .select("role_id")
                 .eq("user_id", value: userID)
+                .eq("isDeleted", value: false)
                 .execute()
             
             struct UserRoleID: Codable {
@@ -884,23 +982,31 @@ class SupabaseDataController: ObservableObject {
                 print("Update response data: \(jsonString ?? "")")
             }
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception updating maintenance personnel status: \(error.localizedDescription)")
         }
     }
     
     func softDeleteDriver(for userID: UUID) async {
         do {
-        let response = try await supabase
+            let response = try await supabase
             .from("driver")
             .update(["isDeleted": true])
             .eq("id", value: userID)
             .execute()
+            
+            let response2 = try await supabase
+                .from("user_roles")
+                .update(["isDeleted": true])
+                .eq("user_id", value: userID)
+                .execute()
         
-        let data = response.data
-        let jsonString = String(data: data, encoding: .utf8)
-        print("Update response data: \(jsonString ?? "")")
+            let data = response.data
+            let data2 = response2.data
+            let jsonString = String(data: data, encoding: .utf8)
+            let jsonString2 = String(data: data2, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")\n\(jsonString2 ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception deleting driver details: \(error.localizedDescription)")
         }
     }
     
@@ -912,16 +1018,37 @@ class SupabaseDataController: ObservableObject {
                 .eq("id", value: userID)
                 .execute()
             
+            let response2 = try await supabase
+                .from("user_roles")
+                .update(["isDeleted": true])
+                .eq("user_id", value: userID)
+                .execute()
+            
             let data = response.data
+            let data2 = response2.data
             let jsonString = String(data: data, encoding: .utf8)
-            print("Update response data: \(jsonString ?? "")")
+            let jsonString2 = String(data: data2, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")\n\(jsonString2 ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception deleting maintenance personnel details: \(error.localizedDescription)")
         }
     }
     
     func updateDriver(driver: Driver) async {
         do {
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the personnel to JSON for debugging/logging.
+            let personnelJSONData = try encoder.encode(driver)
+            if let personnelJSONString = String(data: personnelJSONData, encoding: .utf8) {
+                print("Driver JSON to insert: \(personnelJSONString)")
+            }
+            
         let response = try await supabase
             .from("driver")
             .update(driver)
@@ -932,12 +1059,25 @@ class SupabaseDataController: ObservableObject {
         let jsonString = String(data: data, encoding: .utf8)
         print("Update response data: \(jsonString ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception updating driver details: \(error.localizedDescription)")
         }
     }
     
     func updateMaintenancePersonnel(personnel: MaintenancePersonnel) async {
         do {
+            
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the personnel to JSON for debugging/logging.
+            let personnelJSONData = try encoder.encode(personnel)
+            if let personnelJSONString = String(data: personnelJSONData, encoding: .utf8) {
+                print("Maintenance Personnel JSON to insert: \(personnelJSONString)")
+            }
             let response = try await supabase
                 .from("maintenance_personnel")
                 .update(personnel)
@@ -948,7 +1088,7 @@ class SupabaseDataController: ObservableObject {
             let jsonString = String(data: data, encoding: .utf8)
             print("Update response data: \(jsonString ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception updating maintenance personnel details: \(error.localizedDescription)")
         }
     }
     
@@ -1071,7 +1211,7 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    func updateVehichleStatus(newStatus: VehicleStatus, vehicleID: UUID) async {
+    func updateVehicleStatus(newStatus: VehicleStatus, vehicleID: UUID) async {
         do {
             // 6. Update the payload in Supabase by filtering with the vehicle's `id`
             let response = try await supabase
@@ -1136,6 +1276,53 @@ class SupabaseDataController: ObservableObject {
             return false
         }
     }
+    
+    public func updateTripDetails(id: UUID, destination: String, address: String, notes: String, distance: String? = nil) async throws {
+        do {
+            // First update the basic trip info
+            try await databaseFrom("trips")
+                .update([
+                    "destination": destination,
+                    "pickup": address,
+                    "notes": notes
+                ])
+                .eq("id", value: id)
+                .execute()
+            
+            // If distance is provided, update it separately
+            if let distance = distance {
+                // Extract numeric value from distance string
+                let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                    .joined()
+                
+                if let distanceValue = Double(numericDistance) {
+                    try await databaseFrom("trips")
+                        .update(["estimated_distance": distanceValue])
+                        .eq("id", value: id)
+                        .execute()
+                }
+            }
+            
+            print("Trip details updated for id \(id)")
+        } catch {
+            print("Error updating trip details: \(error)")
+            throw error
+        }
+    }
+    
+    func deleteTrip(tripID: UUID) {
+        Task {
+            do {
+                let response = try await supabase
+                    .from("trips")
+                    .delete()
+                    .eq("id", value: tripID)
+                    .execute()
+                
+                print("Trip deleted successfully: \(response)")
+            }
+        }
+    }
 
     // Optimized function to fetch a single vehicle with all details including documents
     func fetchVehicleDetails(vehicleId: UUID) async throws -> Vehicle? {
@@ -1198,4 +1385,80 @@ class SupabaseDataController: ObservableObject {
             throw error
         }
     }
+
+    public func updateTrip(id: UUID, secondaryDriverId: UUID) async throws {
+        do {
+            let response = try await supabase
+                .from("trips")
+                .update(["secondary_driver_id": secondaryDriverId])
+                .eq("id", value: id)
+                .execute()
+            
+            print("Trip secondary driver update success: \(response)")
+        } catch {
+            print("Error updating trip secondary driver: \(error)")
+            throw error
+        }
+    }
+    
+    func fetchAvailableVehicles(startDate: Date, endDate: Date) async throws -> [Vehicle] {
+        let vehicles = try await fetchVehicles()
+        let trips = TripDataController.shared.getAllTrips()
+        
+        // Filter trips that overlap with the given date range.
+        // This assumes each trip has an `endTime` property.
+        let filteredTrips = trips.filter { trip in
+            if let startTime = trip.startTime, let endTime = trip.endTime {
+                return startTime < endDate && endTime > startDate
+            } else {
+                return false
+            }
+        }
+        
+        var availableVehicles: [Vehicle] = []
+        
+        // Add vehicles that are not used in any of the overlapping trips.
+        for vehicle in vehicles {
+            let isUsed = filteredTrips.contains { trip in
+                trip.vehicleDetails.id == vehicle.id
+            }
+            if !isUsed && vehicle.status != .underMaintenance {
+                availableVehicles.append(vehicle)
+            }
+        }
+        
+        print(filteredTrips)
+        print("\n\(availableVehicles)")
+        
+        return availableVehicles
+    }
+    
+    func fetchAvailableDrivers(startDate: Date, endDate: Date) async throws -> [Driver] {
+        let drivers = try await fetchDrivers()
+        let trips = TripDataController.shared.getAllTrips()
+        
+        // Filter trips that overlap with the given date range.
+        let filteredTrips = trips.filter { trip in
+            if let startTime = trip.startTime, let endTime = trip.endTime {
+                return startTime < endDate && endTime > startDate
+            } else {
+                return false
+            }
+        }
+        
+        var availableDrivers: [Driver] = []
+        
+        // Add drivers that are not used in any of the overlapping trips.
+        for driver in drivers {
+            let isUsed = filteredTrips.contains { trip in
+                trip.driverId == driver.id
+            }
+            if !isUsed && driver.status != .offDuty {
+                availableDrivers.append(driver)
+            }
+        }
+        
+        return availableDrivers
+    }
+
 }

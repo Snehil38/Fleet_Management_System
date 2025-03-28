@@ -3,9 +3,6 @@ import MapKit
 import AVFoundation
 import CoreLocation
 
-// Import custom components
-import SwiftUI
-
 struct DriverTabView: View {
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
@@ -28,6 +25,7 @@ struct DriverTabView: View {
     @State private var selectedDelivery: DeliveryDetails?
     @State private var isCurrentTripDeclined = false
     @State private var tripQueue: [Trip] = []
+    @State private var showingSosModal = false
     
     // Route Information
     @State private var availableRoutes: [RouteOption] = [
@@ -57,8 +55,9 @@ struct DriverTabView: View {
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
         .task {
             // Set the driver ID and load trips
-            await tripController.setDriverId(driverId)
+            tripController.setDriverId(driverId)
             await tripController.refreshTrips()
+            TripDataController.shared.startMonitoringRegions()
         }
     }
     
@@ -100,9 +99,23 @@ struct DriverTabView: View {
 
                                     // Upcoming Trips Section
                                     VStack(alignment: .leading, spacing: 20) {
-                                        Text("Upcoming Trips")
-                                            .font(.system(size: 24, weight: .bold))
-                                            .padding(.horizontal)
+                                        HStack {
+                                            Text("Upcoming Trips")
+                                                .font(.system(size: 24, weight: .bold))
+                                            
+                                            if !tripController.upcomingTrips.isEmpty {
+                                                Text("\(tripController.upcomingTrips.count)")
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 4)
+                                                    .background(Color.blue)
+                                                    .cornerRadius(12)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal)
 
                                         if tripController.upcomingTrips.isEmpty {
                                             emptyUpcomingTripsView
@@ -153,18 +166,25 @@ struct DriverTabView: View {
                                     } else {
                                         VStack(spacing: 0) {
                                             ForEach(tripController.recentDeliveries) { delivery in
-                                                Button(action: {
+                                                Button {
                                                     selectedDelivery = delivery
-                                                    showingDeliveryDetails = true
-                                                }) {
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                        showingDeliveryDetails = true
+                                                    }
+                                                } label: {
                                                     DeliveryRow(delivery: delivery)
                                                 }
                                                 .buttonStyle(PlainButtonStyle())
-                                                
+
                                                 if delivery.id != tripController.recentDeliveries.last?.id {
                                                     Divider()
                                                         .padding(.horizontal)
                                                 }
+                                            }
+                                        }
+                                        .onChange(of: selectedDelivery) { _, newValue in
+                                            if newValue != nil {
+                                                showingDeliveryDetails = true
                                             }
                                         }
                                         .background(Color(.systemBackground))
@@ -189,14 +209,6 @@ struct DriverTabView: View {
                 .toolbar {
                     ToolbarItemGroup(placement: .navigationBarTrailing) {
                         HStack(spacing: 16) {
-                            Button(action: {
-                                showingChatBot = true
-                            }) {
-                                Image(systemName: "message.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.blue)
-                            }
-                            
                             Button(action: {
                                 showingProfileView = true
                             }) {
@@ -281,6 +293,9 @@ struct DriverTabView: View {
             if let currentTrip = tripController.currentTrip {
                 VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
             }
+        }
+        .sheet(isPresented: $showingSosModal) {
+            SOSModalView(isPresented: $showingSosModal)
         }
         .alert(isPresented: $showingAlert) {
             Alert(
@@ -605,24 +620,35 @@ struct DriverTabView: View {
                     }
                 }
                 
-                ActionButton(
-                    title: "Mark Delivered",
-                    icon: "checkmark.circle.fill",
-                    color: .green
-                ) {
-                    if !trip.hasCompletedPreTrip {
-                        alertMessage = "Please complete pre-trip inspection before marking as delivered"
-                        showingAlert = true
-                    } else if trip.hasCompletedPostTrip {
-                        // Already completed post-trip
-                        // Use Task to handle the async call
-                        Task {
-                            await MainActor.run {
-                                markCurrentTripDelivered()
+                HStack(spacing: 10) {
+                    ActionButton(
+                        title: "Mark Delivered",
+                        icon: "checkmark.circle.fill",
+                        color: .green
+                    ) {
+                        if !trip.hasCompletedPreTrip {
+                            alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                            showingAlert = true
+                        } else if trip.hasCompletedPostTrip {
+                            // Already completed post-trip
+                            // Use Task to handle the async call
+                            Task {
+                                await MainActor.run {
+                                    markCurrentTripDelivered()
+                                }
                             }
+                        } else {
+                            showingPostTripInspection = true
                         }
-                    } else {
-                        showingPostTripInspection = true
+                    }
+                    
+                    ActionButton(
+                        title: "SOS",
+                        icon: "exclamationmark.triangle.fill",
+                        color: .red
+                    ) {
+                        // Show the SOS modal instead of an alert
+                        showingSosModal = true
                     }
                 }
             }
@@ -881,49 +907,81 @@ struct UpcomingTripRow: View {
     @EnvironmentObject var tripController: TripDataController
     @State private var showingAlert = false
     @State private var errorMessage = ""
+    @State private var showingDetails = false
     
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text(trip.destination)
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with destination and start button
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(trip.destination)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.primary)
+                    if let pickup = trip.pickup {
+                        Text(pickup)
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                    }
+                }
                 Spacer()
                 Button(action: {
                     Task {
                         do {
                             try await tripController.startTrip(trip: trip)
                         } catch {
-                            errorMessage = error.localizedDescription
+                            errorMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
                             showingAlert = true
                         }
                     }
                 }) {
                     Text("Start Trip")
+                        .font(.system(.subheadline, weight: .medium))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(Color.blue)
-                        .cornerRadius(8)
+                        .cornerRadius(20)
                 }
             }
             
-            if let notes = trip.notes {
-                Text(notes)
+            // Trip details
+            VStack(alignment: .leading, spacing: 8) {
+                if !trip.eta.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 14))
+                        Text("ETA:")
+                            .foregroundColor(.gray)
+                        Text(trip.eta)
+                    }
                     .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            
-            if let pickup = trip.pickup {
-                Text("Pickup: \(pickup)")
+                }
+                
+                if !trip.distance.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.left.and.right")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 14))
+                        Text("Distance:")
+                            .foregroundColor(.gray)
+                        Text(trip.distance)
+                    }
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                }
             }
         }
         .padding()
         .background(Color(.systemBackground))
-        .cornerRadius(10)
-        .shadow(radius: 2)
-        .alert("Error", isPresented: $showingAlert) {
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .onTapGesture {
+            showingDetails = true
+        }
+        .sheet(isPresented: $showingDetails) {
+            TripDetailsView(trip: trip)
+        }
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
@@ -1088,8 +1146,8 @@ struct DeliveryDetailsView: View {
                 }
                 
                 // Vehicle & Driver Info Section
-                Section(header: Text("Driver & Vehicle")) {
-                    DetailRow(icon: "person.fill", title: "Driver", value: delivery.driver)
+                Section(header: Text("Vehicle")) {
+//                    DetailRow(icon: "person.fill", title: "Driver", value: delivery.driver)
                     DetailRow(icon: "truck.box.fill", title: "Vehicle", value: delivery.vehicle)
                 }
                 
@@ -1108,30 +1166,30 @@ struct DeliveryDetailsView: View {
                 }
                 
                 // Proof of Delivery Section
-                Section(header: Text("Proof of Delivery")) {
-                    HStack {
-                        Image(systemName: "doc.fill")
-                        Text("Delivery Receipt")
-                        Spacer()
-                        Image(systemName: "arrow.down.circle")
-                            .foregroundColor(.blue)
-                    }
-                    
-                    HStack {
-                        Image(systemName: "signature")
-                        Text("Customer Signature")
-                        Spacer()
-                        Image(systemName: "eye")
-                            .foregroundColor(.blue)
-                    }
-                }
+//                Section(header: Text("Proof of Delivery")) {
+//                    HStack {
+//                        Image(systemName: "doc.fill")
+//                        Text("Delivery Receipt")
+//                        Spacer()
+//                        Image(systemName: "arrow.down.circle")
+//                            .foregroundColor(.blue)
+//                    }
+//                    
+//                    HStack {
+//                        Image(systemName: "signature")
+//                        Text("Customer Signature")
+//                        Spacer()
+//                        Image(systemName: "eye")
+//                            .foregroundColor(.blue)
+//                    }
+//                }
             }
             .listStyle(InsetGroupedListStyle())
             .navigationTitle("Delivery Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
@@ -1196,7 +1254,7 @@ struct QueuedTripRow: View {
                             try await tripController.startTrip(trip: trip)
                             onStart()
                         } catch {
-                            alertMessage = error.localizedDescription
+                            alertMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
                             showingAlert = true
                         }
                     }
@@ -1236,7 +1294,7 @@ struct QueuedTripRow: View {
                 secondaryButton: .cancel()
             )
         }
-        .alert("Error", isPresented: $showingAlert) {
+        .alert("Active Trip in Progress", isPresented: $showingAlert) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)
@@ -1274,6 +1332,185 @@ struct MapPolyline: View {
             }
             .stroke(strokeColor, lineWidth: lineWidth)
         }
+    }
+}
+
+struct SOSModalView: View {
+    @Binding var isPresented: Bool
+    @StateObject private var profileManager = ProfileManager.shared
+    @State private var emergencySubject: String = ""
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                // Emergency icon and header
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.red)
+                    
+                    Text("Emergency Assistance")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("Describe your emergency situation")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding(.top, 20)
+                
+                // Emergency subject text field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Emergency Subject")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Enter emergency details", text: $emergencySubject)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                }
+                .padding(.horizontal)
+                .padding(.top, 20)
+                
+                // Fleet manager contact information
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Fleet Manager Contact")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(profileManager.fleetManagerName.isEmpty ? "Fleet Manager" : profileManager.fleetManagerName)
+                                .font(.headline)
+                            
+                            Text(profileManager.fleetManagerPhone.isEmpty ? "+1 (555) 123-4567" : profileManager.fleetManagerPhone)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                }
+                
+                Spacer()
+                
+                // Contact button
+                Button(action: {
+                    if emergencySubject.isEmpty {
+                        // Show alert if no subject entered
+                        alertMessage = "Please enter a description of your emergency"
+                        showingAlert = true
+                    } else {
+                        // Open phone dialer with fleet manager number
+                        contactFleetManager()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "phone.fill")
+                        Text("Contact Fleet Manager")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(emergencySubject.isEmpty ? Color.gray : Color.red)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                    .shadow(color: Color.black.opacity(0.1), radius: 5)
+                }
+                .disabled(emergencySubject.isEmpty)
+                .padding(.horizontal)
+                .padding(.bottom, 30)
+            }
+            .alert(isPresented: $showingAlert) {
+                Alert(
+                    title: Text("Missing Information"),
+                    message: Text(alertMessage),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+            .navigationTitle("SOS Emergency")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func contactFleetManager() {
+        // Get the fleet manager's phone number
+        let phoneNumber = profileManager.fleetManagerPhone.isEmpty ? "+15551234567" : profileManager.fleetManagerPhone
+        
+        // Clean the phone number (remove non-numeric characters except +)
+        let cleanedNumber = phoneNumber.components(separatedBy: CharacterSet(charactersIn: "+0123456789").inverted).joined()
+        
+        // Create the URL for the phone
+        if let url = URL(string: "tel://\(cleanedNumber)") {
+            // Open the URL
+            UIApplication.shared.open(url)
+            
+            // Log the emergency call
+            Task {
+                try? await logEmergencyCall(subject: emergencySubject, phoneNumber: cleanedNumber)
+            }
+            
+            // Dismiss the sheet after initiating the call
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                isPresented = false
+            }
+        }
+    }
+    
+    private func logEmergencyCall(subject: String, phoneNumber: String) async throws {
+        // In a real implementation, this would log the emergency call to a database
+        // For now, we'll just print to the console
+        print("Emergency call logged: \(subject) to \(phoneNumber)")
+        
+        // This could be a call to SupabaseDataController to log the emergency
+        // await SupabaseDataController.shared.logEmergencyCall(subject: subject, phoneNumber: phoneNumber)
+    }
+}
+
+class ProfileManager: ObservableObject {
+    static let shared = ProfileManager()
+    
+    @Published var fleetManagerName: String = "John Smith"
+    @Published var fleetManagerPhone: String = "+1 (555) 123-4567"
+    
+    private init() {
+        // Load fleet manager details from local storage or fetch from server
+        Task {
+            await loadFleetManagerDetails()
+        }
+    }
+    
+    private func loadFleetManagerDetails() async {
+        // This would typically fetch the fleet manager's contact information from a database
+        // For now, we'll use hardcoded values
+        
+        // In a real implementation, you might fetch this data from Supabase
+        // let fleetManagerData = try await SupabaseDataController.shared.getFleetManagerProfile()
+        // await MainActor.run {
+        //     self.fleetManagerName = fleetManagerData.name
+        //     self.fleetManagerPhone = fleetManagerData.phone
+        // }
     }
 }
 

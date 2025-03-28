@@ -13,8 +13,10 @@ struct FleetManagerDashboardTabView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
+    @StateObject private var tripController = TripDataController.shared
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
+    @State private var showingAlertsView = false
     
     // Computed properties for counts and expenses
     private var availableVehiclesCount: Int {
@@ -29,16 +31,53 @@ struct FleetManagerDashboardTabView: View {
         vehicleManager.vehicles.filter { $0.status == .underMaintenance }.count
     }
 
+    private var activeTripsCount: Int {
+        // Only count trips that are in progress
+        tripController.getAllTrips().filter { $0.status == .inProgress }.count
+    }
+
     private var totalMonthlySalaries: Double {
         dataManager.totalSalaryExpenses
     }
 
+    private var totalFuelCost: Double {
+        // Calculate total fuel cost from all trips
+        tripController.getAllTrips().reduce(0) { total, trip in
+            // Extract numeric value from distance string
+            let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                .joined()
+            
+            if let distance = Double(numericDistance) {
+                // Calculate fuel cost ($0.5 per km)
+                return total + (distance * 0.5)
+            }
+            return total
+        }
+    }
+
+    private var totalTripRevenue: Double {
+        // Calculate total revenue from all trips
+        tripController.getAllTrips().reduce(0) { total, trip in
+            // Extract numeric value from distance string
+            let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                .joined()
+            
+            if let distance = Double(numericDistance) {
+                // Total Revenue = Fuel Cost + ($0.25 × Distance) + $50
+                let fuelCost = distance * 0.5
+                let distanceRevenue = distance * 0.25
+                return total + (fuelCost + distanceRevenue + 50.0)
+            }
+            return total
+        }
+    }
+
     private var totalExpenses: Double {
-        totalMonthlySalaries  // Now total expenses is just the salary expenses
+        totalMonthlySalaries + totalFuelCost
     }
 
     private var totalRevenue: Double {
-        -totalExpenses  // Revenue is negative of expenses
+        totalTripRevenue - totalExpenses
     }
 
     var body: some View {
@@ -79,7 +118,7 @@ struct FleetManagerDashboardTabView: View {
                             icon: "arrow.triangle.turn.up.right.diamond.fill",
                             iconColor: .purple,
                             title: "Active Trips",
-                            value: "0"
+                            value: "\(activeTripsCount)"
                         )
                     }
                     .padding(.horizontal)
@@ -132,7 +171,15 @@ struct FleetManagerDashboardTabView: View {
             }
             .navigationTitle("Fleet Manager")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // Alerts button
+                    Button {
+                        showingAlertsView = true
+                    } label: {
+                        Image(systemName: "bell.fill")
+                            .foregroundColor(.blue)
+                    }
+                    // Profile button
                     Button {
                         showingProfile = true
                     } label: {
@@ -155,6 +202,11 @@ struct FleetManagerDashboardTabView: View {
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingAlertsView) {
+                NavigationView {
+                    AlertsView()
+                }
             }
         }
     }
@@ -353,6 +405,7 @@ struct AddTripView: View {
     let dismiss: () -> Void
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
+    @EnvironmentObject private var crewDataController: CrewDataController
     
     // Location Manager for current location
     @StateObject private var locationManager = LocationManager()
@@ -375,9 +428,12 @@ struct AddTripView: View {
     @State private var activeTextField: LocationField? = nil
     @State private var searchCompleter = MKLocalSearchCompleter()
     @State private var searchCompleterDelegate: SearchCompleterDelegate? = nil
+    @State private var pickupLocationSelected = false
+    @State private var dropoffLocationSelected = false
     
     // Trip details state
     @State private var selectedVehicle: Vehicle?
+    @State private var selectedDriverId: UUID?
     @State private var cargoType = "General Goods"
     @State private var startDate = Date()
     @State private var deliveryDate = Date().addingTimeInterval(86400)
@@ -390,13 +446,16 @@ struct AddTripView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     
+    // Fetched available vehicles after route calculation.
+    @State private var fetchedAvailableVehicles: [Vehicle] = []
+    
     let cargoTypes = ["General Goods", "Perishable", "Hazardous", "Heavy Machinery", "Liquids", "Livestock"]
     
     enum LocationField {
         case pickup, dropoff
     }
     
-    // Break down complex expressions
+    // Validation for location and vehicle selection
     private var isLocationValid: Bool {
         !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation
     }
@@ -405,12 +464,21 @@ struct AddTripView: View {
         selectedVehicle != nil
     }
     
-    var isFormValid: Bool {
-        isLocationValid && isVehicleSelected
+    private var isDriverSelected: Bool {
+        selectedDriverId != nil
     }
     
+    var isFormValid: Bool {
+        isLocationValid
+    }
+    
+    // Compute available vehicles from the environment and fall back to fetched ones if available.
     var availableVehicles: [Vehicle] {
-        vehicleManager.vehicles.filter { $0.status == .available }
+        vehicleManager.vehicles.filter { $0.status == .available && $0.status != .inService }
+    }
+    
+    var displayedVehicles: [Vehicle] {
+        return fetchedAvailableVehicles
     }
     
     var body: some View {
@@ -435,15 +503,24 @@ struct AddTripView: View {
                             onPickupClear: {
                                 pickupLocation = ""
                                 pickupCoordinate = nil
+                                pickupLocationSelected = false
                                 updateMapRegion()
                             },
                             onDropoffClear: {
                                 dropoffLocation = ""
                                 dropoffCoordinate = nil
+                                dropoffLocationSelected = false
                                 updateMapRegion()
                             },
                             onPickupChange: { newValue in
-                                if newValue.count > 2 {
+                                if pickupLocationSelected && !newValue.isEmpty {
+                                    // If a location was previously selected and user is editing, allow new search
+                                    if newValue != pickupLocation {
+                                        pickupLocationSelected = false
+                                    }
+                                }
+                                
+                                if !pickupLocationSelected && newValue.count > 2 {
                                     searchCompleter.queryFragment = newValue
                                     activeTextField = .pickup
                                 } else {
@@ -451,7 +528,14 @@ struct AddTripView: View {
                                 }
                             },
                             onDropoffChange: { newValue in
-                                if newValue.count > 2 {
+                                if dropoffLocationSelected && !newValue.isEmpty {
+                                    // If a location was previously selected and user is editing, allow new search
+                                    if newValue != dropoffLocation {
+                                        dropoffLocationSelected = false
+                                    }
+                                }
+                                
+                                if !dropoffLocationSelected && newValue.count > 2 {
                                     searchCompleter.queryFragment = newValue
                                     activeTextField = .dropoff
                                 } else {
@@ -464,30 +548,25 @@ struct AddTripView: View {
                             }
                         )
                         
-                        // Search Results if any
-                        if !searchResults.isEmpty {
+                        if !searchResults.isEmpty && activeTextField != nil && 
+                          ((activeTextField == .pickup && !pickupLocationSelected) || 
+                           (activeTextField == .dropoff && !dropoffLocationSelected)) {
                             LocationSearchResults(results: searchResults) { result in
                                 if activeTextField == .pickup {
+                                    pickupLocationSelected = true
                                     searchForLocation(result.title, isPickup: true)
                                 } else {
+                                    dropoffLocationSelected = true
                                     searchForLocation(result.title, isPickup: false)
                                 }
                             }
                         }
                         
-                        // Vehicle Selection
-                        VehicleSelectionView(
-                            selectedVehicle: $selectedVehicle,
-                            availableVehicles: availableVehicles
-                        )
-                        
                         // Cargo Details Card
                         CardView(title: "CARGO DETAILS", systemImage: "shippingbox.fill") {
                             Menu {
                                 ForEach(cargoTypes, id: \.self) { type in
-                                    Button(type) {
-                                        cargoType = type
-                                    }
+                                    Button(type) { cargoType = type }
                                 }
                             } label: {
                                 HStack {
@@ -506,17 +585,15 @@ struct AddTripView: View {
                         // Schedule Card
                         CardView(title: "SCHEDULE", systemImage: "calendar") {
                             VStack(spacing: 16) {
-                                // Start Date
-                                DatePicker("Start Date", 
-                                    selection: $startDate,
-                                    in: Date()..., // This sets the minimum date to today
-                                    displayedComponents: [.date, .hourAndMinute]
+                                DatePicker("Start Date",
+                                           selection: $startDate,
+                                           in: Date()...,
+                                           displayedComponents: [.date, .hourAndMinute]
                                 )
                                 .onChange(of: startDate) { newDate, _ in
                                     if distance > 0 {
                                         let estimatedHours = distance / 40.0
-                                        let timeInterval = estimatedHours * 3600
-                                        deliveryDate = newDate.addingTimeInterval(timeInterval)
+                                        deliveryDate = newDate.addingTimeInterval(estimatedHours * 3600)
                                     }
                                 }
                                 .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
@@ -551,11 +628,10 @@ struct AddTripView: View {
                             .cornerRadius(10)
                         }
                         
-                        // Trip Estimates Card (if available)
+                        // Trip Estimates Card
                         if distance > 0 {
                             CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
                                 VStack(spacing: 16) {
-                                    // Distance and Time Row
                                     HStack(spacing: 20) {
                                         EstimateItem(
                                             icon: "arrow.left.and.right",
@@ -576,7 +652,6 @@ struct AddTripView: View {
                                     
                                     Divider()
                                     
-                                    // Fuel Cost Row
                                     EstimateItem(
                                         icon: "fuelpump.fill",
                                         title: "Est. Fuel Cost",
@@ -590,8 +665,80 @@ struct AddTripView: View {
                             }
                         }
                         
-                        // Remove the debug log view display
-                        // Bottom spacing to prevent button overlap
+                        // Vehicle Selection is displayed only after route calculation.
+                        if distance > 0 {
+                            if displayedVehicles.isEmpty {
+                                Text("No vehicles available for the selected time range.")
+                                    .foregroundColor(.gray)
+                                    .padding()
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(10)
+                            } else {
+                                VehicleSelectionView(
+                                    selectedVehicle: $selectedVehicle,
+                                    availableVehicles: displayedVehicles
+                                )
+                            }
+                            
+                            // Driver Selection - displayed after route calculation
+                            if let vehicle = selectedVehicle {
+                                CardView(title: "DRIVER ASSIGNMENT", systemImage: "person.fill") {
+                                    VStack {
+                                        Menu {
+                                            // Option to unassign driver
+                                            Button(action: {
+                                                selectedDriverId = nil
+                                            }) {
+                                                HStack {
+                                                    Text("Unassigned")
+                                                        .foregroundColor(.red)
+                                                    Spacer()
+                                                    if selectedDriverId == nil {
+                                                        Image(systemName: "checkmark")
+                                                    }
+                                                }
+                                            }
+                                            
+                                            Divider()
+                                            
+                                            // Available drivers
+                                            ForEach(crewDataController.drivers.filter { $0.status == .available }, id: \.userID) { driver in
+                                                Button(action: {
+                                                    selectedDriverId = driver.userID
+                                                }) {
+                                                    HStack {
+                                                        Text(driver.name)
+                                                        Spacer()
+                                                        if selectedDriverId == driver.userID {
+                                                            Image(systemName: "checkmark")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } label: {
+                                            HStack {
+                                                if let driverId = selectedDriverId,
+                                                   let driver = crewDataController.drivers.first(where: { $0.userID == driverId }) {
+                                                    Text(driver.name)
+                                                        .foregroundColor(.primary)
+                                                } else {
+                                                    Text("Select Driver")
+                                                        .foregroundColor(.gray)
+                                                }
+                                                Image(systemName: "chevron.down")
+                                                    .font(.caption)
+                                                    .foregroundColor(.blue)
+                                            }
+                                            .padding()
+                                            .background(Color(.systemGray6))
+                                            .cornerRadius(10)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
                         Color.clear.frame(height: 100)
                     }
                     .padding(.horizontal, 16)
@@ -600,7 +747,6 @@ struct AddTripView: View {
             }
             .background(Color(.systemGroupedBackground))
             
-            // Fixed Bottom Button
             VStack(spacing: 0) {
                 Button(action: distance > 0 ? saveTrip : calculateRoute) {
                     HStack {
@@ -614,11 +760,11 @@ struct AddTripView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(isFormValid ? Color.blue : Color.gray)
+                    .background((distance > 0 ? (isVehicleSelected && isDriverSelected) : isFormValid) ? Color.blue : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(!isFormValid || isCalculating)
+                .disabled(distance > 0 ? (!isVehicleSelected || !isDriverSelected) : (!isFormValid || isCalculating))
                 .padding(16)
                 .background(
                     Rectangle()
@@ -626,32 +772,30 @@ struct AddTripView: View {
                         .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
                 )
             }
+
         }
         .edgesIgnoringSafeArea(.bottom)
         .navigationTitle("Add New Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") {
-                    dismiss()
-                }
+                Button("Cancel") { dismiss() }
             }
         }
         .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Trip Creation"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+            Alert(title: Text("Trip Creation"),
+                  message: Text(alertMessage),
+                  dismissButton: .default(Text("OK")))
         }
         .onAppear {
             setupSearchCompleter()
+            crewDataController.update() // Update drivers list when view appears
             
             // Observe location updates
             locationManager.objectWillChange.sink { [weak locationManager] _ in
                 if let location = locationManager?.location {
                     let geocoder = CLGeocoder()
-                    geocoder.reverseGeocodeLocation(location) { placemarks, error in
+                    geocoder.reverseGeocodeLocation(location) { placemarks, _ in
                         if let placemark = placemarks?.first {
                             let address = [
                                 placemark.name,
@@ -674,23 +818,15 @@ struct AddTripView: View {
     }
     
     private func setupSearchCompleter() {
-        // Enable all result types to get the most detailed location results
         searchCompleter.resultTypes = [.pointOfInterest, .address, .query]
-        
-        // Set a smaller region for more precise results
         searchCompleter.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
-            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10) // Smaller span for more detailed results
+            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
+            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
         )
-        
-        // Set up the delegate
         let delegate = SearchCompleterDelegate { results in
-            // Limit to top 10 results for better performance
             self.searchResults = Array(results.prefix(10))
         }
         searchCompleter.delegate = delegate
-        
-        // Store the delegate to prevent it from being deallocated
         searchCompleterDelegate = delegate
     }
     
@@ -703,45 +839,32 @@ struct AddTripView: View {
         let searchRequest = MKLocalSearch.Request()
         searchRequest.naturalLanguageQuery = query
         searchRequest.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
+            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
             span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 30)
         )
-        
-        // Include more result types for detailed locations
         searchRequest.resultTypes = [.pointOfInterest, .address]
         
-        let search = MKLocalSearch(request: searchRequest)
-        search.start { response, error in
-            guard let response = response, error == nil else {
-                return
+        MKLocalSearch(request: searchRequest).start { response, error in
+            guard let response = response, error == nil,
+                  let mapItem = response.mapItems.first else { return }
+            if isPickup {
+                self.pickupLocation = mapItem.name ?? query
+                self.pickupCoordinate = mapItem.placemark.coordinate
+            } else {
+                self.dropoffLocation = mapItem.name ?? query
+                self.dropoffCoordinate = mapItem.placemark.coordinate
             }
-            
-            // Get the first result if available
-            if let mapItem = response.mapItems.first {
-                if isPickup {
-                    self.pickupLocation = mapItem.name ?? query
-                    self.pickupCoordinate = mapItem.placemark.coordinate
-                } else {
-                    self.dropoffLocation = mapItem.name ?? query
-                    self.dropoffCoordinate = mapItem.placemark.coordinate
-                }
-                
-                self.hideSearchResults()
-                self.updateMapRegion()
-            }
+            self.hideSearchResults()
+            self.updateMapRegion()
         }
     }
     
     private func updateMapRegion() {
-        // If we have both coordinates, center the map to show both
         if let pickup = pickupCoordinate, let dropoff = dropoffCoordinate {
             let centerLat = (pickup.latitude + dropoff.latitude) / 2
             let centerLon = (pickup.longitude + dropoff.longitude) / 2
-            
-            // Calculate span to fit both points with padding
-            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.5 // Reduced padding for more detail
-            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.5 // Reduced padding for more detail
-            
+            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.5
+            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.5
             region = MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
                 span: MKCoordinateSpan(latitudeDelta: max(latDelta, 0.02), longitudeDelta: max(lonDelta, 0.02))
@@ -749,12 +872,12 @@ struct AddTripView: View {
         } else if let pickup = pickupCoordinate {
             region = MKCoordinateRegion(
                 center: pickup,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02) // More detailed zoom level
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
             )
         } else if let dropoff = dropoffCoordinate {
             region = MKCoordinateRegion(
                 center: dropoff,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02) // More detailed zoom level
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
             )
         }
     }
@@ -792,12 +915,21 @@ struct AddTripView: View {
             let costPerKm = 5.0 // $5 per km as requested
             
             self.tripCost = self.distance * costPerKm
-            self.fuelCost = self.tripCost * fuelRatio
+            self.fuelCost = (self.distance * 0.8) + 50.0
             
             // Calculate estimated travel time and update delivery date
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
             let timeInterval = estimatedHours * 3600 // Convert hours to seconds
             self.deliveryDate = self.startDate.addingTimeInterval(timeInterval)
+            
+            Task {
+                do {
+                    let vehicles = try await supabaseDataController.fetchAvailableVehicles(startDate: self.startDate, endDate: self.deliveryDate)
+                    await MainActor.run { self.fetchedAvailableVehicles = vehicles }
+                } catch {
+                    print("Error fetching available vehicles: \(error)")
+                }
+            }
             
             self.updateMapRegion()
         }
@@ -814,8 +946,8 @@ struct AddTripView: View {
         let fuelRatio = 0.2 // 20% of cost is fuel
         let costPerKm = 5.0 // $5 per km as requested
         
-        tripCost = distance * costPerKm
-        fuelCost = tripCost * fuelRatio
+        tripCost = (distance * 0.8) + 50.0
+        fuelCost = (distance * 0.8) + 50.0
         
         // Calculate estimated travel time and update delivery date
         let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
@@ -830,16 +962,14 @@ struct AddTripView: View {
     private func saveTrip() {
         Task {
             guard let vehicle = selectedVehicle else { return }
-            
-//            let tripName = "TRP-\(UUID().uuidString.prefix(8))"
-            let estimatedHours = distance / 40.0 // Convert to hours
+            let estimatedHours = distance / 40.0
             
             do {
                 let success = try await supabaseDataController.createTrip(
                     name: pickupLocation,
                     destination: dropoffLocation,
                     vehicleId: vehicle.id,
-                    driverId: nil,
+                    driverId: selectedDriverId,
                     startTime: startDate,
                     endTime: deliveryDate,
                     startLat: pickupCoordinate?.latitude,
@@ -853,6 +983,7 @@ struct AddTripView: View {
                 )
                 
                 if success {
+                    try await TripDataController.shared.fetchAllTrips()
                     dismiss()
                 } else {
                     alertMessage = "Failed to create trip. Please try again."
@@ -888,6 +1019,7 @@ class SearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
 struct LocationSearchResults: View {
     let results: [MKLocalSearchCompletion]
     let onSelect: (MKLocalSearchCompletion) -> Void
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
@@ -938,7 +1070,7 @@ struct LocationSearchResults: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
+        .background(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground))
         .cornerRadius(10)
         .shadow(color: Color.black.opacity(0.1), radius: 5)
         .frame(height: min(CGFloat(results.count * 70), 280))

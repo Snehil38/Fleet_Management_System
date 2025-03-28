@@ -1,7 +1,6 @@
 import SwiftUI
 import PhotosUI
 
-// MARK: - Basic Information Section
 private struct BasicInformationSection: View {
     @Binding var name: String
     @Binding var year: String
@@ -24,7 +23,6 @@ private struct BasicInformationSection: View {
     }
 }
 
-// MARK: - Vehicle Details Section
 private struct VehicleDetailsSection: View {
     @Binding var vehicleType: VehicleType
     @Binding var color: String

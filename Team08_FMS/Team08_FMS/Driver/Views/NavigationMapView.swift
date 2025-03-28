@@ -7,9 +7,14 @@ struct NavigationMapView: UIViewRepresentable {
     @Binding var route: MKRoute?
     @Binding var userHeading: Double
     let followsUserLocation: Bool
+    @Binding var isRouteCompleted: Bool
     
     // For updating ETA and distance
     var onLocationUpdate: ((CLLocation) -> Void)?
+    var onRouteDeviation: (() -> Void)?  // Add callback for route deviation
+    
+    // Add variables for route deviation detection
+    private let routeDeviationThreshold: Double = 50.0  // Meters
     
     class MapAnnotation: NSObject, MKAnnotation {
         let coordinate: CLLocationCoordinate2D
@@ -20,6 +25,7 @@ struct NavigationMapView: UIViewRepresentable {
         enum AnnotationType {
             case source
             case destination
+            case completed
         }
         
         init(coordinate: CLLocationCoordinate2D, title: String?, subtitle: String? = nil, type: AnnotationType) {
@@ -34,20 +40,31 @@ struct NavigationMapView: UIViewRepresentable {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
+        // Disable automatic tracking - we'll handle it manually
+        mapView.userTrackingMode = .none
         
-        // Set initial tracking mode to follow with heading
-        mapView.setUserTrackingMode(.followWithHeading, animated: true)
+        // Set map type to standard for better visibility of buildings and blocks
+        mapView.mapType = .standard
         
-        // Enhanced map settings for better visualization
-        mapView.mapType = .mutedStandard
-        mapView.pointOfInterestFilter = .includingAll
+        // Configure map features
         mapView.showsBuildings = true
         mapView.showsTraffic = true
-        mapView.showsCompass = true
-        mapView.showsScale = true
+        mapView.pointOfInterestFilter = .includingAll
         
-        // Show more map details
-        mapView.showsPointsOfInterest = true
+        // Apply custom map styling for better building and block visibility
+        let mapConfiguration = MKStandardMapConfiguration()
+        mapConfiguration.pointOfInterestFilter = .includingAll
+        mapConfiguration.showsTraffic = true
+        mapConfiguration.emphasisStyle = .muted
+        mapView.preferredConfiguration = mapConfiguration
+        
+        // Initial camera setup
+        let camera = MKMapCamera()
+        camera.centerCoordinate = destination
+        camera.centerCoordinateDistance = 500
+        camera.pitch = 0
+        camera.heading = 0
+        mapView.camera = camera
         
         // Add destination annotation
         let destinationAnnotation = MapAnnotation(
@@ -58,37 +75,90 @@ struct NavigationMapView: UIViewRepresentable {
         )
         mapView.addAnnotation(destinationAnnotation)
         
+        #if targetEnvironment(simulator)
+        let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
+        mapView.addGestureRecognizer(panGesture)
+        #endif
+        
         return mapView
     }
     
     func updateUIView(_ mapView: MKMapView, context: Context) {
-        // Update route overlay with animation
-        if let route = route {
+        // Update route overlay based on completion status
+        if isRouteCompleted {
+            mapView.removeOverlays(mapView.overlays)
+            context.coordinator.currentRouteId = nil
+            context.coordinator.remainingPolyline = nil
+        } else if let route = route {
             let currentRouteId = route.polyline.hash
             if context.coordinator.currentRouteId != currentRouteId {
                 mapView.removeOverlays(mapView.overlays)
+                
+                // Reset tracking state when route changes
+                context.coordinator.remainingPolyline = nil
+                context.coordinator.completedPathCoordinates = []
+                
+                // Add the full route initially
                 mapView.addOverlay(route.polyline)
                 context.coordinator.currentRouteId = currentRouteId
                 
-                // If not following user, show the entire route
-                if !followsUserLocation {
-                    mapView.setVisibleMapRect(
-                        route.polyline.boundingMapRect,
-                        edgePadding: UIEdgeInsets(top: 100, left: 100, bottom: 100, right: 100),
-                        animated: true
+                // Show entire route if not following user
+                if !followsUserLocation && !context.coordinator.isUpdatingCamera {
+                    let routeRect = route.polyline.boundingMapRect
+                    // Add padding to the route rect
+                    let paddedRect = routeRect.insetBy(
+                        dx: -routeRect.width * 0.1,
+                        dy: -routeRect.height * 0.1
                     )
+                    let region = mapView.regionThatFits(
+                        MKCoordinateRegion(paddedRect)
+                    )
+                    
+                    context.coordinator.queueCameraUpdate {
+                        UIView.animate(withDuration: 1.0) {
+                            mapView.setRegion(region, animated: false)
+                        } completion: { _ in
+                            context.coordinator.isUpdatingCamera = false
+                        }
+                    }
                 }
             }
-        } else {
-            mapView.removeOverlays(mapView.overlays)
-            context.coordinator.currentRouteId = nil
         }
         
-        // Always ensure we're in the correct tracking mode
-        if followsUserLocation && mapView.userTrackingMode != .followWithHeading {
-            mapView.setUserTrackingMode(.followWithHeading, animated: true)
-        } else if !followsUserLocation && mapView.userTrackingMode != .none {
-            mapView.setUserTrackingMode(.none, animated: true)
+        // Update user location and camera
+        if let userLocation = userLocation {
+            // Check for route deviation and trigger recalculation
+            if let route = route, !isRouteCompleted {
+                let location = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                if context.coordinator.checkRouteDeviation(userLocation: location, route: route) {
+                    // Notify parent about deviation to recalculate route
+                    onRouteDeviation?()
+                }
+            }
+            
+            if followsUserLocation && !context.coordinator.isUpdatingCamera {
+                context.coordinator.queueCameraUpdate {
+                    let camera = MKMapCamera(
+                        lookingAtCenter: userLocation,
+                        fromDistance: 500,
+                        pitch: 45,
+                        heading: userHeading
+                    )
+                    
+                    UIView.animate(withDuration: 1.0, delay: 0, options: .curveEaseInOut) {
+                        mapView.camera = camera
+                    } completion: { _ in
+                        context.coordinator.isUpdatingCamera = false
+                    }
+                }
+            }
+            
+            // Update source annotation
+            context.coordinator.updateSourceAnnotation(
+                at: userLocation,
+                on: mapView,
+                heading: userHeading
+            )
         }
     }
     
@@ -102,37 +172,39 @@ struct NavigationMapView: UIViewRepresentable {
         var currentRouteId: Int?
         var sourceAnnotation: MapAnnotation?
         var simulatedSpeed: Double = 5.0
+        var updateCount: Int = 0
         var lastUpdateTime: Date = Date()
-        var lastSpeed: Double = 0
-        var hasSetInitialPosition = false
-        private let minimumUpdateDistance: CLLocationDistance = 5.0
-        private let minimumMovementThreshold: CLLocationDistance = 10.0 // 10 meters minimum movement
-        private let accuracyThreshold: CLLocationAccuracy = 20.0 // 20 meters accuracy threshold
-        private var lastCameraUpdate = Date()
-        private let cameraUpdateThreshold: TimeInterval = 1.0 // Minimum time between camera updates
-        private var lastRecalculationTime = Date()
-        private let recalculationThreshold: TimeInterval = 30.0 // Recalculate route every 30 seconds if off route
-        private let offRouteThreshold: CLLocationDistance = 50.0 // Distance in meters to consider off route
+        var isUpdatingCamera: Bool = false
+        var updateTimer: Timer?
+        var pendingCameraUpdate: (() -> Void)?
+        var lastRouteDeviation: Date?  // Track last time route was recalculated
+        var completedPathCoordinates: [CLLocationCoordinate2D] = []
+        var remainingPolyline: MKPolyline?
         
         init(_ parent: NavigationMapView) {
             self.parent = parent
             super.init()
-            print("NavigationMapView Coordinator initialized")
+            setupUpdateTimer()
         }
         
-        func shouldUpdateCamera(for newLocation: CLLocationCoordinate2D) -> Bool {
-            guard let lastLoc = lastLocation else {
-                if !hasSetInitialPosition {
-                    hasSetInitialPosition = true
-                    return true
+        deinit {
+            updateTimer?.invalidate()
+        }
+        
+        private func setupUpdateTimer() {
+            // Increase update interval to 3 seconds
+            updateTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                if !self.isUpdatingCamera, let pendingUpdate = self.pendingCameraUpdate {
+                    self.isUpdatingCamera = true
+                    pendingUpdate()
+                    self.pendingCameraUpdate = nil
                 }
-                return false
             }
-            
-            let newLoc = CLLocation(latitude: newLocation.latitude, longitude: newLocation.longitude)
-            let distance = newLoc.distance(from: lastLoc)
-            
-            return distance >= minimumUpdateDistance
+        }
+        
+        func queueCameraUpdate(_ update: @escaping () -> Void) {
+            pendingCameraUpdate = update
         }
         
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -142,6 +214,14 @@ struct NavigationMapView: UIViewRepresentable {
                 renderer.lineWidth = 8
                 renderer.lineCap = .round
                 renderer.lineJoin = .round
+                
+                // Add second line for better visibility
+                let backgroundRenderer = MKPolylineRenderer(polyline: routePolyline)
+                backgroundRenderer.strokeColor = UIColor.white.withAlphaComponent(0.3)
+                backgroundRenderer.lineWidth = 10
+                backgroundRenderer.lineCap = .round
+                backgroundRenderer.lineJoin = .round
+                
                 return renderer
             }
             return MKOverlayRenderer()
@@ -149,7 +229,15 @@ struct NavigationMapView: UIViewRepresentable {
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if annotation is MKUserLocation {
-                return nil
+                let annotationView = MKAnnotationView(annotation: annotation, reuseIdentifier: "UserLocation")
+                // Update car icon based on route completion
+                if parent.isRouteCompleted {
+                    annotationView.image = UIImage(systemName: "checkmark.circle.fill")?.withTintColor(.systemGreen, renderingMode: .alwaysOriginal)
+                } else {
+                    annotationView.image = UIImage(systemName: "car.fill")
+                }
+                annotationView.canShowCallout = true
+                return annotationView
             }
             
             guard let mapAnnotation = annotation as? MapAnnotation else { return nil }
@@ -161,32 +249,53 @@ struct NavigationMapView: UIViewRepresentable {
                 annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
                 annotationView?.canShowCallout = true
                 
-                // Add right callout accessory for more info
+                // Add custom callout with more info
+                let detailLabel = UILabel()
+                detailLabel.numberOfLines = 2
+                detailLabel.font = .systemFont(ofSize: 12)
+                annotationView?.detailCalloutAccessoryView = detailLabel
+                
+                // Add right callout accessory
                 let infoButton = UIButton(type: .detailDisclosure)
+                infoButton.tintColor = .systemBlue
                 annotationView?.rightCalloutAccessoryView = infoButton
             }
             
             annotationView?.annotation = annotation
             
-            // Customize the annotation based on type
+            // Enhanced annotation styling
             switch mapAnnotation.type {
             case .source:
-                annotationView?.markerTintColor = .systemBlue
-                annotationView?.glyphImage = UIImage(systemName: "location.fill")
+                if parent.isRouteCompleted {
+                    annotationView?.markerTintColor = .systemGreen
+                    annotationView?.glyphImage = UIImage(systemName: "checkmark.circle.fill")
+                } else {
+                    annotationView?.markerTintColor = .systemBlue
+                    annotationView?.glyphImage = UIImage(systemName: "location.fill")
+                }
                 annotationView?.animatesWhenAdded = true
                 
-                // Add continuous pulse animation
-                UIView.animate(withDuration: 1.0, delay: 0, options: [.autoreverse, .repeat]) {
-                    annotationView?.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
-                }
             case .destination:
-                annotationView?.markerTintColor = .systemRed
-                annotationView?.glyphImage = UIImage(systemName: "flag.fill")
-                // Add continuous bounce animation
-                UIView.animate(withDuration: 1.0, delay: 0, options: [.autoreverse, .repeat]) {
-                    annotationView?.transform = CGAffineTransform(translationX: 0, y: -8)
+                if parent.isRouteCompleted {
+                    annotationView?.markerTintColor = .systemGreen
+                    annotationView?.glyphImage = UIImage(systemName: "flag.checkered.circle.fill")
+                } else {
+                    annotationView?.markerTintColor = .systemRed
+                    annotationView?.glyphImage = UIImage(systemName: "flag.fill")
                 }
+                annotationView?.displayPriority = .required
+                
+            case .completed:
+                annotationView?.markerTintColor = .systemGreen
+                annotationView?.glyphImage = UIImage(systemName: "checkmark.circle.fill")
+                annotationView?.displayPriority = .required
             }
+            
+            // Add shadow for depth
+            annotationView?.layer.shadowColor = UIColor.black.cgColor
+            annotationView?.layer.shadowOpacity = 0.3
+            annotationView?.layer.shadowOffset = CGSize(width: 0, height: 2)
+            annotationView?.layer.shadowRadius = 4
             
             return annotationView
         }
@@ -201,16 +310,6 @@ struct NavigationMapView: UIViewRepresentable {
             
             // Update user location
             if gesture.state == .changed {
-                let now = Date()
-                let timeInterval = now.timeIntervalSince(lastUpdateTime)
-                
-                // Calculate speed based on movement
-                if let lastCoord = lastLocation?.coordinate {
-                    let distance = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                        .distance(from: CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude))
-                    lastSpeed = distance / timeInterval
-                }
-                
                 parent.userLocation = coordinate
                 
                 // Simulate heading based on movement
@@ -219,15 +318,10 @@ struct NavigationMapView: UIViewRepresentable {
                     parent.userHeading = heading
                 }
                 
-                // Update location with speed information
+                // Update location
                 let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
                 lastLocation = location
-                lastUpdateTime = now
-                
-                // Only update if moved significantly or speed changed
-                if lastLocation?.distance(from: location) ?? 0 > 2 || abs(lastSpeed - simulatedSpeed) > 1 {
-                    parent.onLocationUpdate?(location)
-                }
+                parent.onLocationUpdate?(location)
             }
             #endif
         }
@@ -239,159 +333,22 @@ struct NavigationMapView: UIViewRepresentable {
             return heading
         }
         
-        // Add method to handle user location updates
-        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
-            guard let location = userLocation.location else { return }
-            
-            // Check for accuracy
-            if location.horizontalAccuracy > accuracyThreshold {
-                return
-            }
-            
-            // Always update user location immediately
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.parent.userLocation = userLocation.coordinate
-                if let heading = userLocation.heading {
-                    self.parent.userHeading = heading.trueHeading
-                }
-            }
-            
-            // Check if we need to recalculate route
-            if let route = parent.route {
-                let polyline = route.polyline
-                let closest = closestPointOnRoute(to: location.coordinate, route: polyline)
-                let distanceFromRoute = distance(from: location.coordinate, to: closest)
-                
-                let now = Date()
-                if distanceFromRoute > offRouteThreshold && 
-                   now.timeIntervalSince(lastRecalculationTime) >= recalculationThreshold {
-                    // We're off route - recalculate
-                    recalculateRoute(from: location.coordinate, to: parent.destination)
-                    lastRecalculationTime = now
-                }
-            }
-            
-            // Check for significant movement
-            if let lastLoc = lastLocation {
-                let distance = location.distance(from: lastLoc)
-                if distance < minimumMovementThreshold {
-                    return
-                }
-                
-                // Calculate distance to destination
-                let destinationLocation = CLLocation(latitude: parent.destination.latitude, longitude: parent.destination.longitude)
-                let distanceToDestination = location.distance(from: destinationLocation)
-                
-                // If within 20 meters of destination, remove the route
-                if distanceToDestination < 20 {
-                    DispatchQueue.main.async {
-                        mapView.removeOverlays(mapView.overlays)
-                        self.parent.route = nil
-                    }
-                    return
-                }
-            }
-            
-            // Update camera with user's movement
-            if parent.followsUserLocation {
-                let camera = MKMapCamera(
-                    lookingAtCenter: location.coordinate,
-                    fromDistance: 150, // Lower altitude for better street view
-                    pitch: 70, // More tilted angle for better perspective
-                    heading: parent.userHeading
-                )
-                mapView.setCamera(camera, animated: true)
-            }
-            
-            lastLocation = location
-            parent.onLocationUpdate?(location)
-        }
-        
-        private func recalculateRoute(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) {
-            let request = MKDirections.Request()
-            request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
-            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
-            request.transportType = .automobile
-            
-            let directions = MKDirections(request: request)
-            directions.calculate { [weak self] response, error in
-                guard let self = self,
-                      let route = response?.routes.first else { return }
-                
-                DispatchQueue.main.async {
-                    self.parent.route = route
-                }
-            }
-        }
-        
-        private func closestPointOnRoute(to point: CLLocationCoordinate2D, route: MKPolyline) -> CLLocationCoordinate2D {
-            var closest = route.coordinate
-            var minDistance = Double.infinity
-            
-            // Convert polyline to array of coordinates
-            let pointCount = route.pointCount
-            let coordinates = UnsafeMutablePointer<CLLocationCoordinate2D>.allocate(capacity: pointCount)
-            route.getCoordinates(coordinates, range: NSRange(location: 0, length: pointCount))
-            
-            // Find closest point
-            for i in 0..<pointCount {
-                let distance = self.distance(from: point, to: coordinates[i])
-                if distance < minDistance {
-                    minDistance = distance
-                    closest = coordinates[i]
-                }
-            }
-            
-            coordinates.deallocate()
-            return closest
-        }
-        
-        private func distance(from point1: CLLocationCoordinate2D, to point2: CLLocationCoordinate2D) -> CLLocationDistance {
-            let location1 = CLLocation(latitude: point1.latitude, longitude: point1.longitude)
-            let location2 = CLLocation(latitude: point2.latitude, longitude: point2.longitude)
-            return location1.distance(from: location2)
-        }
-        
-        func mapView(_ mapView: MKMapView, didFailToLocateUserWithError error: Error) {
-            print("❌ Failed to locate user: \(error.localizedDescription)")
-        }
-        
-        func mapViewWillStartLocatingUser(_ mapView: MKMapView) {
-            print("🟢 MapView will start locating user")
-        }
-        
-        func mapViewDidStopLocatingUser(_ mapView: MKMapView) {
-            print("🔴 MapView did stop locating user")
-        }
-        
-        // Handle when user tracking mode changes
-        func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
-            if parent.followsUserLocation && mode != .followWithHeading {
-                // If we should be following but aren't, reset the mode
-                DispatchQueue.main.async {
-                    mapView.setUserTrackingMode(.followWithHeading, animated: true)
-                }
-            }
-        }
-        
         func updateSourceAnnotation(at coordinate: CLLocationCoordinate2D, on mapView: MKMapView, heading: Double) {
             // Remove old source annotation if it exists
             if let oldAnnotation = sourceAnnotation {
                 mapView.removeAnnotation(oldAnnotation)
             }
             
-            // Create new source annotation with speed and distance info
-            let speedString = String(format: "Speed: %.1f km/h", lastSpeed * 3.6)
+            // Create new source annotation with distance info
             let distanceString = lastLocation.map { loc -> String in
                 let distance = loc.distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
-                return String(format: "Distance: %.0f meters", distance)
+                return String(format: "Moved %.0f meters", distance)
             } ?? "Starting point"
             
             let newAnnotation = MapAnnotation(
                 coordinate: coordinate,
                 title: "Current Location",
-                subtitle: "\(speedString)\n\(distanceString)",
+                subtitle: distanceString,
                 type: .source
             )
             sourceAnnotation = newAnnotation
@@ -400,6 +357,159 @@ struct NavigationMapView: UIViewRepresentable {
             UIView.animate(withDuration: 0.3) {
                 mapView.addAnnotation(newAnnotation)
             }
+            
+            // Update location for distance calculations
+            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            if lastLocation?.distance(from: location) ?? 0 > 5 { // Only update if moved more than 5 meters
+                lastLocation = location
+                parent.onLocationUpdate?(location)
+                
+                // Update the completed path
+                if !parent.isRouteCompleted, let route = parent.route {
+                    updateCompletedPath(currentLocation: location, route: route, mapView: mapView)
+                }
+            }
+        }
+        
+        // Add method to update completed path segments
+        func updateCompletedPath(currentLocation: CLLocation, route: MKRoute, mapView: MKMapView) {
+            let polyline = route.polyline
+            let pointCount = polyline.pointCount
+            let points = polyline.points()
+            
+            // Find the closest point on the route
+            var closestPointIndex = 0
+            var closestDistance = Double.greatestFiniteMagnitude
+            
+            for i in 0..<pointCount {
+                let polylinePoint = points[i]
+                let coordinate = CLLocationCoordinate2D(
+                    latitude: CLLocationDegrees(polylinePoint.x),
+                    longitude: CLLocationDegrees(polylinePoint.y)
+                )
+                
+                let routeLocation = CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                
+                let distance = currentLocation.distance(from: routeLocation)
+                if distance < closestDistance {
+                    closestDistance = distance
+                    closestPointIndex = i
+                }
+            }
+            
+            // Only update if we're close to the route
+            if closestDistance <= parent.routeDeviationThreshold {
+                // Create array of remaining coordinates (from closest point to end)
+                var remainingCoordinates: [CLLocationCoordinate2D] = []
+                
+                // Add current point plus all remaining points
+                for i in closestPointIndex..<pointCount {
+                    let point = points[i]
+                    let coordinate = CLLocationCoordinate2D(
+                        latitude: CLLocationDegrees(point.x),
+                        longitude: CLLocationDegrees(point.y)
+                    )
+                    remainingCoordinates.append(coordinate)
+                }
+                
+                // Create new polyline for remaining route
+                if remainingCoordinates.count >= 2 {
+                    // Remove old polyline
+                    if let oldPolyline = remainingPolyline {
+                        mapView.removeOverlay(oldPolyline)
+                    }
+                    
+                    // Create and add new polyline
+                    let newPolyline = MKPolyline(coordinates: remainingCoordinates, count: remainingCoordinates.count)
+                    remainingPolyline = newPolyline
+                    
+                    // Remove all overlays and add the new one
+                    mapView.removeOverlays(mapView.overlays)
+                    mapView.addOverlay(newPolyline)
+                    
+                    print("Updated route: \(pointCount - closestPointIndex) points remaining")
+                }
+                
+                // Store completed coordinates for potential rendering
+                completedPathCoordinates = []
+                for i in 0..<closestPointIndex {
+                    let point = points[i]
+                    let coordinate = CLLocationCoordinate2D(
+                        latitude: CLLocationDegrees(point.x),
+                        longitude: CLLocationDegrees(point.y)
+                    )
+                    completedPathCoordinates.append(coordinate)
+                }
+            }
+        }
+        
+        // Add map region change monitoring with stricter timing
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let now = Date()
+            // Increase minimum time between updates to 2 seconds
+            if now.timeIntervalSince(lastUpdateTime) < 2.0 {
+                return
+            }
+            lastUpdateTime = now
+            
+            updateCount += 1
+            let span = mapView.region.span
+            print("Map Update #\(updateCount)")
+            print("New zoom levels - Latitude span: \(span.latitudeDelta), Longitude span: \(span.longitudeDelta)")
+            print("Center coordinate: \(mapView.region.center)")
+            print("Camera altitude: \(mapView.camera.altitude)")
+            print("-------------------")
+        }
+        
+        // Add method to check for route deviation
+        func checkRouteDeviation(userLocation: CLLocation, route: MKRoute) -> Bool {
+            // Don't check too frequently - at most once every 10 seconds
+            if let lastDeviation = lastRouteDeviation, 
+               Date().timeIntervalSince(lastDeviation) < 10 {
+                return false
+            }
+            
+            // Find the closest point on the route
+            var closestDistance = Double.greatestFiniteMagnitude
+            
+            // Sample points from the route polyline
+            let polyline = route.polyline
+            let pointCount = polyline.pointCount
+            
+            // Get the route's point data
+            let points = polyline.points()
+            
+            // Check distance to each point on the route
+            for i in 0..<pointCount {
+                let polylinePoint = points[i]
+                let coordinate = CLLocationCoordinate2D(
+                    latitude: CLLocationDegrees(polylinePoint.x),
+                    longitude: CLLocationDegrees(polylinePoint.y)
+                )
+                
+                let routeLocation = CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                
+                let distance = userLocation.distance(from: routeLocation)
+                if distance < closestDistance {
+                    closestDistance = distance
+                }
+            }
+            
+            // If we're more than threshold distance from the route, consider it a deviation
+            let hasDeviated = closestDistance > parent.routeDeviationThreshold
+            
+            if hasDeviated {
+                lastRouteDeviation = Date()
+                print("Route deviation detected: \(closestDistance) meters from route")
+            }
+            
+            return hasDeviated
         }
     }
 } 
