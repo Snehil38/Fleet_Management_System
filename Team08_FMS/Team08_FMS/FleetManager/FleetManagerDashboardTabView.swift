@@ -626,10 +626,11 @@ struct AddTripView: View {
                         if distance > 0 {
                             CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
                                 VStack(spacing: 16) {
+                                    // First row: Distance and Travel Time
                                     HStack(spacing: 20) {
                                         EstimateItem(
                                             icon: "arrow.left.and.right",
-                                            title: "Total Distance",
+                                            title: "Distance",
                                             value: String(format: "%.1f km", distance),
                                             valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
                                         )
@@ -638,7 +639,7 @@ struct AddTripView: View {
                                         
                                         EstimateItem(
                                             icon: "clock.fill",
-                                            title: "Est. Travel Time",
+                                            title: "Travel Time",
                                             value: String(format: "%.1f hours", distance / 40.0),
                                             valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
                                         )
@@ -646,18 +647,31 @@ struct AddTripView: View {
                                     
                                     Divider()
                                     
-                                    EstimateItem(
-                                        icon: "fuelpump.fill",
-                                        title: "Est. Fuel Cost",
-                                        value: String(format: "$%.2f", fuelCost),
-                                        valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                    )
+                                    // Second row: Fuel Cost and Trip Cost
+                                    HStack(spacing: 20) {
+                                        EstimateItem(
+                                            icon: "fuelpump.fill",
+                                            title: "Fuel Cost",
+                                            value: String(format: "$%.2f", fuelCost),
+                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                        )
+                                        
+                                        Divider()
+                                        
+                                        EstimateItem(
+                                            icon: "dollarsign.circle.fill",
+                                            title: "Trip Cost",
+                                            value: String(format: "$%.2f", tripCost),
+                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                        )
+                                    }
                                 }
                                 .padding()
                                 .background(Color(.systemGray6))
                                 .cornerRadius(10)
                             }
                         }
+
                         
                         // Vehicle Selection is displayed only after route calculation.
                         if distance > 0 {
@@ -854,12 +868,20 @@ struct AddTripView: View {
             // Get distance in kilometers
             self.distance = route.distance / 1000
             
-            // Calculate costs with $5 per km
-            let fuelRatio = 0.2 // 20% of cost is fuel
-            let costPerKm = 5.0 // $5 per km as requested
-            
-            self.tripCost = self.distance * costPerKm
-            self.fuelCost = (self.distance * 0.8) + 50.0
+            // Cost parameters
+            let costPerKm = 5.0         // Additional cost per kilometer (e.g., maintenance, driver, etc.)
+            let baseCost = 50.0         // Base cost for starting the trip
+
+            // Fuel efficiency parameters
+            let fuelConsumptionRate = 8.5   // Liters per 100 km (adjust as needed)
+            let fuelPricePerLiter = 1.50    // Price per liter in dollars (adjust as needed)
+
+            // Calculate fuel cost using realistic fuel consumption formula
+            // Fuel cost = (distance / 100) * fuelConsumptionRate * fuelPricePerLiter
+            fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
+
+            // Calculate total trip cost including the base cost, per km cost, and fuel cost
+            tripCost = baseCost + (distance * costPerKm) + fuelCost
             
             // Calculate estimated travel time and update delivery date
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
@@ -877,12 +899,20 @@ struct AddTripView: View {
         // Get distance in kilometers
         distance = locationA.distance(from: locationB) / 1000
         
-        // Calculate costs with $5 per km
-        let fuelRatio = 0.2 // 20% of cost is fuel
-        let costPerKm = 5.0 // $5 per km as requested
-        
-        tripCost = (distance * 0.8) + 50.0
-        fuelCost = (distance * 0.8) + 50.0
+        // Cost parameters
+        let costPerKm = 5.0         // Additional cost per kilometer (e.g., maintenance, driver, etc.)
+        let baseCost = 50.0         // Base cost for starting the trip
+
+        // Fuel efficiency parameters
+        let fuelConsumptionRate = 8.5   // Liters per 100 km (adjust as needed)
+        let fuelPricePerLiter = 1.50    // Price per liter in dollars (adjust as needed)
+
+        // Calculate fuel cost using realistic fuel consumption formula
+        // Fuel cost = (distance / 100) * fuelConsumptionRate * fuelPricePerLiter
+        fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
+
+        // Calculate total trip cost including the base cost, per km cost, and fuel cost
+        tripCost = baseCost + (distance * costPerKm) + fuelCost
         
         // Calculate estimated travel time and update delivery date
         let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h

@@ -138,7 +138,7 @@ struct TripsView: View {
     private func createTripFromDelivery(_ delivery: DeliveryDetails) -> Trip {
         // Extract information from delivery notes
         let deliveryNotes = delivery.notes
-        var cargoType = "General Cargo"
+//        var cargoType = "General Cargo"
         var tripName = "Trip-\(delivery.id.uuidString.prefix(4))"
         var distance = ""
         var startingPoint = ""
@@ -148,9 +148,11 @@ struct TripsView: View {
         for line in lines {
             if line.hasPrefix("Trip:") {
                 tripName = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
-            } else if line.hasPrefix("Cargo:") {
-                cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
-            } else if line.hasPrefix("Distance:") {
+            }
+//            else if line.hasPrefix("Cargo:") {
+//                cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
+//            }
+        else if line.hasPrefix("Distance:") {
                 distance = String(line.dropFirst(9).trimmingCharacters(in: .whitespaces))
             } else if line.hasPrefix("From:") {
                 startingPoint = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
