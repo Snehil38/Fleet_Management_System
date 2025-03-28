@@ -796,7 +796,10 @@ struct AddTripView: View {
     }
     
     private func calculateRoute() {
-        guard let pickup = pickupCoordinate, let dropoff = dropoffCoordinate else { return }
+        guard let pickup = pickupCoordinate, let dropoff = dropoffCoordinate else {
+            return
+        }
+        
         isCalculating = true
         
         let request = MKDirections.Request()
@@ -804,35 +807,35 @@ struct AddTripView: View {
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: dropoff))
         request.transportType = .automobile
         
-        MKDirections(request: request).calculate { response, error in
+        let directions = MKDirections(request: request)
+        directions.calculate { response, error in
             self.isCalculating = false
             
             guard let route = response?.routes.first, error == nil else {
+                // Fallback to straight-line distance if route calculation fails
                 self.calculateStraightLineDistance(from: pickup, to: dropoff)
                 return
             }
             
+            // Get the route polyline
             self.routePolyline = route.polyline
+            
+            // Get distance in kilometers
             self.distance = route.distance / 1000
             
-            let fuelRatio = 0.2
-            let costPerKm = 5.0
+            // Calculate costs with $5 per km
+            let fuelRatio = 0.2 // 20% of cost is fuel
+            let costPerKm = 5.0 // $5 per km as requested
+            
             self.tripCost = self.distance * costPerKm
-            self.fuelCost = self.tripCost * fuelRatio
+            self.fuelCost = (self.distance * 0.8) + 50.0
             
-            let estimatedHours = self.distance / 40.0
-            self.deliveryDate = self.startDate.addingTimeInterval(estimatedHours * 3600)
+            // Calculate estimated travel time and update delivery date
+            let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
+            let timeInterval = estimatedHours * 3600 // Convert hours to seconds
+            self.deliveryDate = self.startDate.addingTimeInterval(timeInterval)
+            
             self.updateMapRegion()
-            
-            // Fetch available vehicles for the calculated time range.
-            Task {
-                do {
-                    let vehicles = try await supabaseDataController.fetchAvailableVehicles(startDate: self.startDate, endDate: self.deliveryDate)
-                    await MainActor.run { self.fetchedAvailableVehicles = vehicles }
-                } catch {
-                    print("Error fetching available vehicles: \(error)")
-                }
-            }
         }
     }
     
@@ -840,15 +843,22 @@ struct AddTripView: View {
         let locationA = CLLocation(latitude: source.latitude, longitude: source.longitude)
         let locationB = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
         
+        // Get distance in kilometers
         distance = locationA.distance(from: locationB) / 1000
-        let fuelRatio = 0.2
-        let costPerKm = 5.0
-        tripCost = distance * costPerKm
-        fuelCost = tripCost * fuelRatio
         
-        let estimatedHours = distance / 40.0
-        deliveryDate = startDate.addingTimeInterval(estimatedHours * 3600)
+        // Calculate costs with $5 per km
+        let fuelRatio = 0.2 // 20% of cost is fuel
+        let costPerKm = 5.0 // $5 per km as requested
         
+        tripCost = (distance * 0.8) + 50.0
+        fuelCost = (distance * 0.8) + 50.0
+        
+        // Calculate estimated travel time and update delivery date
+        let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
+        let timeInterval = estimatedHours * 3600 // Convert hours to seconds
+        deliveryDate = startDate.addingTimeInterval(timeInterval)
+        
+        // Create a simple polyline between points for visualization
         let points = [source, destination]
         routePolyline = MKPolyline(coordinates: points, count: points.count)
     }
