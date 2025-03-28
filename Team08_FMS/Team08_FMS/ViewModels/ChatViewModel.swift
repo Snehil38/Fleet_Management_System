@@ -20,17 +20,20 @@ class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var isLoading = false
     @Published var error: Error?
+    @Published var unreadCount: Int = 0
     
     private var cancellables = Set<AnyCancellable>()
     private let supabaseDataController = SupabaseDataController.shared
     private let recipientId: UUID
     private let recipientType: RecipientType
+    private var realtimeChannel: RealtimeChannel?
     
     init(recipientId: UUID, recipientType: RecipientType) {
         self.recipientId = recipientId
         self.recipientType = recipientType
         loadMessages()
         setupMessageListener()
+        updateUnreadCount()
     }
     
     func loadMessages() {
@@ -38,6 +41,8 @@ class ChatViewModel: ObservableObject {
         
         Task {
             do {
+                let currentUserId = try await supabaseDataController.getUserID()
+                
                 let response = try await supabaseDataController.supabase
                     .from("chat_messages")
                     .select()
@@ -46,8 +51,6 @@ class ChatViewModel: ObservableObject {
                     .execute()
                 
                 let decoder = JSONDecoder()
-                
-                // Custom date formatter for PostgreSQL timestamp format
                 let dateFormatter = DateFormatter()
                 dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
                 dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
@@ -56,18 +59,25 @@ class ChatViewModel: ObservableObject {
                 
                 var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
                 
-                // Get current user ID to set isFromCurrentUser
-                if let currentUserId = try? await supabaseDataController.getUserID() {
-                    fetchedMessages = fetchedMessages.map { message in
-                        var updatedMessage = message
-                        updatedMessage.isFromCurrentUser = message.fleet_manager_id == currentUserId
-                        return updatedMessage
+                // Update isFromCurrentUser and mark messages as read if they're for current user
+                for index in fetchedMessages.indices {
+                    var message = fetchedMessages[index]
+                    message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                    
+                    // If message is for current user and unread, mark it as read
+                    if message.recipient_id == currentUserId && message.status == .sent {
+                        Task {
+                            await markMessageAsRead(message.id)
+                        }
                     }
+                    
+                    fetchedMessages[index] = message
                 }
                 
                 await MainActor.run {
                     self.messages = fetchedMessages
                     self.isLoading = false
+                    self.updateUnreadCount()
                 }
             } catch {
                 await MainActor.run {
@@ -75,18 +85,71 @@ class ChatViewModel: ObservableObject {
                     self.isLoading = false
                 }
                 print("Error loading messages: \(error)")
+            }
+        }
+    }
+    
+    private func updateUnreadCount() {
+        Task {
+            do {
+                let currentUserId = try await supabaseDataController.getUserID()
                 
-                // Print raw response for debugging
-                if let response = try? await supabaseDataController.supabase
+                let response = try await supabaseDataController.supabase
                     .from("chat_messages")
-                    .select()
-                    .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
-                    .order("created_at", ascending: true)
-                    .execute() {
-                    if let responseString = String(data: response.data, encoding: .utf8) {
-                        print("Raw response: \(responseString)")
+                    .select("""
+                        count
+                    """)
+                    .eq("recipient_id", value: currentUserId)
+                    .eq("status", value: "sent")
+                    .execute()
+                
+                if let countString = try? JSONDecoder().decode([String: Int].self, from: response.data)["count"] {
+                    await MainActor.run {
+                        self.unreadCount = countString
                     }
                 }
+            } catch {
+                print("Error updating unread count: \(error)")
+            }
+        }
+    }
+    
+    private func setupMessageListener() {
+        Task {
+            do {
+                // Unsubscribe from any existing channel
+                if let existingChannel = realtimeChannel {
+                    try await existingChannel.unsubscribe()
+                }
+                
+                let currentUserId = try await supabaseDataController.getUserID()
+                
+                let channel = supabaseDataController.supabase.realtime
+                    .channel("chat_messages")
+                
+                channel.on("postgres_changes", filter: .init(
+                    event: "*",
+                    schema: "public",
+                    table: "chat_messages"
+                )) { [weak self] message in
+                    guard let self = self else { return }
+                    
+                    Task { @MainActor in
+                        print("Received realtime message: \(message)")
+                        
+                        // For now, just reload messages to handle any changes
+                        await self.loadMessages()
+                        
+                        // Update unread count
+                        self.updateUnreadCount()
+                    }
+                }
+                
+                try await channel.subscribe()
+                self.realtimeChannel = channel
+                
+            } catch {
+                print("Error setting up realtime listener: \(error)")
             }
         }
     }
@@ -207,39 +270,27 @@ class ChatViewModel: ObservableObject {
         return false
     }
     
-    private func setupMessageListener() {
-        Task {
-            do {
-                let channel = supabaseDataController.supabase.realtime
-                    .channel("chat_messages")
-                
-                try await channel.subscribe()
-                
-                channel.on("postgres_changes", filter: .init(event: "*", schema: "public", table: "chat_messages")) { [weak self] change in
-                    guard let self = self else { return }
-                    print("New message received: \(change)")
-                    Task { @MainActor in
-                        await self.loadMessages()
-                    }
-                }
-            } catch {
-                print("Error setting up realtime listener: \(error)")
+    func markMessageAsRead(_ messageId: UUID) async {
+        do {
+            let response = try await supabaseDataController.supabase
+                .from("chat_messages")
+                .update(["status": "read"])
+                .eq("id", value: messageId)
+                .execute()
+            
+            print("Message marked as read: \(response)")
+            await MainActor.run {
+                self.updateUnreadCount()
             }
+        } catch {
+            print("Error marking message as read: \(error)")
         }
     }
     
-    func markMessageAsRead(_ messageId: UUID) {
+    deinit {
         Task {
-            do {
-                let response = try await supabaseDataController.supabase
-                    .from("chat_messages")
-                    .update(["status": "read"])
-                    .eq("id", value: messageId)
-                    .execute()
-                
-                print("Message marked as read: \(response)")
-            } catch {
-                print("Error marking message as read: \(error)")
+            if let channel = realtimeChannel {
+                try? await channel.unsubscribe()
             }
         }
     }
