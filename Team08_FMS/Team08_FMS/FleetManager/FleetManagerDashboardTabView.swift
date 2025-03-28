@@ -921,6 +921,16 @@ struct AddTripView: View {
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
             let timeInterval = estimatedHours * 3600 // Convert hours to seconds
             self.deliveryDate = self.startDate.addingTimeInterval(timeInterval)
+            
+            Task {
+                do {
+                    let vehicles = try await supabaseDataController.fetchAvailableVehicles(startDate: self.startDate, endDate: self.deliveryDate)
+                    await MainActor.run { self.fetchedAvailableVehicles = vehicles }
+                } catch {
+                    print("Error fetching available vehicles: \(error)")
+                }
+            }
+            
             self.updateMapRegion()
         }
     }
