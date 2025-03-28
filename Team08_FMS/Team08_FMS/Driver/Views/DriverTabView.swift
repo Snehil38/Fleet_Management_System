@@ -1411,8 +1411,14 @@ struct SOSModalView: View {
                 } else {
                     // Chat View
                     if let manager = profileManager.fleetManager {
-                        ChatView(recipientType: .fleetManager, recipientId: manager.id, recipientName: manager.name)
-                            .frame(maxHeight: .infinity)
+                        if let userID = manager.userID {
+                            ChatView(recipientType: .maintenance, recipientId: userID, recipientName: manager.name)
+                                .frame(maxHeight: .infinity)
+                        } else {
+                            Text("Unable to start chat: Fleet manager information is incomplete")
+                                .foregroundColor(.red)
+                                .padding()
+                        }
                     } else {
                         ProgressView("Loading fleet manager...")
                     }
@@ -1475,3 +1481,4 @@ struct HomeView_Previews: PreviewProvider {
         DriverTabView(driverId: UUID())
     }
 } 
+

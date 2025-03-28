@@ -1,14 +1,11 @@
 import SwiftUI
 
 enum RecipientType: String {
-    case fleetManager = "fleet_manager"
     case maintenance = "maintenance"
     case driver = "driver"
     
     var displayName: String {
         switch self {
-        case .fleetManager:
-            return "Fleet Manager"
         case .maintenance:
             return "Maintenance"
         case .driver:

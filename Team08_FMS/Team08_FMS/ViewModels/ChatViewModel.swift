@@ -82,12 +82,20 @@ class ChatViewModel: ObservableObject {
                     return
                 }
                 
+                // Get the fleet manager's ID
+                guard let fleetManagers = try? await supabaseDataController.fetchFleetManagers(),
+                      let firstManager = fleetManagers.first,
+                      let fleetManagerId = firstManager.userID else {
+                    print("No fleet manager found")
+                    return
+                }
+                
                 // Create message payload
                 let message = ChatMessage(
                     id: UUID(),
-                    fleet_manager_id: userId,
-                    recipient_id: recipientId,
-                    recipient_type: recipientType.rawValue.lowercased(),
+                    fleet_manager_id: fleetManagerId,
+                    recipient_id: userId,  // Current user (driver) is the recipient
+                    recipient_type: "driver",  // Always use "driver" as recipient_type
                     message_text: text,
                     status: .sent,
                     created_at: Date(),
@@ -114,6 +122,47 @@ class ChatViewModel: ObservableObject {
                 print("Error sending message: \(error)")
             }
         }
+    }
+    
+    private func verifyRecipientExists() async throws -> Bool {
+        let table = recipientType == .maintenance ? "maintenance_personnel" : "driver"
+        print("Checking recipient in table: \(table)")
+        print("Recipient ID: \(recipientId)")
+        
+        let response = try await supabaseDataController.supabase
+            .from(table)
+            .select("""
+                userID,
+                name,
+                email
+            """)
+            .execute()
+        
+        // Print raw response for debugging
+        if let responseString = String(data: response.data, encoding: .utf8) {
+            print("Raw response: \(responseString)")
+        }
+        
+        struct RecipientResponse: Codable {
+            let userID: UUID
+            let name: String
+            let email: String
+        }
+        
+        let decoder = JSONDecoder()
+        if let recipients = try? decoder.decode([RecipientResponse].self, from: response.data) {
+            print("Found \(recipients.count) recipients")
+            for recipient in recipients {
+                print("Recipient: \(recipient.name) (\(recipient.userID))")
+                if recipient.userID == recipientId {
+                    print("Match found!")
+                    return true
+                }
+            }
+        }
+        
+        print("No matching recipient found")
+        return false
     }
     
     private func setupMessageListener() {
