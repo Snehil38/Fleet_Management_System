@@ -405,6 +405,7 @@ struct AddTripView: View {
     let dismiss: () -> Void
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
+    @EnvironmentObject private var crewDataController: CrewDataController
     
     // Location Manager for current location
     @StateObject private var locationManager = LocationManager()
@@ -430,6 +431,7 @@ struct AddTripView: View {
     
     // Trip details state
     @State private var selectedVehicle: Vehicle?
+    @State private var selectedDriverId: UUID?
     @State private var cargoType = "General Goods"
     @State private var startDate = Date()
     @State private var deliveryDate = Date().addingTimeInterval(86400)
@@ -458,6 +460,10 @@ struct AddTripView: View {
     
     private var isVehicleSelected: Bool {
         selectedVehicle != nil
+    }
+    
+    private var isDriverSelected: Bool {
+        selectedDriverId != nil
     }
     
     var isFormValid: Bool {
@@ -651,6 +657,64 @@ struct AddTripView: View {
                                     availableVehicles: displayedVehicles
                                 )
                             }
+                            
+                            // Driver Selection - displayed after route calculation
+                            if let vehicle = selectedVehicle {
+                                CardView(title: "DRIVER ASSIGNMENT", systemImage: "person.fill") {
+                                    VStack {
+                                        Menu {
+                                            // Option to unassign driver
+                                            Button(action: {
+                                                selectedDriverId = nil
+                                            }) {
+                                                HStack {
+                                                    Text("Unassigned")
+                                                        .foregroundColor(.red)
+                                                    Spacer()
+                                                    if selectedDriverId == nil {
+                                                        Image(systemName: "checkmark")
+                                                    }
+                                                }
+                                            }
+                                            
+                                            Divider()
+                                            
+                                            // Available drivers
+                                            ForEach(crewDataController.drivers.filter { $0.status == .available }, id: \.userID) { driver in
+                                                Button(action: {
+                                                    selectedDriverId = driver.userID
+                                                }) {
+                                                    HStack {
+                                                        Text(driver.name)
+                                                        Spacer()
+                                                        if selectedDriverId == driver.userID {
+                                                            Image(systemName: "checkmark")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } label: {
+                                            HStack {
+                                                if let driverId = selectedDriverId,
+                                                   let driver = crewDataController.drivers.first(where: { $0.userID == driverId }) {
+                                                    Text(driver.name)
+                                                        .foregroundColor(.primary)
+                                                } else {
+                                                    Text("Select Driver")
+                                                        .foregroundColor(.gray)
+                                                }
+                                                Image(systemName: "chevron.down")
+                                                    .font(.caption)
+                                                    .foregroundColor(.blue)
+                                            }
+                                            .padding()
+                                            .background(Color(.systemGray6))
+                                            .cornerRadius(10)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                    }
+                                }
+                            }
                         }
                         
                         Color.clear.frame(height: 100)
@@ -674,11 +738,11 @@ struct AddTripView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(isFormValid ? Color.blue : Color.gray)
+                    .background((distance > 0 ? (isVehicleSelected && isDriverSelected) : isFormValid) ? Color.blue : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(distance > 0 ? (!isVehicleSelected && displayedVehicles.isEmpty) : (!isFormValid || isCalculating))
+                .disabled(distance > 0 ? (!isVehicleSelected || !isDriverSelected) : (!isFormValid || isCalculating))
                 .padding(16)
                 .background(
                     Rectangle()
@@ -703,6 +767,7 @@ struct AddTripView: View {
         }
         .onAppear {
             setupSearchCompleter()
+            crewDataController.update() // Update drivers list when view appears
             
             // Observe location updates
             locationManager.objectWillChange.sink { [weak locationManager] _ in
@@ -796,7 +861,10 @@ struct AddTripView: View {
     }
     
     private func calculateRoute() {
-        guard let pickup = pickupCoordinate, let dropoff = dropoffCoordinate else { return }
+        guard let pickup = pickupCoordinate, let dropoff = dropoffCoordinate else {
+            return
+        }
+        
         isCalculating = true
         
         let request = MKDirections.Request()
@@ -804,35 +872,34 @@ struct AddTripView: View {
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: dropoff))
         request.transportType = .automobile
         
-        MKDirections(request: request).calculate { response, error in
+        let directions = MKDirections(request: request)
+        directions.calculate { response, error in
             self.isCalculating = false
             
             guard let route = response?.routes.first, error == nil else {
+                // Fallback to straight-line distance if route calculation fails
                 self.calculateStraightLineDistance(from: pickup, to: dropoff)
                 return
             }
             
+            // Get the route polyline
             self.routePolyline = route.polyline
+            
+            // Get distance in kilometers
             self.distance = route.distance / 1000
             
-            let fuelRatio = 0.2
-            let costPerKm = 5.0
+            // Calculate costs with $5 per km
+            let fuelRatio = 0.2 // 20% of cost is fuel
+            let costPerKm = 5.0 // $5 per km as requested
+            
             self.tripCost = self.distance * costPerKm
-            self.fuelCost = self.tripCost * fuelRatio
+            self.fuelCost = (self.distance * 0.8) + 50.0
             
-            let estimatedHours = self.distance / 40.0
-            self.deliveryDate = self.startDate.addingTimeInterval(estimatedHours * 3600)
+            // Calculate estimated travel time and update delivery date
+            let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
+            let timeInterval = estimatedHours * 3600 // Convert hours to seconds
+            self.deliveryDate = self.startDate.addingTimeInterval(timeInterval)
             self.updateMapRegion()
-            
-            // Fetch available vehicles for the calculated time range.
-            Task {
-                do {
-                    let vehicles = try await supabaseDataController.fetchAvailableVehicles(startDate: self.startDate, endDate: self.deliveryDate)
-                    await MainActor.run { self.fetchedAvailableVehicles = vehicles }
-                } catch {
-                    print("Error fetching available vehicles: \(error)")
-                }
-            }
         }
     }
     
@@ -840,15 +907,22 @@ struct AddTripView: View {
         let locationA = CLLocation(latitude: source.latitude, longitude: source.longitude)
         let locationB = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
         
+        // Get distance in kilometers
         distance = locationA.distance(from: locationB) / 1000
-        let fuelRatio = 0.2
-        let costPerKm = 5.0
-        tripCost = distance * costPerKm
-        fuelCost = tripCost * fuelRatio
         
-        let estimatedHours = distance / 40.0
-        deliveryDate = startDate.addingTimeInterval(estimatedHours * 3600)
+        // Calculate costs with $5 per km
+        let fuelRatio = 0.2 // 20% of cost is fuel
+        let costPerKm = 5.0 // $5 per km as requested
         
+        tripCost = (distance * 0.8) + 50.0
+        fuelCost = (distance * 0.8) + 50.0
+        
+        // Calculate estimated travel time and update delivery date
+        let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
+        let timeInterval = estimatedHours * 3600 // Convert hours to seconds
+        deliveryDate = startDate.addingTimeInterval(timeInterval)
+        
+        // Create a simple polyline between points for visualization
         let points = [source, destination]
         routePolyline = MKPolyline(coordinates: points, count: points.count)
     }
@@ -863,7 +937,7 @@ struct AddTripView: View {
                     name: pickupLocation,
                     destination: dropoffLocation,
                     vehicleId: vehicle.id,
-                    driverId: nil,
+                    driverId: selectedDriverId,
                     startTime: startDate,
                     endTime: deliveryDate,
                     startLat: pickupCoordinate?.latitude,
