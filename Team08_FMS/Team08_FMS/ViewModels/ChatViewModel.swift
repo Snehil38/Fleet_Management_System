@@ -101,18 +101,28 @@ class ChatViewModel: ObservableObject {
             
             let decoder = JSONDecoder()
             
-            // Create date formatter for the specific format we're receiving
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            // Create date formatters for both formats
+            let basicFormatter = DateFormatter()
+            basicFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            basicFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            basicFormatter.locale = Locale(identifier: "en_US_POSIX")
+            
+            let fractionalFormatter = DateFormatter()
+            fractionalFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+            fractionalFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            fractionalFormatter.locale = Locale(identifier: "en_US_POSIX")
             
             decoder.dateDecodingStrategy = .custom { decoder in
                 let container = try decoder.singleValueContainer()
                 let dateString = try container.decode(String.self)
                 
-                // Try to parse the date
-                if let date = dateFormatter.date(from: dateString) {
+                // Try parsing with fractional seconds first
+                if let date = fractionalFormatter.date(from: dateString) {
+                    return date
+                }
+                
+                // If that fails, try without fractional seconds
+                if let date = basicFormatter.date(from: dateString) {
                     return date
                 }
                 
@@ -219,9 +229,9 @@ class ChatViewModel: ObservableObject {
                 print("Recipient ID: \(messageRecipientId)")
                 print("Recipient Type: \(messageRecipientType)")
                 
-                // Format dates in the same format as we receive them
+                // Format dates with fractional seconds for consistency
                 let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
                 dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
                 dateFormatter.locale = Locale(identifier: "en_US_POSIX")
                 let currentDate = dateFormatter.string(from: Date())
