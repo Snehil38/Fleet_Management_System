@@ -351,11 +351,18 @@ struct TripCardView: View {
     private var statusText: String {
         switch trip.status {
         case .inProgress:
+            if !trip.hasCompletedPreTrip {
+                return "Initiated"
+            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
+                return "Pre-Trip Completed"
+            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
+                return "Post-Trip Completed"
+            }
             return "In Progress"
         case .pending:
             return "Pending"
         case .delivered:
-            return "Completed"
+            return "Delivered"
         case .assigned:
             return "Assigned"
         }
@@ -364,7 +371,14 @@ struct TripCardView: View {
     private var statusColor: Color {
         switch trip.status {
         case .inProgress:
-            return .blue
+            if !trip.hasCompletedPreTrip {
+                return .orange // Initiated
+            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
+                return .blue // Pre-Trip Completed
+            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
+                return .green // Post-Trip Completed
+            }
+            return .blue // In Progress
         case .pending:
             return .green
         case .delivered:
@@ -1035,11 +1049,18 @@ struct TripDetailView: View {
     private var statusText: String {
         switch trip.status {
         case .inProgress:
+            if !trip.hasCompletedPreTrip {
+                return "Initiated"
+            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
+                return "Pre-Trip Completed"
+            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
+                return "Post-Trip Completed"
+            }
             return "In Progress"
         case .pending:
             return "Pending"
         case .delivered:
-            return "Completed"
+            return "Delivered"
         case .assigned:
             return "Assigned"
         }
@@ -1048,7 +1069,14 @@ struct TripDetailView: View {
     private var statusIcon: String {
         switch trip.status {
         case .inProgress:
-            return "car.circle.fill"
+            if !trip.hasCompletedPreTrip {
+                return "play.circle.fill" // Initiated
+            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
+                return "checkmark.circle.fill" // Pre-Trip Completed
+            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
+                return "checkmark.shield.fill" // Post-Trip Completed
+            }
+            return "car.circle.fill" // In Progress
         case .pending:
             return "clock.fill"
         case .delivered:
