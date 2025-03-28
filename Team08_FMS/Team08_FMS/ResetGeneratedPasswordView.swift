@@ -126,14 +126,21 @@ struct ResetGeneratedPasswordView: View {
 
 struct ResetPasswordView: View {
     @Environment(\.presentationMode) var presentationMode
+    
+    // User credentials and state
+    @State private var email = ""
     @State private var currentPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
-    @State private var isNewPasswordVisible: Bool = false
+    
+    @State private var isNewPasswordVisible = false
+    @State private var isCurrentPasswordVerified = false
+    @State private var isGenPass = true  // Assume true initially; will be updated after password reset
+    
     @State private var showingAlert = false
     @State private var alertMessage = ""
     
-    // Computed property to check if the new password meets all criteria.
+    // Computed property for new password validity
     private var isPasswordValid: Bool {
         let hasMinLength = newPassword.count >= 6
         let hasUppercase = newPassword.rangeOfCharacter(from: .uppercaseLetters) != nil
@@ -146,43 +153,79 @@ struct ResetPasswordView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("New Password")) {
-                    // New Password Field with view toggle
-                    ZStack(alignment: .trailing) {
-                        Group {
-                            if isNewPasswordVisible {
-                                TextField("Enter new password", text: $newPassword)
-                                    .autocapitalization(.none)
-                            } else {
-                                SecureField("Enter new password", text: $newPassword)
-                            }
-                        }
+                if !isCurrentPasswordVerified {
+                    Section(header: Text("Verify Current Password").font(.headline)) {
+                        TextField("Email", text: $email)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                            .modifier(FormFieldModifier())
+                        
+                        SecureField("Enter current password", text: $currentPassword)
+                            .modifier(FormFieldModifier())
+                        
                         Button(action: {
-                            isNewPasswordVisible.toggle()
+                            SupabaseDataController.shared.verifyCurrentPassword(email: email, currentPassword: currentPassword) { success in
+                                if success {
+                                    isCurrentPasswordVerified = true
+                                    alertMessage = "Current password verified."
+                                } else {
+                                    alertMessage = "Incorrect current password."
+                                }
+                                showingAlert = true
+                            }
                         }) {
-                            Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                .foregroundColor(.gray)
+                            Text("Verify")
+                                .frame(maxWidth: .infinity)
                         }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
+                } else {
+                    Section(header: Text("New Password").font(.headline)) {
+                        // New Password Field with toggle to view/hide text
+                        ZStack(alignment: .trailing) {
+                            Group {
+                                if isNewPasswordVisible {
+                                    TextField("Enter new password", text: $newPassword)
+                                        .autocapitalization(.none)
+                                        .modifier(FormFieldModifier())
+                                } else {
+                                    SecureField("Enter new password", text: $newPassword)
+                                        .modifier(FormFieldModifier())
+                                }
+                            }
+                            Button {
+                                isNewPasswordVisible.toggle()
+                            } label: {
+                                Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.trailing, 8)
+                        }
+                        
+                        SecureField("Confirm new password", text: $confirmPassword)
+                            .modifier(FormFieldModifier())
                     }
                     
-                    SecureField("Confirm new password", text: $confirmPassword)
-                }
-                
-                // Display password criteria as a separate section.
-                Section {
-                    ResetPasswordCriteriaView(newPassword: newPassword, confirmPassword: confirmPassword)
-                }
-                
-                Section {
-                    Button("Reset Password") {
-                        // Here you would handle the password reset logic.
-                        // For demonstration, we'll simply show a success message.
-                        alertMessage = "Password successfully reset."
-                        showingAlert = true
+                    Section {
+                        ResetPasswordCriteriaView(newPassword: newPassword, confirmPassword: confirmPassword)
                     }
-                    .frame(maxWidth: .infinity)
-                    .foregroundColor(isPasswordValid ? .blue : .gray)
-                    .disabled(!isPasswordValid)
+                    
+                    Section {
+                        Button("Reset Password") {
+                            Task {
+                                let updated = await SupabaseDataController.shared.updatePassword(newPassword: newPassword)
+                                if updated {
+                                    alertMessage = "Password successfully reset."
+                                } else {
+                                    alertMessage = "Error updating password."
+                                }
+                                showingAlert = true
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(!isPasswordValid)
+                    }
                 }
             }
             .navigationTitle("Reset Password")
@@ -199,6 +242,28 @@ struct ResetPasswordView: View {
                 )
             }
         }
+    }
+}
+
+// Custom modifier to style form fields
+struct FormFieldModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(10)
+            .background(Color(UIColor.systemGray6))
+            .cornerRadius(8)
+            .padding(.vertical, 4)
+    }
+}
+
+// Custom button style for primary actions
+struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(.white)
+            .padding()
+            .background(configuration.isPressed ? Color.blue.opacity(0.7) : Color.blue)
+            .cornerRadius(8)
     }
 }
 

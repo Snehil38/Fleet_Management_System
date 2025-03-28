@@ -355,6 +355,18 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
+    func verifyCurrentPassword(email: String, currentPassword: String, completion: @escaping (Bool) -> Void) {
+        Task {
+            do {
+                let _ = try await supabase.auth.signIn(email: email, password: currentPassword)
+                completion(true) // Password is correct
+            } catch {
+                print("Incorrect password: \(error.localizedDescription)")
+                completion(false) // Password is incorrect
+            }
+        }
+    }
+    
     func signOut() {
         Task {
             do {
