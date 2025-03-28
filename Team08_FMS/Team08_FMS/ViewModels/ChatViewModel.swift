@@ -2,6 +2,20 @@ import SwiftUI
 import Combine
 import Supabase
 
+private struct MessagePayload: Encodable {
+    let id: String
+    let fleet_manager_id: String
+    let recipient_id: String
+    let recipient_type: String
+    let message_text: String
+    let status: String
+    let created_at: String
+    let updated_at: String
+    let is_deleted: Bool
+    let attachment_url: String?
+    let attachment_type: String?
+}
+
 class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var isLoading = false
@@ -65,11 +79,118 @@ class ChatViewModel: ObservableObject {
                     return
                 }
                 
+                // First try to get fleet manager details
+                let fleetManagerResponse = try await supabaseDataController.supabase
+                    .from("fleet_manager")
+                    .select()
+                    .eq("userID", value: userId)
+                    .execute()
+                
+                // Try to decode as fleet manager first
+                let decoder = JSONDecoder()
+                var senderType = "fleet_manager"
+                var senderId: UUID? = nil
+                
+                struct FleetManager: Decodable {
+                    let id: UUID
+                    let userID: UUID
+                    
+                    enum CodingKeys: String, CodingKey {
+                        case id
+                        case userID = "userID"
+                    }
+                }
+                
+                if let fleetManagers = try? decoder.decode([FleetManager].self, from: fleetManagerResponse.data),
+                   let fleetManager = fleetManagers.first {
+                    senderId = fleetManager.userID  // Use userID instead of id
+                } else {
+                    // If not a fleet manager, try to get driver details
+                    let driverResponse = try await supabaseDataController.supabase
+                        .from("driver")
+                        .select("*, fleet_Manager")
+                        .eq("userID", value: userId)
+                        .execute()
+                    
+                    struct Driver: Decodable {
+                        let id: UUID
+                        let userID: UUID
+                        let fleet_Manager: UUID
+                        
+                        enum CodingKeys: String, CodingKey {
+                            case id
+                            case userID = "userID"
+                            case fleet_Manager = "fleet_Manager"
+                        }
+                    }
+                    
+                    if let drivers = try? decoder.decode([Driver].self, from: driverResponse.data),
+                       let driver = drivers.first {
+                        senderType = "driver"
+                        senderId = driver.id
+                        // For drivers, we need to set the recipient as their fleet manager
+                        let fleetManagerId = driver.fleet_Manager
+                        
+                        let message = ChatMessage(
+                            id: UUID(),
+                            fleet_manager_id: fleetManagerId, // The fleet manager's ID
+                            recipient_id: driver.userID, // Use userID instead of id for the recipient
+                            recipient_type: "driver", // Lowercase to match database constraint
+                            message_text: text,
+                            status: .sent,
+                            created_at: Date(),
+                            updated_at: Date(),
+                            is_deleted: false,
+                            attachment_url: nil,
+                            attachment_type: nil,
+                            isFromCurrentUser: true
+                        )
+                        
+                        messageToSend = message
+                        
+                        // Optimistically add message to UI
+                        await MainActor.run {
+                            self.messages.append(message)
+                        }
+                        
+                        let dateFormatter = ISO8601DateFormatter()
+                        
+                        // Create an encodable payload
+                        let payload = MessagePayload(
+                            id: message.id.uuidString,
+                            fleet_manager_id: message.fleet_manager_id.uuidString,
+                            recipient_id: message.recipient_id.uuidString,
+                            recipient_type: message.recipient_type,
+                            message_text: message.message_text,
+                            status: message.status.rawValue,
+                            created_at: dateFormatter.string(from: message.created_at),
+                            updated_at: dateFormatter.string(from: message.updated_at),
+                            is_deleted: message.is_deleted,
+                            attachment_url: message.attachment_url,
+                            attachment_type: message.attachment_type
+                        )
+                        
+                        let insertResponse = try await supabaseDataController.supabase
+                            .from("chat_messages")
+                            .insert(payload)
+                            .execute()
+                        
+                        print("Message sent successfully: \(insertResponse)")
+                        return
+                    }
+                }
+                
+                // If we get here and don't have a sender ID, throw an error
+                guard let senderId = senderId else {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not found in either fleet_manager or driver tables"])
+                }
+                
+                // This part only executes for fleet managers
                 let message = ChatMessage(
                     id: UUID(),
-                    fleet_manager_id: userId,
-                    recipient_id: UUID(), // Replace with actual recipient ID
-                    recipient_type: "driver", // Replace with actual type
+                    fleet_manager_id: senderId,
+                    recipient_id: UUID(), // TODO: Replace with actual driver's userID
+                    recipient_type: "driver",
                     message_text: text,
                     status: .sent,
                     created_at: Date(),
@@ -89,33 +210,27 @@ class ChatViewModel: ObservableObject {
                 
                 let dateFormatter = ISO8601DateFormatter()
                 
-                // Create a dictionary with explicit types
-                let messageDict: [String: Any] = [
-                    "id": message.id.uuidString,
-                    "fleet_manager_id": message.fleet_manager_id.uuidString,
-                    "recipient_id": message.recipient_id.uuidString,
-                    "recipient_type": message.recipient_type,
-                    "message_text": message.message_text,
-                    "status": message.status.rawValue,
-                    "created_at": dateFormatter.string(from: message.created_at),
-                    "updated_at": dateFormatter.string(from: message.updated_at),
-                    "is_deleted": message.is_deleted,
-                    "attachment_url": message.attachment_url as Any,
-                    "attachment_type": message.attachment_type as Any
-                ]
+                // Create an encodable payload
+                let payload = MessagePayload(
+                    id: message.id.uuidString,
+                    fleet_manager_id: message.fleet_manager_id.uuidString,
+                    recipient_id: message.recipient_id.uuidString,
+                    recipient_type: message.recipient_type,
+                    message_text: message.message_text,
+                    status: message.status.rawValue,
+                    created_at: dateFormatter.string(from: message.created_at),
+                    updated_at: dateFormatter.string(from: message.updated_at),
+                    is_deleted: message.is_deleted,
+                    attachment_url: message.attachment_url,
+                    attachment_type: message.attachment_type
+                )
                 
-                // Convert dictionary to Data
-                let jsonData = try JSONSerialization.data(withJSONObject: messageDict)
+                let insertResponse = try await supabaseDataController.supabase
+                    .from("chat_messages")
+                    .insert(payload)
+                    .execute()
                 
-                // Convert back to a dictionary that Supabase can handle
-                if let jsonDict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
-                    let response = try await supabaseDataController.supabase
-                        .from("chat_messages")
-                        //.insert(jsonDict)
-                        .execute()
-                    
-                    print("Message sent successfully: \(response)")
-                }
+                print("Message sent successfully: \(insertResponse)")
             } catch {
                 print("Error sending message: \(error)")
                 // Remove message from UI if failed
