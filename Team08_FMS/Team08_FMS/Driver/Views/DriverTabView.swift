@@ -57,6 +57,7 @@ struct DriverTabView: View {
             // Set the driver ID and load trips
             tripController.setDriverId(driverId)
             await tripController.refreshTrips()
+            TripDataController.shared.startMonitoringRegions()
         }
     }
     
