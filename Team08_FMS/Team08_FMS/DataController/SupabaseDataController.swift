@@ -982,7 +982,7 @@ class SupabaseDataController: ObservableObject {
                 print("Update response data: \(jsonString ?? "")")
             }
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception updating maintenance personnel status: \(error.localizedDescription)")
         }
     }
     
@@ -1006,7 +1006,7 @@ class SupabaseDataController: ObservableObject {
             let jsonString2 = String(data: data2, encoding: .utf8)
             print("Update response data: \(jsonString ?? "")\n\(jsonString2 ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception deleting driver details: \(error.localizedDescription)")
         }
     }
     
@@ -1030,12 +1030,25 @@ class SupabaseDataController: ObservableObject {
             let jsonString2 = String(data: data2, encoding: .utf8)
             print("Update response data: \(jsonString ?? "")\n\(jsonString2 ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception deleting maintenance personnel details: \(error.localizedDescription)")
         }
     }
     
     func updateDriver(driver: Driver) async {
         do {
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the personnel to JSON for debugging/logging.
+            let personnelJSONData = try encoder.encode(driver)
+            if let personnelJSONString = String(data: personnelJSONData, encoding: .utf8) {
+                print("Driver JSON to insert: \(personnelJSONString)")
+            }
+            
         let response = try await supabase
             .from("driver")
             .update(driver)
@@ -1046,12 +1059,25 @@ class SupabaseDataController: ObservableObject {
         let jsonString = String(data: data, encoding: .utf8)
         print("Update response data: \(jsonString ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception updating driver details: \(error.localizedDescription)")
         }
     }
     
     func updateMaintenancePersonnel(personnel: MaintenancePersonnel) async {
         do {
+            
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            // Encode the personnel to JSON for debugging/logging.
+            let personnelJSONData = try encoder.encode(personnel)
+            if let personnelJSONString = String(data: personnelJSONData, encoding: .utf8) {
+                print("Maintenance Personnel JSON to insert: \(personnelJSONString)")
+            }
             let response = try await supabase
                 .from("maintenance_personnel")
                 .update(personnel)
@@ -1062,7 +1088,7 @@ class SupabaseDataController: ObservableObject {
             let jsonString = String(data: data, encoding: .utf8)
             print("Update response data: \(jsonString ?? "")")
         } catch {
-            print("Exception updating driver status: \(error.localizedDescription)")
+            print("Exception updating maintenance personnel details: \(error.localizedDescription)")
         }
     }
     
