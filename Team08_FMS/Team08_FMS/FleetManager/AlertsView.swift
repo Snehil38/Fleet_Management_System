@@ -1,36 +1,243 @@
 import SwiftUI
 
+struct AlertsView: View {
+    @ObservedObject var supabase = SupabaseDataController.shared
+    @State private var events: [GeofenceEvents] = []
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color(UIColor.systemGroupedBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Navigation Header
+                NavigationHeader()
+                
+                // Content
+                if events.isEmpty {
+                    EmptysStateView()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // Summary Cards with adjusted padding
+                            VStack(spacing: 0) {
+                                SummarySection()
+                                    .padding(.top, 8) // Reduced top padding
+                                    .padding(.horizontal)
+                                
+                                // Alerts List
+                                AlertsListView()
+                                    .padding(.top, 16)
+                            }
+                        }
+                    }
+                    .refreshable {
+                        loadData()
+                    }
+                }
+            }
+        }
+        .navigationBarHidden(true)
+        .onAppear {
+            loadData()
+        }
+    }
+
+    // MARK: - Helper Methods
+    
+    func loadData() {
+        events = supabase.geofenceEvents.sorted(by: { $0.timestamp > $1.timestamp })
+    }
+    
+    func markAsRead(_ event: GeofenceEvents) {
+        if let index = events.firstIndex(where: { $0.id == event.id }) {
+            events[index].isRead = true
+        }
+    }
+    
+    func deleteEvent(_ event: GeofenceEvents) {
+        events.removeAll { $0.id == event.id }
+    }
+
+    // MARK: - UI Components
+    
+    @ViewBuilder
+    private func NavigationHeader() -> some View {
+        HStack {
+            Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Back")
+                        .font(.system(size: 16))
+                }
+                .foregroundColor(.blue)
+            }
+            Spacer()
+            Text("Alerts")
+                .font(.headline)
+            Spacer()
+        }
+        .padding()
+        .background(Color(UIColor.systemBackground))
+        .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
+    }
+    
+    @ViewBuilder
+    private func SummarySection() -> some View {
+        HStack(spacing: 12) {
+            // Unread Card
+            SummaryCard(
+                icon: "bell.fill",
+                title: "Unread",
+                count: events.filter { !$0.isRead }.count,
+                color: .blue
+            )
+            
+            // Total Card
+            SummaryCard(
+                icon: "bell",
+                title: "Total",
+                count: events.count,
+                color: .gray
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private func AlertsListView() -> some View {
+        LazyVStack(spacing: 12) {
+            ForEach(events) { event in
+                AlertRow(event: event)
+                    .padding(.horizontal)
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        if !event.isRead {
+                            Button {
+                                withAnimation {
+                                    markAsRead(event)
+                                }
+                            } label: {
+                                Label("Mark as Read", systemImage: "checkmark")
+                            }
+                            .tint(.blue)
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            withAnimation {
+                                deleteEvent(event)
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct EmptysStateView: View {
+    var body: some View {
+        VStack(spacing: 24) {
+            ZStack {
+                Circle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 100, height: 100)
+
+                Image(systemName: "bell.slash.circle.fill")
+                    .font(.system(size: 50))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.gray)
+            }
+            
+            VStack(spacing: 8) {
+                Text("No Alerts")
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.primary)
+
+                Text("You're all caught up!")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct SummaryCard: View {
+    let icon: String
+    let title: String
+    let count: Int
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 36, height: 36)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(color)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                
+                Text("\(count)")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.primary)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(UIColor.systemBackground))
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        )
+    }
+}
+
 struct AlertRow: View {
     var event: GeofenceEvents
 
     var body: some View {
         HStack(spacing: 16) {
-            // Icon with refined styling
             Image(systemName: event.isRead ? "bell" : "bell.fill")
                 .font(.system(size: 24))
                 .foregroundColor(event.isRead ? .gray : .blue)
                 .padding(6)
                 .background(Color(UIColor.systemGray6))
                 .clipShape(Circle())
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.message)
                     .font(event.isRead ? .body : .headline)
                     .foregroundColor(.primary)
                     .lineLimit(2)
-                
+
                 Text("Trip: \(event.tripId.uuidString.prefix(8))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing, spacing: 2) {
                 Text(event.timestamp, style: .time)
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                
+
                 Text(event.timestamp, style: .date)
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -39,7 +246,6 @@ struct AlertRow: View {
         .padding(.vertical, 8)
         .padding(.horizontal)
         .background(
-            // Use a subtle blue tint for unread alerts instead of yellow.
             RoundedRectangle(cornerRadius: 12)
                 .fill(event.isRead ? Color(UIColor.systemBackground) : Color.blue.opacity(0.1))
         )
@@ -47,90 +253,5 @@ struct AlertRow: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(UIColor.separator), lineWidth: event.isRead ? 0.5 : 0)
         )
-        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
-    }
-}
-
-struct AlertsView: View {
-    @ObservedObject var supabase = SupabaseDataController.shared
-    @State private var events: [GeofenceEvents] = SupabaseDataController.shared.geofenceEvents
-    @Environment(\.presentationMode) var presentationMode
-
-    var body: some View {
-        NavigationView {
-            Group {
-                if events.isEmpty {
-                    // Native empty state design
-                    VStack(spacing: 16) {
-                        Image(systemName: "bell.slash")
-                            .font(.system(size: 48))
-                            .foregroundColor(.gray)
-                        Text("No Alerts")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(UIColor.systemGroupedBackground))
-                } else {
-                    List {
-                        ForEach(events.sorted(by: { $0.timestamp > $1.timestamp })) { event in
-                            AlertRow(event: event)
-                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                                .listRowBackground(Color(UIColor.systemGroupedBackground))
-                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                    if !event.isRead {
-                                        Button {
-                                            markAsRead(event)
-                                        } label: {
-                                            Label("Mark as Read", systemImage: "checkmark")
-                                        }
-                                        .tint(.blue)
-                                    }
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        deleteEvent(event)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                        }
-                    }
-                    // Using PlainListStyle minimizes the extra spacing compared to InsetGroupedListStyle.
-                    .listStyle(PlainListStyle())
-                }
-            }
-            .navigationTitle("Alerts")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // Back button to dismiss the view
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        presentationMode.wrappedValue.dismiss()
-                    }) {
-                        HStack {
-                            Image(systemName: "chevron.left")
-                            Text("Back")
-                        }
-                    }
-                }
-            }
-            .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
-        }
-    }
-    
-    // MARK: - Helper Methods
-    
-    func markAsRead(_ event: GeofenceEvents) {
-        if let index = events.firstIndex(where: { $0.id == event.id }) {
-            events[index].isRead = true
-            // Optionally update the server state here
-        }
-    }
-    
-    func deleteEvent(_ event: GeofenceEvents) {
-        events.removeAll { $0.id == event.id }
-        // Optionally delete from the server/database here
     }
 }
