@@ -497,7 +497,7 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("fleet_manager")
                 .select()
-                .eq("isDeleted", value: false)
+                .is("deletedAt", value: nil)  // Check for non-deleted records
                 .execute()
             
             let data = response.data
@@ -526,7 +526,7 @@ class SupabaseDataController: ObservableObject {
             return fleetManagers
         } catch {
             print("Error fetching fleet managers: \(error)")
-            return []
+            throw error
         }
     }
     
