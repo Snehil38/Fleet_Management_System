@@ -1410,8 +1410,12 @@ struct SOSModalView: View {
                     .padding(.top, 20)
                 } else {
                     // Chat View
-                    ChatView(recipientType: .fleetManager, recipientName: "Fleet Manager")
-                        .frame(maxHeight: .infinity)
+                    if let manager = profileManager.fleetManager {
+                        ChatView(recipientType: .fleetManager, recipientId: manager.id, recipientName: manager.name)
+                            .frame(maxHeight: .infinity)
+                    } else {
+                        ProgressView("Loading fleet manager...")
+                    }
                 }
                 
                 Spacer()
@@ -1439,6 +1443,7 @@ struct SOSModalView: View {
 class ProfileManager: ObservableObject {
     static let shared = ProfileManager()
     
+    @Published var fleetManager: FleetManager?
     @Published var fleetManagerName: String = "John Smith"
     @Published var fleetManagerPhone: String = "+1 (555) 123-4567"
     
@@ -1450,15 +1455,18 @@ class ProfileManager: ObservableObject {
     }
     
     private func loadFleetManagerDetails() async {
-        // This would typically fetch the fleet manager's contact information from a database
-        // For now, we'll use hardcoded values
-        
-        // In a real implementation, you might fetch this data from Supabase
-        // let fleetManagerData = try await SupabaseDataController.shared.getFleetManagerProfile()
-        // await MainActor.run {
-        //     self.fleetManagerName = fleetManagerData.name
-        //     self.fleetManagerPhone = fleetManagerData.phone
-        // }
+        do {
+            let fleetManagers = try await SupabaseDataController.shared.fetchFleetManagers()
+            if !fleetManagers.isEmpty {
+                await MainActor.run {
+                    self.fleetManager = fleetManagers[0]
+                    self.fleetManagerName = fleetManagers[0].name
+                    self.fleetManagerPhone = String(fleetManagers[0].phoneNumber)
+                }
+            }
+        } catch {
+            print("Error loading fleet manager details: \(error)")
+        }
     }
 }
 

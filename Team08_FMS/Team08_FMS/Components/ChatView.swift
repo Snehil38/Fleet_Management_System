@@ -1,9 +1,9 @@
 import SwiftUI
 
-enum RecipientType {
-    case fleetManager
-    case maintenance
-    case driver
+enum RecipientType: String {
+    case fleetManager = "fleet_manager"
+    case maintenance = "maintenance"
+    case driver = "driver"
     
     var displayName: String {
         switch self {
@@ -19,11 +19,19 @@ enum RecipientType {
 
 struct ChatView: View {
     let recipientType: RecipientType
+    let recipientId: UUID
     let recipientName: String
-    @StateObject private var viewModel = ChatViewModel()
+    @StateObject private var viewModel: ChatViewModel
     @State private var messageText = ""
     @State private var isShowingEmergencySheet = false
     @FocusState private var isFocused: Bool
+    
+    init(recipientType: RecipientType, recipientId: UUID, recipientName: String) {
+        self.recipientType = recipientType
+        self.recipientId = recipientId
+        self.recipientName = recipientName
+        self._viewModel = StateObject(wrappedValue: ChatViewModel(recipientId: recipientId, recipientType: recipientType))
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -139,6 +147,6 @@ struct ChatView: View {
 // Preview provider
 struct ChatView_Previews: PreviewProvider {
     static var previews: some View {
-        ChatView(recipientType: .driver, recipientName: "John Smith")
+        ChatView(recipientType: .driver, recipientId: UUID(), recipientName: "John Smith")
     }
 } 

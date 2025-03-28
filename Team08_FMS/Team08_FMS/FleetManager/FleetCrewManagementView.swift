@@ -157,7 +157,6 @@ struct CrewCardView: View {
     @EnvironmentObject var dataManager: CrewDataController
     @State private var showingDeleteAlert = false
     @State private var showingMessageSheet = false
-    @StateObject private var chatViewModel = ChatViewModel()
     @State private var unreadMessageCount = 0
     
     // This computed property returns the most recent crew member from the data manager.
@@ -324,8 +323,7 @@ struct CrewCardView: View {
         .sheet(isPresented: $showingMessageSheet) {
             if let id = recipientId {
                 NavigationView {
-                    ChatView(recipientType: .driver, recipientName: currentCrew.name)
-                        .environmentObject(chatViewModel)
+                    ChatView(recipientType: .driver, recipientId: id, recipientName: currentCrew.name)
                 }
             }
         }
@@ -333,12 +331,20 @@ struct CrewCardView: View {
             if let id = recipientId {
                 // Load unread message count
                 Task {
-                    let count = chatViewModel.messages.filter { 
-                        $0.recipient_id == id && 
-                        $0.status != .read 
-                    }.count
-                    await MainActor.run {
-                        unreadMessageCount = count
+                    do {
+                        let response = try await SupabaseDataController.shared.supabase
+                            .from("chat_messages")
+                            .select()
+                            .eq("recipient_id", value: id)
+                            .eq("status", value: "sent")
+                            .execute()
+                        
+                        let count = response.count ?? 0
+                        await MainActor.run {
+                            unreadMessageCount = count
+                        }
+                    } catch {
+                        print("Error loading unread message count: \(error)")
                     }
                 }
             }
