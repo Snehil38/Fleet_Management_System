@@ -55,7 +55,7 @@ struct DriverTabView: View {
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
         .task {
             // Set the driver ID and load trips
-            await tripController.setDriverId(driverId)
+            tripController.setDriverId(driverId)
             await tripController.refreshTrips()
         }
     }

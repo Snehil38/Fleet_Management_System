@@ -47,6 +47,7 @@ struct FleetManagerTabView: View {
             vehicleManager.loadVehicles()
             CrewDataController.shared.update()
             await TripDataController.shared.refreshAllTrips()
+            await SupabaseDataController.shared.fetchGeofenceEvents()
         }
     }
 }

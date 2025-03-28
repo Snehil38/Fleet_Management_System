@@ -16,6 +16,7 @@ struct FleetManagerDashboardTabView: View {
     @StateObject private var tripController = TripDataController.shared
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
+    @State private var showingAlertsView = false
     
     // Computed properties for counts and expenses
     private var availableVehiclesCount: Int {
@@ -170,7 +171,15 @@ struct FleetManagerDashboardTabView: View {
             }
             .navigationTitle("Fleet Manager")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // Alerts button
+                    Button {
+                        showingAlertsView = true
+                    } label: {
+                        Image(systemName: "bell.fill")
+                            .foregroundColor(.blue)
+                    }
+                    // Profile button
                     Button {
                         showingProfile = true
                     } label: {
@@ -193,6 +202,11 @@ struct FleetManagerDashboardTabView: View {
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingAlertsView) {
+                NavigationView {
+                    AlertsView()
+                }
             }
         }
     }

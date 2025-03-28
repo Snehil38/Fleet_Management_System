@@ -234,13 +234,13 @@ class CrewDataController: ObservableObject {
     
     private func calculateSalaries() -> Double {
         return drivers.reduce(0.0) { total, driver in
-            total + (Double(driver.salary) ?? 0.0)
+            total + (Double(driver.salary))
         }
     }
     
     private func calculateMaintenancePersonnelSalaries() -> Double {
         return maintenancePersonnel.reduce(0.0) { runningTotal, personnel in
-            let salary = Double(personnel.salary) ?? 0.0
+            let salary = Double(personnel.salary)
             return runningTotal + salary
         }
     }

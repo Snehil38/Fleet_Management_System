@@ -3,6 +3,32 @@ import Supabase
 import Combine
 import SwiftSMTP
 
+struct GeofenceEvents: Codable, Identifiable {
+    
+    // The ID for the trip
+    let tripId: UUID
+    
+    // The event message
+    let message: String
+    
+    // When the event was created or triggered
+    let timestamp: Date = Date()
+    
+    // Whether the event has been read
+    var isRead: Bool = false
+    
+    // Conformance to Identifiable
+    var id: UUID { tripId }
+    
+    // Map the Swift property names to your database column names
+    enum CodingKeys: String, CodingKey {
+        case tripId
+        case message
+        case timestamp
+        case isRead
+    }
+}
+
 class SupabaseDataController: ObservableObject {
     static let shared = SupabaseDataController()
     
@@ -19,6 +45,7 @@ class SupabaseDataController: ObservableObject {
     @Published var showAlert = false
     @Published var alertMessage = ""
     @Published var session: Session?
+    @Published var geofenceEvents: [GeofenceEvents] = []
     
      let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
@@ -407,6 +434,74 @@ class SupabaseDataController: ObservableObject {
     func getUserID() async -> UUID? {
         guard let userID = supabase.auth.currentUser?.id else { return nil }
         return userID
+    }
+    
+    func subscribeToGeofenceEvents() {
+        Task {
+            let myChannel = supabase.channel("db-changes")
+            let changes = myChannel.postgresChange(AnyAction.self, schema: "public", table: "geofence_events")
+            await myChannel.subscribe()
+            for await change in changes {
+              switch change {
+              case .insert(let action):
+                  print(action)
+                  await fetchGeofenceEvents()
+              case .update(let action):
+                  print(action)
+              case .delete(let action):
+                  print(action)
+              }
+            }
+        }
+    }
+    
+    func fetchGeofenceEvents() async {
+        do {
+            // Select all columns; you can also specify columns explicitly
+            let response = try await supabase
+                .from("geofence_events")
+                .select("*")
+                // Optionally, order by timestamp descending
+                .order("timestamp", ascending: false)
+                .execute()
+            
+            // Decode the returned data into an array of GeofenceEvents
+            let events = try JSONDecoder().decode([GeofenceEvents].self, from: response.data)
+            
+            // Update your local array
+            await MainActor.run {
+                self.geofenceEvents = events
+            }
+            
+        } catch {
+            print("Error fetching geofence events: \(error.localizedDescription)")
+        }
+    }
+    
+    func insertIntoGeofenceEvents(event: GeofenceEvents) {
+        Task {
+            do {
+                let response = try await supabase
+                    .from("geofence_events")
+                    .insert(event)
+                    .execute()
+                print(response)
+            } catch {
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    func deleteFromGeofenceEvents(event: GeofenceEvents) {
+        Task {
+            do {
+                let response = supabase
+                    .from("geofence_events")
+                    .delete()
+                    .eq("tripId", value: event.tripId)
+                print(response)
+            }
+        }
     }
     
     // MARK: - Fetch User Role
@@ -904,8 +999,10 @@ class SupabaseDataController: ObservableObject {
                 .execute()
         
             let data = response.data
+            let data2 = response2.data
             let jsonString = String(data: data, encoding: .utf8)
-            print("Update response data: \(jsonString ?? "")")
+            let jsonString2 = String(data: data2, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")\n\(jsonString2 ?? "")")
         } catch {
             print("Exception updating driver status: \(error.localizedDescription)")
         }
@@ -926,8 +1023,10 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             let data = response.data
+            let data2 = response2.data
             let jsonString = String(data: data, encoding: .utf8)
-            print("Update response data: \(jsonString ?? "")")
+            let jsonString2 = String(data: data2, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")\n\(jsonString2 ?? "")")
         } catch {
             print("Exception updating driver status: \(error.localizedDescription)")
         }
@@ -1147,6 +1246,39 @@ class SupabaseDataController: ObservableObject {
         } catch {
             print("Error creating trip: \(error)")
             return false
+        }
+    }
+    
+    public func updateTripDetails(id: UUID, destination: String, address: String, notes: String, distance: String? = nil) async throws {
+        do {
+            // First update the basic trip info
+            try await databaseFrom("trips")
+                .update([
+                    "destination": destination,
+                    "pickup": address,
+                    "notes": notes
+                ])
+                .eq("id", value: id)
+                .execute()
+            
+            // If distance is provided, update it separately
+            if let distance = distance {
+                // Extract numeric value from distance string
+                let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+                    .joined()
+                
+                if let distanceValue = Double(numericDistance) {
+                    try await databaseFrom("trips")
+                        .update(["estimated_distance": distanceValue])
+                        .eq("id", value: id)
+                        .execute()
+                }
+            }
+            
+            print("Trip details updated for id \(id)")
+        } catch {
+            print("Error updating trip details: \(error)")
+            throw error
         }
     }
     

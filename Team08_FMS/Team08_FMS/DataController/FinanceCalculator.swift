@@ -50,14 +50,14 @@ class FinanceCalculator: ObservableObject {
     
     private func calculateDriverSalaries() -> Double {
         return crewController.drivers.reduce(0.0) { total, driver in
-            let salary = Double(driver.salary) ?? 0.0
+            let salary = Double(driver.salary)
             return total + salary
         }
     }
     
     private func calculateMaintenancePersonnelSalaries() -> Double {
         return crewController.maintenancePersonnel.reduce(0.0) { total, personnel in
-            let salary = Double(personnel.salary) ?? 0.0
+            let salary = Double(personnel.salary)
             return total + salary
         }
     }
