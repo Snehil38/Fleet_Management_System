@@ -3,77 +3,77 @@ import SwiftUI
 struct ChatBubbleView: View {
     let message: ChatMessage
     @State private var isAnimating = false
+    @StateObject private var supabaseController = SupabaseDataController.shared
+    @State private var currentUserId: UUID?
     
     private var backgroundColor: Color {
-        message.isFromCurrentUser ? ChatThemeColors.primary : ChatThemeColors.secondary
+        message.isFromCurrentUser ? .blue : Color(.systemGray5)
     }
     
     private var textColor: Color {
-        message.isFromCurrentUser ? .white : ChatThemeColors.text
+        message.isFromCurrentUser ? .white : .black
     }
     
     var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
+        HStack {
             if message.isFromCurrentUser {
-                Spacer(minLength: 60)
-            }
-            
-            VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 2) {
-                Text(message.message_text)
-                    .foregroundColor(textColor)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(backgroundColor)
-                    )
-                    .contextMenu {
-                        Button(action: {
-                            UIPasteboard.general.string = message.message_text
-                        }) {
-                            Label("Copy", systemImage: "doc.on.doc")
-                        }
-                    }
-                
-                HStack(spacing: 4) {
-                    if message.isFromCurrentUser {
-                        // Message status indicator
-                        Group {
-                            switch message.status {
-                            case .sent:
-                                Image(systemName: "checkmark")
-                                    .font(.caption2)
-                            case .delivered:
-                                Image(systemName: "checkmark.circle")
-                                    .font(.caption2)
-                            case .read:
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption2)
-                            }
-                        }
-                        .foregroundColor(.gray.opacity(0.8))
-                    }
-                    
-                    // Timestamp
-                    Text(formatDate(message.created_at))
-                        .font(.caption2)
-                        .foregroundColor(ChatThemeColors.timestamp)
-                }
-                .padding(.horizontal, 4)
-            }
-            
-            if !message.isFromCurrentUser {
-                Spacer(minLength: 60)
+                Spacer(minLength: 30)
+                messageContent(alignment: .trailing)
+            } else {
+                messageContent(alignment: .leading)
+                Spacer(minLength: 30)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 2)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
         .opacity(isAnimating ? 1 : 0)
         .offset(y: isAnimating ? 0 : 20)
         .onAppear {
             withAnimation(ChatBubbleAnimation.messageAppearance) {
                 isAnimating = true
             }
+            
+            // Get current user ID when view appears
+            Task {
+                do {
+                    currentUserId = try await supabaseController.getUserID()
+                } catch {
+                    print("Error getting user ID: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func messageContent(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
+            Text(message.message_text)
+                .foregroundColor(textColor)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(backgroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            
+            HStack(spacing: 4) {
+                Text(formatDate(message.created_at))
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+                
+                if message.isFromCurrentUser {
+                    Group {
+                        switch message.status {
+                        case .sent:
+                            Image(systemName: "checkmark")
+                        case .delivered:
+                            Image(systemName: "checkmark.circle")
+                        case .read:
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                    }
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+                }
+            }
+            .padding(alignment == .trailing ? .trailing : .leading, 4)
         }
     }
     

@@ -24,6 +24,11 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     
     // Additional UI properties - not stored in database
     var isFromCurrentUser: Bool = false
+    var isFromFleetManager: Bool {
+        // If the recipient_type is "driver", then the message is from fleet manager
+        // If the recipient_type is "maintenance", then the message is from maintenance
+        recipient_type == "driver"
+    }
     
     enum CodingKeys: String, CodingKey {
         case id

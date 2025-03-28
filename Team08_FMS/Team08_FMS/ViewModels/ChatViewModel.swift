@@ -27,6 +27,7 @@ class ChatViewModel: ObservableObject {
     private let recipientId: UUID
     private let recipientType: RecipientType
     private var realtimeChannel: RealtimeChannel?
+    private var refreshTimer: Timer?
     
     init(recipientId: UUID, recipientType: RecipientType) {
         self.recipientId = recipientId
@@ -37,6 +38,20 @@ class ChatViewModel: ObservableObject {
             await loadMessages()
             await setupMessageListener()
             updateUnreadCount()
+            setupRefreshTimer()
+        }
+    }
+    
+    private func setupRefreshTimer() {
+        // Cancel existing timer if any
+        refreshTimer?.invalidate()
+        
+        // Create a new timer that refreshes every 30 seconds
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.loadMessages()
+                self?.updateUnreadCount()
+            }
         }
     }
     
@@ -56,12 +71,13 @@ class ChatViewModel: ObservableObject {
                 event: "*",
                 schema: "public",
                 table: "chat_messages"
-            )) { [weak self] _ in
+            )) { [weak self] payload in
                 guard let self = self else { return }
                 
-                // Dispatch to main thread
+                // Dispatch to main thread and refresh messages
                 DispatchQueue.main.async {
                     Task { @MainActor in
+                        print("Realtime update received: \(payload)")
                         await self.loadMessages()
                         self.updateUnreadCount()
                     }
@@ -70,6 +86,7 @@ class ChatViewModel: ObservableObject {
             
             // Subscribe to the channel
             try await channel.subscribe()
+            print("Successfully subscribed to realtime updates")
             
             // Store the channel reference
             await MainActor.run {
@@ -332,7 +349,8 @@ class ChatViewModel: ObservableObject {
     }
     
     deinit {
-        // Cleanup channel on deinit
+        // Cleanup
+        refreshTimer?.invalidate()
         if let channel = realtimeChannel {
             Task {
                 try? await channel.unsubscribe()
