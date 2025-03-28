@@ -448,8 +448,10 @@ class SupabaseDataController: ObservableObject {
                   await fetchGeofenceEvents()
               case .update(let action):
                   print(action)
+                  await fetchGeofenceEvents()
               case .delete(let action):
                   print(action)
+                  await fetchGeofenceEvents()
               }
             }
         }
