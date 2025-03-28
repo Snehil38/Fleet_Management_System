@@ -405,7 +405,6 @@ struct AddTripView: View {
     let dismiss: () -> Void
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
-    @EnvironmentObject private var crewDataController: CrewDataController
     
     // Location Manager for current location
     @StateObject private var locationManager = LocationManager()
@@ -433,7 +432,6 @@ struct AddTripView: View {
     
     // Trip details state
     @State private var selectedVehicle: Vehicle?
-    @State private var selectedDriverId: UUID?
     @State private var cargoType = "General Goods"
     @State private var startDate = Date()
     @State private var deliveryDate = Date().addingTimeInterval(86400)
@@ -462,10 +460,6 @@ struct AddTripView: View {
     
     private var isVehicleSelected: Bool {
         selectedVehicle != nil
-    }
-    
-    private var isDriverSelected: Bool {
-        selectedDriverId != nil
     }
     
     var isFormValid: Bool {
@@ -679,64 +673,6 @@ struct AddTripView: View {
                                     availableVehicles: displayedVehicles
                                 )
                             }
-                            
-                            // Driver Selection - displayed after route calculation
-                            if let vehicle = selectedVehicle {
-                                CardView(title: "DRIVER ASSIGNMENT", systemImage: "person.fill") {
-                                    VStack {
-                                        Menu {
-                                            // Option to unassign driver
-                                            Button(action: {
-                                                selectedDriverId = nil
-                                            }) {
-                                                HStack {
-                                                    Text("Unassigned")
-                                                        .foregroundColor(.red)
-                                                    Spacer()
-                                                    if selectedDriverId == nil {
-                                                        Image(systemName: "checkmark")
-                                                    }
-                                                }
-                                            }
-                                            
-                                            Divider()
-                                            
-                                            // Available drivers
-                                            ForEach(crewDataController.drivers.filter { $0.status == .available }, id: \.userID) { driver in
-                                                Button(action: {
-                                                    selectedDriverId = driver.userID
-                                                }) {
-                                                    HStack {
-                                                        Text(driver.name)
-                                                        Spacer()
-                                                        if selectedDriverId == driver.userID {
-                                                            Image(systemName: "checkmark")
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } label: {
-                                            HStack {
-                                                if let driverId = selectedDriverId,
-                                                   let driver = crewDataController.drivers.first(where: { $0.userID == driverId }) {
-                                                    Text(driver.name)
-                                                        .foregroundColor(.primary)
-                                                } else {
-                                                    Text("Select Driver")
-                                                        .foregroundColor(.gray)
-                                                }
-                                                Image(systemName: "chevron.down")
-                                                    .font(.caption)
-                                                    .foregroundColor(.blue)
-                                            }
-                                            .padding()
-                                            .background(Color(.systemGray6))
-                                            .cornerRadius(10)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                    }
-                                }
-                            }
                         }
                         
                         Color.clear.frame(height: 100)
@@ -760,11 +696,11 @@ struct AddTripView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background((distance > 0 ? (isVehicleSelected && isDriverSelected) : isFormValid) ? Color.blue : Color.gray)
+                    .background(isFormValid ? Color.blue : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(distance > 0 ? (!isVehicleSelected || !isDriverSelected) : (!isFormValid || isCalculating))
+                .disabled(distance > 0 ? (!isVehicleSelected && displayedVehicles.isEmpty) : (!isFormValid || isCalculating))
                 .padding(16)
                 .background(
                     Rectangle()
@@ -789,7 +725,6 @@ struct AddTripView: View {
         }
         .onAppear {
             setupSearchCompleter()
-            crewDataController.update() // Update drivers list when view appears
             
             // Observe location updates
             locationManager.objectWillChange.sink { [weak locationManager] _ in
@@ -969,7 +904,7 @@ struct AddTripView: View {
                     name: pickupLocation,
                     destination: dropoffLocation,
                     vehicleId: vehicle.id,
-                    driverId: selectedDriverId,
+                    driverId: nil,
                     startTime: startDate,
                     endTime: deliveryDate,
                     startLat: pickupCoordinate?.latitude,
