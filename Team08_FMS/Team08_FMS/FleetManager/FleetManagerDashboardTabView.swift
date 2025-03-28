@@ -678,7 +678,7 @@ struct AddTripView: View {
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(distance > 0 ? !isVehicleSelected : (!isFormValid || isCalculating))
+                .disabled(distance > 0 ? (!isVehicleSelected && displayedVehicles.isEmpty) : (!isFormValid || isCalculating))
                 .padding(16)
                 .background(
                     Rectangle()
