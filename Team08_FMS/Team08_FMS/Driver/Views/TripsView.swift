@@ -356,8 +356,8 @@ struct TripDetailsView: View {
     
     init(trip: Trip) {
         self.trip = trip
-        // Initialize ChatViewModel with the fleet manager's ID
-        // We'll get the fleet manager ID in onAppear
+        // Initialize ChatViewModel with a temporary UUID
+        // We'll update it with the correct fleet manager ID in onAppear
         self._chatViewModel = StateObject(wrappedValue: ChatViewModel(recipientId: UUID(), recipientType: .driver))
     }
     
@@ -489,13 +489,15 @@ struct TripDetailsView: View {
                     let fleetManagers = try await SupabaseDataController.shared.fetchFleetManagers()
                     if let fleetManager = fleetManagers.first,
                        let fleetManagerId = fleetManager.userID {
-                        // Create a new ChatViewModel with the correct fleet manager ID
-                        let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
+                        // Update the existing chatViewModel with the correct fleet manager ID
                         await MainActor.run {
-                            chatViewModel.clearMessages()
-                            // Load messages for the new view model
+                            // Create a new ChatViewModel with the correct fleet manager ID
+                            let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
+                            // Load messages
                             Task {
                                 await newViewModel.loadMessages()
+                                // Update our chatViewModel with the loaded messages
+                                chatViewModel.messages = newViewModel.messages
                             }
                         }
                     }
@@ -542,28 +544,41 @@ struct TripDetailsView: View {
     }
     
     private func generatePDFContent() -> Data {
-        // Create PDF content
-        let pdfMetadata = """
+        // Create PDF content with better formatting
+        var content = """
+        TRIP CHAT HISTORY
+        =================
+        
         Trip Details:
-        ID: \(trip.name)
+        ------------
+        Trip ID: \(trip.name)
         From: \(trip.startingPoint)
         To: \(trip.destination)
         Status: Completed
+        Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
+        License Plate: \(trip.vehicleDetails.licensePlate)
         Date: \(Date().formatted())
         
         Chat History:
+        ------------
+        
         """
         
-        let chatHistory = chatViewModel.messages.map { message in
+        // Sort messages by date
+        let sortedMessages = chatViewModel.messages.sorted { $0.created_at < $1.created_at }
+        
+        // Add each message with proper formatting
+        for message in sortedMessages {
             let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
-            let timestamp = message.created_at.formatted()
-            return "\(timestamp) - \(sender):\n\(message.message_text)\n"
-        }.joined(separator: "\n")
+            let timestamp = message.created_at.formatted(date: .complete, time: .standard)
+            content += "\n[\(timestamp)]\n\(sender): \(message.message_text)\n"
+            content += "----------------------------------------\n"
+        }
         
-        let content = pdfMetadata + "\n\n" + chatHistory
+        if sortedMessages.isEmpty {
+            content += "\nNo messages found for this trip.\n"
+        }
         
-        // For now, we'll just return the content as Data
-        // In a real implementation, you would use PDFKit or another library to create a properly formatted PDF
         return Data(content.utf8)
     }
     
