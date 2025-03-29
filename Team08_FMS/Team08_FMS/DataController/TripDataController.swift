@@ -499,6 +499,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     end_latitude,
                     end_longitude,
                     pickup,
+                    estimated_distance,
+                    estimated_time,
                     vehicles (
                         id,
                         name,
@@ -545,10 +547,15 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let end_latitude: Double?
                 let end_longitude: Double?
                 let pickup: String?
+                let estimated_distance: Double?
+                let estimated_time: Double?
                 let vehicles: Vehicle
                 
                 // Add computed properties to parse distance and fuel cost
                 var parsedDistance: String {
+                    if let estimatedDistance = estimated_distance {
+                        return String(format: "%.1f", estimatedDistance)
+                    }
                     guard let notes = notes,
                           let distanceRange = notes.range(of: "Distance: "),
                           let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
@@ -563,7 +570,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                           let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
                         return "N/A"
                     }
-                    return String(notes[fuelRange.upperBound..<endRange.lowerBound])
+                    let dist = (Double(parsedDistance) ?? 0)*0.5
+                    return "\(dist) $"
                 }
             }
             
@@ -589,7 +597,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     start_longitude: data.start_longitude,
                     end_latitude: data.end_latitude,
                     end_longitude: data.end_longitude,
-                    pickup: data.pickup
+                    pickup: data.pickup,
+                    estimated_distance: data.estimated_distance,
+                    estimated_time: data.estimated_time
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
@@ -672,6 +682,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     end_latitude,
                     end_longitude,
                     pickup,
+                    estimated_distance,
+                    estimated_time,
                     vehicles (
                         id,
                         name,
@@ -723,10 +735,15 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let end_latitude: Double?
                 let end_longitude: Double?
                 let pickup: String?
+                let estimated_distance: Double?
+                let estimated_time: Double?
                 let vehicles: Vehicle
                 
                 // Add computed properties to parse distance and fuel cost
                 var parsedDistance: String {
+                    if let estimatedDistance = estimated_distance {
+                        return String(format: "%.1f", estimatedDistance)
+                    }
                     guard let notes = notes,
                           let distanceRange = notes.range(of: "Distance: "),
                           let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
@@ -768,7 +785,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     start_longitude: data.start_longitude,
                     end_latitude: data.end_latitude,
                     end_longitude: data.end_longitude,
-                    pickup: data.pickup
+                    pickup: data.pickup,
+                    estimated_distance: data.estimated_distance,
+                    estimated_time: data.estimated_time
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }

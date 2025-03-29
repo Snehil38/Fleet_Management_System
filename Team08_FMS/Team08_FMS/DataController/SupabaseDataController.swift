@@ -1289,7 +1289,7 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    public func updateTripDetails(id: UUID, destination: String, address: String, notes: String, distance: String? = nil) async throws {
+    public func updateTripDetails(id: UUID, destination: String, address: String, notes: String, distance: String? = nil, time: String? = nil) async throws {
         do {
             // First update the basic trip info
             try await databaseFrom("trips")
@@ -1310,6 +1310,22 @@ class SupabaseDataController: ObservableObject {
                 if let distanceValue = Double(numericDistance) {
                     try await databaseFrom("trips")
                         .update(["estimated_distance": distanceValue])
+                        .eq("id", value: id)
+                        .execute()
+                }
+            }
+            
+            // If time is provided, update it separately
+            if let time = time {
+                // Extract hours and minutes from time string (e.g., "2h 30m" or "45m")
+                let components = time.lowercased().components(separatedBy: CharacterSet.letters)
+                let hours = components.first?.trimmingCharacters(in: .whitespaces) ?? "0"
+                let minutes = components.last?.trimmingCharacters(in: .whitespaces) ?? "0"
+                
+                if let hoursValue = Double(hours), let minutesValue = Double(minutes) {
+                    let totalHours = hoursValue + (minutesValue / 60.0)
+                    try await databaseFrom("trips")
+                        .update(["estimated_time": totalHours])
                         .eq("id", value: id)
                         .execute()
                 }

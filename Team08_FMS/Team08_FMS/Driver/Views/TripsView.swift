@@ -130,23 +130,65 @@ struct TripsView: View {
         case .delivered:
             // Convert recent deliveries to Trip objects with improved information
             return tripController.recentDeliveries.map { delivery in
-                createTripFromDelivery(delivery)
+                createTripFromDelivery(delivery) ?? {
+                    // Create a fallback vehicle
+                    let vehicle = Vehicle(
+                        name: "Unknown Vehicle",
+                        year: 0,
+                        make: "Unknown",
+                        model: "Unknown",
+                        vin: "Unknown",
+                        licensePlate: "Unknown",
+                        vehicleType: .truck,
+                        color: "Unknown",
+                        bodyType: .cargo,
+                        bodySubtype: "Unknown",
+                        msrp: 0.0,
+                        pollutionExpiry: Date(),
+                        insuranceExpiry: Date(),
+                        status: .available
+                    )
+                    
+                    // Create a fallback SupabaseTrip
+                    let supabaseTrip = SupabaseTrip(
+                        id: UUID(),
+                        destination: "Unknown Location",
+                        trip_status: "pending",
+                        has_completed_pre_trip: false,
+                        has_completed_post_trip: false,
+                        vehicle_id: vehicle.id,
+                        driver_id: nil,
+                        start_time: nil,
+                        end_time: nil,
+                        notes: "No notes available",
+                        created_at: Date(),
+                        updated_at: Date(),
+                        is_deleted: false,
+                        start_latitude: 0,
+                        start_longitude: 0,
+                        end_latitude: 0,
+                        end_longitude: 0,
+                        pickup: "Unknown Address",
+                        estimated_distance: 0,
+                        estimated_time: nil
+                    )
+                    
+                    return Trip(from: supabaseTrip, vehicle: vehicle)
+                }()
             }
         }
     }
     
     // Helper function to create Trip from DeliveryDetails
-    private func createTripFromDelivery(_ delivery: DeliveryDetails) -> Trip {
-        // Extract information from delivery notes
-        let deliveryNotes = delivery.notes
+    private func createTripFromDelivery(_ delivery: DeliveryDetails) -> Trip? {
+        var tripName = delivery.id.uuidString
         var cargoType = "General Cargo"
-        var tripName = "Trip-\(delivery.id.uuidString.prefix(4))"
-        var distance = ""
+        var distance = "N/A"
         var startingPoint = ""
+        var deliveryNotes = delivery.notes
         
-        // Parse notes to extract structured data
-        let lines = deliveryNotes.split(separator: "\n")
-        for line in lines {
+        // Parse notes for additional information
+        for line in delivery.notes.components(separatedBy: .newlines) {
             if line.hasPrefix("Trip:") {
                 tripName = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
             } else if line.hasPrefix("Cargo:") {
@@ -158,40 +200,49 @@ struct TripsView: View {
             }
         }
         
-        // Create a Trip object with the delivery information
-        return Trip(
-            id: delivery.id,
-            name: tripName,
-            destination: delivery.location,
-            address: delivery.location,
-            eta: "",
-            distance: distance,
-            status: .delivered,
-            hasCompletedPreTrip: true,
-            hasCompletedPostTrip: true,
-            vehicleDetails: Vehicle(
-                name: "Vehicle",
-                year: 2023,
-                make: "Unknown",
-                model: "Unknown",
-                vin: "Unknown",
-                licensePlate: delivery.vehicle,
-                vehicleType: .truck,
-                color: "Unknown",
-                bodyType: .cargo,
-                bodySubtype: "Unknown",
-                msrp: 0.0,
-                pollutionExpiry: Date(),
-                insuranceExpiry: Date(),
-                status: .available
-            ),
-            sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            startingPoint: startingPoint.isEmpty ? delivery.location : startingPoint,
-            notes: deliveryNotes,
-            startTime: nil,
-            endTime: nil
+        // Create a mock vehicle for the delivery
+        let vehicle = Vehicle(
+            name: "Vehicle",
+            year: 2023,
+            make: "Unknown",
+            model: "Unknown",
+            vin: "Unknown",
+            licensePlate: delivery.vehicle,
+            vehicleType: .truck,
+            color: "Unknown",
+            bodyType: .cargo,
+            bodySubtype: "Unknown",
+            msrp: 0.0,
+            pollutionExpiry: Date(),
+            insuranceExpiry: Date(),
+            status: .available
         )
+        
+        // Create a SupabaseTrip with the delivery information
+        let supabaseTrip = SupabaseTrip(
+            id: delivery.id,
+            destination: delivery.location,
+            trip_status: "delivered",
+            has_completed_pre_trip: true,
+            has_completed_post_trip: true,
+            vehicle_id: vehicle.id,
+            driver_id: nil,
+            start_time: nil,
+            end_time: nil,
+            notes: deliveryNotes,
+            created_at: Date(),
+            updated_at: Date(),
+            is_deleted: false,
+            start_latitude: 0,
+            start_longitude: 0,
+            end_latitude: 0,
+            end_longitude: 0,
+            pickup: startingPoint.isEmpty ? delivery.location : startingPoint,
+            estimated_distance: Double(distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0,
+            estimated_time: nil
+        )
+        
+        return Trip(from: supabaseTrip, vehicle: vehicle)
     }
 }
 
