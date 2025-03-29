@@ -57,7 +57,7 @@ struct Trip: Identifiable, Equatable {
         self.id = supabaseTrip.id
         self.name = supabaseTrip.pickup ?? "Trip-\(supabaseTrip.id.uuidString.prefix(8))"
         self.destination = supabaseTrip.destination
-        self.address = supabaseTrip.pickup ?? "Unknown"
+        self.address = supabaseTrip.pickup ?? "N/A"
         self.status = TripStatus(rawValue: supabaseTrip.trip_status) ?? .pending
         self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
         self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
@@ -71,6 +71,12 @@ struct Trip: Identifiable, Equatable {
         // Set distance using estimated_distance if available
         if let estimatedDistance = supabaseTrip.estimated_distance {
             self.distance = String(format: "%.1f km", estimatedDistance)
+        } else if let notes = supabaseTrip.notes,
+                  let distanceRange = notes.range(of: "Estimated Distance: "),
+                  let endRange = notes[distanceRange.upperBound...].range(of: "\n") {
+            // Try to extract distance from notes as fallback
+            let distanceStr = String(notes[distanceRange.upperBound..<endRange.lowerBound])
+            self.distance = distanceStr.trimmingCharacters(in: .whitespaces)
         } else {
             self.distance = "N/A"
         }
@@ -84,6 +90,12 @@ struct Trip: Identifiable, Equatable {
             } else {
                 self.eta = "\(minutes) mins"
             }
+        } else if let notes = supabaseTrip.notes,
+                  let etaRange = notes.range(of: "Estimated Time: "),
+                  let endRange = notes[etaRange.upperBound...].range(of: "\n") {
+            // Try to extract ETA from notes as fallback
+            let etaStr = String(notes[etaRange.upperBound..<endRange.lowerBound])
+            self.eta = etaStr.trimmingCharacters(in: .whitespaces)
         } else {
             self.eta = "N/A"
         }

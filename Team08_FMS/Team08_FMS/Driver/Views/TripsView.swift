@@ -186,6 +186,8 @@ struct TripsView: View {
         var distance = "N/A"
         var startingPoint = ""
         var deliveryNotes = delivery.notes
+        var estimatedDistance: Double? = nil
+        var estimatedTime: Double? = nil
         
         // Parse notes for additional information
         for line in delivery.notes.components(separatedBy: .newlines) {
@@ -193,10 +195,22 @@ struct TripsView: View {
                 tripName = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
             } else if line.hasPrefix("Cargo:") {
                 cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
-            } else if line.hasPrefix("Distance:") {
-                distance = String(line.dropFirst(9).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("Distance:") || line.hasPrefix("Estimated Distance:") {
+                let prefix = line.hasPrefix("Distance:") ? "Distance:" : "Estimated Distance:"
+                distance = String(line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces))
+                // Extract numeric value for estimated_distance
+                if let numericDistance = Double(distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) {
+                    estimatedDistance = numericDistance
+                }
             } else if line.hasPrefix("From:") {
                 startingPoint = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("ETA:") || line.hasPrefix("Estimated Time:") {
+                let prefix = line.hasPrefix("ETA:") ? "ETA:" : "Estimated Time:"
+                let etaString = String(line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces))
+                // Parse ETA string to get minutes
+                if let minutes = parseETAToMinutes(etaString) {
+                    estimatedTime = Double(minutes) / 60.0 // Convert to hours
+                }
             }
         }
         
@@ -229,7 +243,14 @@ struct TripsView: View {
             driver_id: nil,
             start_time: nil,
             end_time: nil,
-            notes: deliveryNotes,
+            notes: """
+                   Trip: \(tripName)
+                   Cargo Type: \(cargoType)
+                   Estimated Distance: \(distance)
+                   Estimated Time: \(estimatedTime.map { "\(Int($0))h \(Int(($0 - Double(Int($0))) * 60))m" } ?? "N/A")
+                   From: \(startingPoint)
+                   \(deliveryNotes)
+                   """,
             created_at: Date(),
             updated_at: Date(),
             is_deleted: false,
@@ -238,11 +259,31 @@ struct TripsView: View {
             end_latitude: 0,
             end_longitude: 0,
             pickup: startingPoint.isEmpty ? delivery.location : startingPoint,
-            estimated_distance: Double(distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0,
-            estimated_time: nil
+            estimated_distance: estimatedDistance,
+            estimated_time: estimatedTime
         )
         
         return Trip(from: supabaseTrip, vehicle: vehicle)
+    }
+    
+    // Helper function to parse ETA string to minutes
+    private func parseETAToMinutes(_ etaString: String) -> Int? {
+        let components = etaString.lowercased().components(separatedBy: CharacterSet.letters)
+        let numbers = components.compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        
+        if etaString.contains("h") && etaString.contains("m") {
+            // Format: "Xh Ym"
+            guard numbers.count >= 2 else { return nil }
+            return numbers[0] * 60 + numbers[1]
+        } else if etaString.contains("h") {
+            // Format: "Xh"
+            guard let hours = numbers.first else { return nil }
+            return hours * 60
+        } else {
+            // Format: "X mins" or "X min"
+            guard let minutes = numbers.first else { return nil }
+            return minutes
+        }
     }
 }
 
