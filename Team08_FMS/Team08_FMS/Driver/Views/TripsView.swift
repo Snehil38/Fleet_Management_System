@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 
 struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
@@ -346,6 +347,19 @@ struct TripCard: View {
 struct TripDetailsView: View {
     @Environment(\.presentationMode) var presentationMode
     let trip: Trip
+    @StateObject private var chatViewModel: ChatViewModel
+    @State private var isGeneratingPDF = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    @State private var showingShareSheet = false
+    @State private var pdfURL: URL?
+    
+    init(trip: Trip) {
+        self.trip = trip
+        // Initialize ChatViewModel with the fleet manager's ID
+        // We'll get the fleet manager ID in onAppear
+        self._chatViewModel = StateObject(wrappedValue: ChatViewModel(recipientId: UUID(), recipientType: .driver))
+    }
     
     var body: some View {
         NavigationView {
@@ -378,7 +392,6 @@ struct TripDetailsView: View {
                         TripDetailRow(icon: "checkmark.shield.fill", title: "Post-Trip Inspection", value: "Completed")
                     }
                     
-                    // Proof of delivery section for completed trips
                     Section(header: Text("Proof of Delivery")) {
                         Button(action: {}) {
                             HStack {
@@ -399,6 +412,23 @@ struct TripDetailsView: View {
                                     .foregroundColor(.gray)
                             }
                         }
+                        
+                        // Add Chat History Download Button
+                        Button(action: generateAndDownloadPDF) {
+                            HStack {
+                                Image(systemName: "arrow.down.doc.fill")
+                                Text("Download Chat History")
+                                Spacer()
+                                if isGeneratingPDF {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                        }
+                        .disabled(isGeneratingPDF)
                     }
                 } else {
                     // Status section for non-completed trips
@@ -441,7 +471,100 @@ struct TripDetailsView: View {
                     }
                 }
             }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") {
+                    showingError = false
+                }
+            } message: {
+                Text(errorMessage)
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let url = pdfURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
+            .task {
+                // Get fleet manager ID and load chat messages
+                do {
+                    let fleetManagers = try await SupabaseDataController.shared.fetchFleetManagers()
+                    if let fleetManager = fleetManagers.first,
+                       let fleetManagerId = fleetManager.userID {
+                        // Create a new ChatViewModel with the correct fleet manager ID
+                        let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
+                        await MainActor.run {
+                            chatViewModel.clearMessages()
+                            // Load messages for the new view model
+                            Task {
+                                await newViewModel.loadMessages()
+                            }
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Failed to load fleet manager: \(error.localizedDescription)"
+                        showingError = true
+                    }
+                }
+            }
         }
+    }
+    
+    private func generateAndDownloadPDF() {
+        isGeneratingPDF = true
+        
+        Task {
+            do {
+                // Create PDF content
+                let pdfContent = generatePDFContent()
+                
+                // Get the documents directory
+                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let fileName = "chat_history_\(trip.name)_\(Date().formatted(.iso8601)).pdf"
+                let fileURL = documentsPath.appendingPathComponent(fileName)
+                
+                // Write PDF data to file
+                try pdfContent.write(to: fileURL)
+                
+                // Show share sheet
+                await MainActor.run {
+                    isGeneratingPDF = false
+                    pdfURL = fileURL
+                    showingShareSheet = true
+                }
+            } catch {
+                await MainActor.run {
+                    isGeneratingPDF = false
+                    errorMessage = "Failed to generate PDF: \(error.localizedDescription)"
+                    showingError = true
+                }
+            }
+        }
+    }
+    
+    private func generatePDFContent() -> Data {
+        // Create PDF content
+        let pdfMetadata = """
+        Trip Details:
+        ID: \(trip.name)
+        From: \(trip.startingPoint)
+        To: \(trip.destination)
+        Status: Completed
+        Date: \(Date().formatted())
+        
+        Chat History:
+        """
+        
+        let chatHistory = chatViewModel.messages.map { message in
+            let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
+            let timestamp = message.created_at.formatted()
+            return "\(timestamp) - \(sender):\n\(message.message_text)\n"
+        }.joined(separator: "\n")
+        
+        let content = pdfMetadata + "\n\n" + chatHistory
+        
+        // For now, we'll just return the content as Data
+        // In a real implementation, you would use PDFKit or another library to create a properly formatted PDF
+        return Data(content.utf8)
     }
     
     private var statusText: String {
@@ -491,5 +614,21 @@ struct TripDetailRow: View {
                 .foregroundColor(.primary)
         }
     }
+}
+
+// ShareSheet view to handle sharing
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    let applicationActivities: [UIActivity]? = nil
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: applicationActivities
+        )
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
