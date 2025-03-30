@@ -102,10 +102,6 @@ struct MaintenancePersonnelDashboardView: View {
     private var profileSheet: some View {
         NavigationView {
             MaintenancePersonnelProfileView()
-                .navigationTitle("Profile")
-                .navigationBarItems(trailing: Button("Done") {
-                    showingProfile = false
-                })
         }
     }
     
