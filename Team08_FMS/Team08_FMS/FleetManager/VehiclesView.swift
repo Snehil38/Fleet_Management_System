@@ -110,45 +110,39 @@ private struct VehicleCard: View {
                 Label("Delete Vehicle", systemImage: "trash")
             }
 
-            if vehicle.status == .underMaintenance {
-                Button {
-                    Task {
-                        await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.available, vehicleID: vehicle.id)
-                    }
-                    if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-                        DispatchQueue.main.async {
-                            vehicleManager.vehicles[index].status = .underMaintenance
-                        }
-                    }
-                } label: {
-                    Label("Mark as available", systemImage: "checkmark.circle.fill")
-                }
-            }
-
-            if vehicle.status == .available {
-                Button {
-                    Task {
-                        // Update on the server
-                        await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
-                        
-                        // Update the local state immediately
-                        if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-                            DispatchQueue.main.async {
-                                vehicleManager.vehicles[index].status = .underMaintenance
+            if vehicle.status != .inService {  // Only show status options if not in service
+                if vehicle.status == .underMaintenance {
+                    Button {
+                        Task {
+                            await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.available, vehicleID: vehicle.id)
+                            if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                                await MainActor.run {
+                                    vehicleManager.vehicles[index].status = .available
+                                }
                             }
                         }
-                        
-                        // Optionally, save the updated vehicles array to UserDefaults
-                        // vehicleManager.saveVehicles()   // Make sure this method is accessible if needed
+                    } label: {
+                        Label("Mark as available", systemImage: "checkmark.circle.fill")
                     }
-                } label: {
-                    Label("Mark as under maintenance", systemImage: "checkmark.circle.fill")
+                }
+
+                if vehicle.status == .available {
+                    Button {
+                        Task {
+                            await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
+                            if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                                await MainActor.run {
+                                    vehicleManager.vehicles[index].status = .underMaintenance
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Mark as under maintenance", systemImage: "checkmark.circle.fill")
+                    }
                 }
             }
 
-
             Button {
-                // Add share functionality here
                 showingOptions = true
             } label: {
                 Label("Share Details", systemImage: "square.and.arrow.up")
@@ -314,6 +308,7 @@ struct VehiclesView: View {
     @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: VehicleStatus?
+    @State private var isInTrip = false
 
     private func matchesSearch(_ vehicle: Vehicle) -> Bool {
         guard !searchText.isEmpty else { return true }
@@ -386,6 +381,11 @@ struct VehiclesView: View {
             .onAppear {
                 if vehicleManager.vehicles.isEmpty {
                     vehicleManager.loadVehicles()
+                }
+            }
+            .onAppear {
+                Task {
+                    await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
                 }
             }
             .navigationTitle("Vehicles")

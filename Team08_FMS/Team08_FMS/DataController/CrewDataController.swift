@@ -183,6 +183,76 @@ class CrewDataController: ObservableObject {
         await SupabaseDataController.shared.updateDriverStatus(newStatus: status, userID: nil, id: id)
     }
     
+    // Check and update driver trip status
+    func checkAndUpdateDriverTripStatus() async {
+        let trips = TripDataController.shared.getAllTrips()
+        
+        // Get all drivers in trips
+        let driversInTrips = trips
+            .filter { $0.status == .inProgress }
+            .compactMap { $0.driverId }
+        
+        // Update status for all drivers
+        for driver in drivers {
+            let shouldBeBusy = driversInTrips.contains(driver.userID!)
+            let needsUpdate = (shouldBeBusy && driver.status != .busy) ||
+                            (!shouldBeBusy && driver.status == .busy)
+            
+            if needsUpdate {
+                do {
+                    try await updateDriverStatus(driver.id, status: shouldBeBusy ? .busy : .available)
+                } catch {
+                    print("Error updating driver status: \(error)")
+                }
+            }
+        }
+        
+        // Update the UI
+        await MainActor.run {
+            self.objectWillChange.send()
+        }
+    }
+    
+    // Check and update vehicle status based on trips
+    func checkAndUpdateVehicleStatus(vehicleManager: VehicleManager) async {
+        let trips = TripDataController.shared.getAllTrips()
+        
+        // First, set all vehicles to available (unless they're under maintenance)
+        for vehicle in vehicleManager.vehicles {
+            if vehicle.status != .underMaintenance {
+                await SupabaseDataController.shared.updateVehicleStatus(
+                    newStatus: .available,
+                    vehicleID: vehicle.id
+                )
+                if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                    await MainActor.run {
+                        vehicleManager.vehicles[index].status = .available
+                    }
+                }
+            }
+        }
+        
+        // Then mark vehicles as in service if they are in any non-completed trip
+        for trip in trips {
+            // Check if trip is pending, assigned, or in progress
+            if trip.status == .pending || trip.status == .assigned || trip.status == .inProgress {
+                let vehicleId = trip.vehicleDetails.id
+                if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicleId }) {
+                    // Only update if the vehicle isn't under maintenance
+                    if vehicleManager.vehicles[index].status != .underMaintenance {
+                        await SupabaseDataController.shared.updateVehicleStatus(
+                            newStatus: .inService,
+                            vehicleID: vehicleId
+                        )
+                        await MainActor.run {
+                            vehicleManager.vehicles[index].status = .inService
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // Update status for maintenance personnel with the given UUID
     func updateMaintenancePersonnelStatus(_ id: UUID, status: Status) {
         if let index = maintenancePersonnel.firstIndex(where: { $0.id == id }) {

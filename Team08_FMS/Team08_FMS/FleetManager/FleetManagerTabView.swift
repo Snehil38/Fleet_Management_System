@@ -49,6 +49,8 @@ struct FleetManagerTabView: View {
             listenForGeofenceEvents()
             await TripDataController.shared.refreshAllTrips()
             await SupabaseDataController.shared.fetchGeofenceEvents()
+            await dataManager.checkAndUpdateDriverTripStatus()
+            await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
         }
     }
     
