@@ -12,7 +12,12 @@ private struct VehicleCard: View {
     @ObservedObject var vehicleManager: VehicleManager
     @State private var showingDeleteAlert = false
     @State private var showingOptions = false
-
+    @State private var showingDeliveryReceipt = false
+    @State private var currentTrip: Trip?
+    @State private var pdfData: Data? = nil
+    @State private var pdfError: String? = nil
+    @State private var showingPDFError = false
+    
     private var statusColor: Color {
         switch vehicle.status {
         case .available: return .green
@@ -85,18 +90,28 @@ private struct VehicleCard: View {
                     }
                 }
 
-                // Document status indicators
-//                HStack(spacing: 12) {
-//                    Label("RC", systemImage: vehicle.documents?.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-//                        .foregroundColor(vehicle.documents?.rc != nil ? .green : .red)
-//
-//                    Label("Insurance", systemImage: vehicle.documents?.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-//                        .foregroundColor(vehicle.documents?.insurance != nil ? .green : .red)
-//
-//                    Label("Pollution", systemImage: vehicle.documents?.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-//                        .foregroundColor(vehicle.documents?.pollutionCertificate != nil ? .green : .red)
-//                }
-//                .font(.caption)
+                if let trip = currentTrip {
+                    Button(action: {
+                        do {
+                            pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+                            showingDeliveryReceipt = true
+                        } catch {
+                            pdfError = error.localizedDescription
+                            showingPDFError = true
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "doc.text.fill")
+                                .foregroundColor(.blue)
+                            Text("Delivery Receipt")
+                                .foregroundColor(.blue)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.top, 8)
+                    }
+                }
             }
             .padding()
         }
@@ -159,6 +174,36 @@ private struct VehicleCard: View {
         } message: {
             Text("Are you sure you want to delete this vehicle? This action cannot be undone.")
         }
+        .sheet(isPresented: $showingDeliveryReceipt) {
+            NavigationView {
+                if let data = pdfData {
+                    PDFViewer(data: data)
+                        .navigationTitle("Delivery Receipt")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showingDeliveryReceipt = false
+                                }
+                            }
+                        }
+                }
+            }
+        }
+        .alert("Error", isPresented: $showingPDFError) {
+            Button("OK") {
+                showingPDFError = false
+            }
+        } message: {
+            Text(pdfError ?? "Failed to generate delivery receipt")
+        }
+        .onAppear {
+            // Find if this vehicle has any current trip
+            currentTrip = TripDataController.shared.allTrips.first(where: { 
+                $0.vehicleDetails.id == vehicle.id && 
+                ($0.status == .inProgress || $0.status == .delivered)
+            })
+        }
     }
 }
 
@@ -172,7 +217,7 @@ private struct VehicleListView: View {
                 MaintenanceEmptyStateView()
             } else {
                 ForEach(vehicles) { vehicle in
-                    NavigationLink(destination: VehicleDetailView(vehicle: vehicle, vehicleManager: vehicleManager)) {
+                    NavigationLink(destination: VehicleDetailView(vehicle: vehicle)) {
                         VehicleCard(vehicle: vehicle, vehicleManager: vehicleManager)
                             .padding(.horizontal)
                     }

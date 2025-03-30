@@ -71,4 +71,187 @@ struct TripCardView: View {
         // Implementation of TripCardView
         Text("Trip Card View")
     }
+}
+
+struct PDFViewer: UIViewRepresentable {
+    let data: Data
+    @State private var isLoading = true
+    @State private var error: Error?
+    
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.autoScales = true
+        return pdfView
+    }
+    
+    func updateUIView(_ pdfView: PDFView, context: Context) {
+        isLoading = true
+        if let document = PDFDocument(data: data) {
+            pdfView.document = document
+            isLoading = false
+        } else {
+            error = TripError.updateError("Failed to load PDF document")
+            isLoading = false
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject {
+        var parent: PDFViewer
+        
+        init(_ parent: PDFViewer) {
+            self.parent = parent
+        }
+    }
+}
+
+// Update TripDetailView to handle PDF generation errors
+struct TripDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingAssignSheet = false
+    @State private var showingDeleteAlert = false
+    @State private var showingPDFViewer = false
+    @State private var pdfError: String? = nil
+    @State private var showingPDFError = false
+    @StateObject private var tripController = TripDataController.shared
+    let trip: Trip
+    @State private var pdfData: Data?
+    
+    // Editing state variables
+    @State private var isEditing = false
+    @State private var editedDestination: String = ""
+    @State private var editedAddress: String = ""
+    @State private var editedNotes: String = ""
+    @State private var calculatedDistance: String = ""
+    @State private var calculatedTime: String = ""
+    @State private var selectedDriverId: UUID? = nil
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // ... existing code ...
+                
+                // Delivery Status Section
+                Section(header: Text("DELIVERY STATUS")) {
+                    TripDetailRow(icon: statusIcon, title: "Status", value: statusText)
+                    TripDetailRow(
+                        icon: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "clock.badge.checkmark.fill",
+                        title: "Pre-Trip Inspection",
+                        value: trip.hasCompletedPreTrip ? "Completed" : "Required"
+                    )
+                    TripDetailRow(
+                        icon: trip.hasCompletedPostTrip ? "checkmark.circle.fill" : "checkmark.shield.fill",
+                        title: "Post-Trip Inspection",
+                        value: trip.hasCompletedPostTrip ? "Completed" : "Required"
+                    )
+                }
+                
+                // Add Proof of Delivery Section for completed trips
+                if trip.status == .delivered {
+                    Section(header: Text("PROOF OF DELIVERY")) {
+                        Button(action: {
+                            do {
+                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+                                showingPDFViewer = true
+                            } catch {
+                                pdfError = error.localizedDescription
+                                showingPDFError = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "doc.text.fill")
+                                    .foregroundColor(.blue)
+                                Text("Delivery Receipt")
+                                    .foregroundColor(.blue)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                }
+                
+                // ... existing code ...
+            }
+            .listStyle(InsetGroupedListStyle())
+            .navigationTitle("Trip Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingPDFViewer) {
+                if let data = pdfData {
+                    NavigationView {
+                        PDFViewer(data: data)
+                            .navigationTitle("Delivery Receipt")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    Button("Done") {
+                                        showingPDFViewer = false
+                                    }
+                                }
+                            }
+                    }
+                }
+            }
+            .alert("Error", isPresented: $showingPDFError) {
+                Button("OK") {
+                    showingPDFError = false
+                }
+            } message: {
+                Text(pdfError ?? "Failed to generate delivery receipt")
+            }
+            // ... existing code ...
+        }
+    }
+}
+
+// Delivery Status Section
+Section(header: Text("DELIVERY STATUS")) {
+    TripDetailRow(icon: statusIcon, title: "Status", value: statusText)
+    TripDetailRow(
+        icon: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "clock.badge.checkmark.fill",
+        title: "Pre-Trip Inspection",
+        value: trip.hasCompletedPreTrip ? "Completed" : "Required"
+    )
+    TripDetailRow(
+        icon: trip.hasCompletedPostTrip ? "checkmark.circle.fill" : "checkmark.shield.fill",
+        title: "Post-Trip Inspection",
+        value: trip.hasCompletedPostTrip ? "Completed" : "Required"
+    )
+}
+
+// Add Proof of Delivery Section for completed trips
+if trip.status == .delivered {
+    Section(header: Text("PROOF OF DELIVERY")) {
+        Button(action: {
+            showingPDFViewer = true
+        }) {
+            HStack {
+                Image(systemName: "doc.text.fill")
+                    .foregroundColor(.blue)
+                Text("Delivery Receipt")
+                    .foregroundColor(.blue)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.gray)
+            }
+        }
+    }
+}
+
+.sheet(isPresented: $showingPDFViewer) {
+    NavigationView {
+        PDFViewer(data: TripDataController.shared.generateDeliveryReceipt(for: trip))
+            .navigationTitle("Delivery Receipt")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        showingPDFViewer = false
+                    }
+                }
+            }
+    }
 } 

@@ -813,8 +813,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     trip.status == .delivered && trip.hasCompletedPostTrip
                 }
                 
-                self.recentDeliveries = completedTrips.compactMap { trip in
-                    guard let joinedData = joinedData.first(where: { $0.id == trip.id }) else { return nil }
+                self.recentDeliveries = completedTrips.map { trip in
+                    let joinedData = joinedData.first(where: { $0.id == trip.id })!
                     
                     // Extract additional details from notes if available
                     var cargoType = "General Cargo"
@@ -840,11 +840,22 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                         driver: "Current Driver",
                         vehicle: trip.vehicleDetails.licensePlate,
                         notes: """
+                               Trip Details
+                               ---------------
                                Trip: \(trip.name)
-                               Cargo: \(cargoType)
-                               Distance: \(distance)
-                               Estimated Fuel Cost: \(fuelCost)
                                From: \(trip.startingPoint)
+                               To: \(trip.destination)
+                               Distance: \(distance) km
+                               Estimated Fuel Cost: \(fuelCost)
+                               
+                               Timing
+                               ---------------
+                               Start: \(formatFullDate(trip.startTime ?? joinedData.created_at))
+                               End: \(formatFullDate(trip.endTime ?? joinedData.created_at))
+                               
+                               Additional Info
+                               ---------------
+                               Cargo Type: \(cargoType)
                                \(trip.notes ?? "")
                                """
                     )
@@ -897,6 +908,12 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             formatter.dateFormat = "MMM d, h:mm a"
             return formatter.string(from: date)
         }
+    }
+    
+    private func formatFullDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy h:mm a"
+        return formatter.string(from: date)
     }
     
     // Update getCurrentTripData to handle optional currentTrip
@@ -970,10 +987,21 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 driver: "Current Driver",
                 vehicle: trip.vehicleDetails.licensePlate,
                 notes: """
+                       Trip Details
+                       ---------------
                        Trip: \(trip.name)
-                       Cargo: General Cargo
-                       Distance: \(trip.distance)
                        From: \(trip.startingPoint)
+                       To: \(trip.destination)
+                       Distance: \(trip.distance) km
+                       
+                       Timing
+                       ---------------
+                       Start: \(formatFullDate(trip.startTime ?? Date()))
+                       End: \(formatFullDate(trip.endTime ?? Date()))
+                       
+                       Additional Info
+                       ---------------
+                       Cargo Type: General Cargo
                        \(trip.notes ?? "")
                        """
             )
@@ -1137,6 +1165,92 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             self.currentTrip = nil
         }
         recentDeliveries.removeAll { $0.id == id }
+    }
+    
+    func generateDeliveryReceipt(for trip: Trip) throws -> Data {
+        guard trip.status == .delivered else {
+            throw TripError.updateError("Cannot generate receipt for non-delivered trip")
+        }
+        
+        let driverName = trip.driverId.flatMap { driverId in
+            CrewDataController.shared.drivers.first { $0.userID == driverId }?.name
+        } ?? "Unassigned"
+        
+        let content = """
+        DELIVERY RECEIPT
+        ===============
+        
+        Trip Details:
+        ------------
+        Trip ID: \(trip.name)
+        Status: \(trip.status.rawValue)
+        
+        Vehicle Information:
+        ------------------
+        Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
+        License Plate: \(trip.vehicleDetails.licensePlate)
+        Driver: \(driverName)
+        
+        Delivery Information:
+        -------------------
+        Destination: \(trip.destination)
+        Address: \(trip.address)
+        Distance: \(trip.distance)
+        
+        Timing:
+        -------
+        Start Time: \(trip.startTime?.formatted() ?? "N/A")
+        End Time: \(trip.endTime?.formatted() ?? "N/A")
+        
+        Cost Information:
+        ---------------
+        Estimated Fuel Cost: $\(Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0 * 0.5)
+        Total Revenue: $\((Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0 * 0.5) + 50.0)
+        
+        Notes:
+        ------
+        \(trip.notes ?? "No additional notes")
+        """
+        
+        // Create a PDF document
+        let format = UIGraphicsPDFRendererFormat()
+        let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        let data = renderer.pdfData { context in
+            context.beginPage()
+            
+            // Set up attributes for drawing
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.alignment = .left
+            paragraphStyle.lineSpacing = 5.0
+            
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .paragraphStyle: paragraphStyle
+            ]
+            
+            let titleAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 16),
+                .paragraphStyle: paragraphStyle
+            ]
+            
+            // Draw content
+            let contentRect = pageRect.insetBy(dx: 50, dy: 50)
+            
+            // Draw title
+            let title = "DELIVERY RECEIPT"
+            title.draw(at: CGPoint(x: contentRect.minX, y: contentRect.minY), withAttributes: titleAttributes)
+            
+            // Draw main content
+            content.draw(in: CGRect(x: contentRect.minX,
+                                  y: contentRect.minY + 40,
+                                  width: contentRect.width,
+                                  height: contentRect.height - 40),
+                        withAttributes: attributes)
+        }
+        
+        return data
     }
 } 
 

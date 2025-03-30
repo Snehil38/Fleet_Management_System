@@ -459,6 +459,12 @@ struct TripDetailView: View {
     @State private var calculatedTime: String = ""
     @State private var selectedDriverId: UUID? = nil
     
+    // Delivery receipt state
+    @State private var showingDeliveryReceipt = false
+    @State private var pdfData: Data? = nil
+    @State private var pdfError: String? = nil
+    @State private var showingPDFError = false
+    
     // Location search state
     @State private var searchResults: [MKLocalSearchCompletion] = []
     @State private var activeTextField: LocationField? = nil
@@ -718,7 +724,15 @@ struct TripDetailView: View {
                 // Proof of Delivery Section (for completed trips)
                 if trip.status == .delivered {
                     Section(header: Text("PROOF OF DELIVERY")) {
-                        Button(action: {}) {
+                        Button(action: {
+                            do {
+                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+                                showingDeliveryReceipt = true
+                            } catch {
+                                pdfError = error.localizedDescription
+                                showingPDFError = true
+                            }
+                        }) {
                             HStack {
                                 Image(systemName: "doc.text.fill")
                                     .foregroundColor(.blue)
@@ -864,6 +878,29 @@ struct TripDetailView: View {
             }
             .sheet(isPresented: $showingAssignSheet) {
                 AssignDriverView(trip: trip)
+            }
+            .sheet(isPresented: $showingDeliveryReceipt) {
+                NavigationView {
+                    if let data = pdfData {
+                        PDFViewer(data: data)
+                            .navigationTitle("Delivery Receipt")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    Button("Done") {
+                                        showingDeliveryReceipt = false
+                                    }
+                                }
+                            }
+                    }
+                }
+            }
+            .alert("Error", isPresented: $showingPDFError) {
+                Button("OK") {
+                    showingPDFError = false
+                }
+            } message: {
+                Text(pdfError ?? "Failed to generate delivery receipt")
             }
         }
     }
