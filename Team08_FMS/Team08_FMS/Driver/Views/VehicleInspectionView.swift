@@ -50,10 +50,7 @@ struct VehicleInspectionView: View {
     
     private var allItemsChecked: Bool {
         inspectionItems.allSatisfy { item in
-            if item.isChecked && item.hasIssue {
-                return !item.notes.isEmpty
-            }
-            return true
+            item.isChecked && (!item.hasIssue || !item.notes.isEmpty)
         }
     }
     
