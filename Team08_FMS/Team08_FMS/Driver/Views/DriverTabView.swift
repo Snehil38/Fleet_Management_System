@@ -29,8 +29,8 @@ struct DriverTabView: View {
     
     // Route Information
     @State private var availableRoutes: [RouteOption] = [
-        RouteOption(id: "1", name: "Route 1", eta: "25 mins", distance: "8.5 km", isRecommended: true),
-        RouteOption(id: "2", name: "Route 2", eta: "32 mins", distance: "7.8 km", isRecommended: false),
+//        RouteOption(id: "1", name: "Route 1", eta: "25 mins", distance: "8.5 km", isRecommended: true),
+//        RouteOption(id: "2", name: "Route 2", eta: "32 mins", distance: "7.8 km", isRecommended: false),
         RouteOption(id: "3", name: "Route 3", eta: "1h 21m", distance: "53 km", isRecommended: false)
     ]
     @State private var selectedRouteId: String = "1"
@@ -1211,7 +1211,7 @@ struct QueuedTripRow: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(trip.name)
+                    Text(trip.displayName)
                         .font(.caption)
                         .foregroundColor(.blue)
                     Text(trip.destination)
@@ -1287,7 +1287,7 @@ struct QueuedTripRow: View {
         .alert(isPresented: $showingDeclineAlert) {
             Alert(
                 title: Text("Decline Trip"),
-                message: Text("Are you sure you want to decline trip \(trip.name)?"),
+                message: Text("Are you sure you want to decline trip \(trip.displayName)?"),
                 primaryButton: .destructive(Text("Decline")) {
                     onDecline()
                 },

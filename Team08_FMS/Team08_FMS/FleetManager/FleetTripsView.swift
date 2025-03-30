@@ -20,6 +20,7 @@ struct FleetTripsView: View {
     @State private var editedAddress: String = ""
     @State private var editedNotes: String = ""
     @State private var calculatedDistance: String = ""
+    @State private var calculatedTime: String = ""
     @State private var selectedDriverId: UUID? = nil
     // Define tab types
     enum TabType: Int, CaseIterable {
@@ -56,25 +57,34 @@ struct FleetTripsView: View {
         
         // Fallback to recentDeliveries if needed
         return tripController.recentDeliveries.compactMap { delivery in
-            // Convert DeliveryDetails back to Trip format
-            Trip(
+            // Create a mock vehicle for the delivery
+            let vehicle = Vehicle.mockVehicle(licensePlate: delivery.vehicle)
+            
+            // Create a SupabaseTrip with the delivery information
+            let supabaseTrip = SupabaseTrip(
                 id: delivery.id,
-                name: delivery.notes.components(separatedBy: "\n").first?.replacingOccurrences(of: "Trip: ", with: "") ?? "Unknown",
                 destination: delivery.location,
-                address: delivery.location,
-                eta: "",
-                distance: "",
-                status: .delivered,
-                hasCompletedPreTrip: true,
-                hasCompletedPostTrip: true,
-                vehicleDetails: Vehicle.mockVehicle(licensePlate: delivery.vehicle),
-                sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                startingPoint: "",
+                trip_status: "delivered",
+                has_completed_pre_trip: true,
+                has_completed_post_trip: true,
+                vehicle_id: vehicle.id,
+                driver_id: nil, secondary_driver_id: nil,
+                start_time: nil,
+                end_time: nil,
                 notes: delivery.notes,
-                startTime: nil,
-                endTime: nil
+                created_at: Date(),
+                updated_at: Date(),
+                is_deleted: false,
+                start_latitude: 0,
+                start_longitude: 0,
+                end_latitude: 0,
+                end_longitude: 0,
+                pickup: delivery.location,
+                estimated_distance: nil,
+                estimated_time: nil
             )
+            
+            return Trip(from: supabaseTrip, vehicle: vehicle)
         }
     }
     
@@ -251,9 +261,8 @@ struct TripCardView: View {
             }
             
             // Trip name
-            Text(trip.name)
-                .font(.title3)
-                .fontWeight(.semibold)
+            Text(trip.displayName)
+                .font(.headline)
             
             // Destination
             HStack(spacing: 4) {
@@ -446,7 +455,16 @@ struct TripDetailView: View {
     @State private var editedAddress: String = ""
     @State private var editedNotes: String = ""
     @State private var calculatedDistance: String = ""
+    @State private var calculatedTime: String = ""
     @State private var selectedDriverId: UUID? = nil
+    
+    // Delivery receipt state
+    @State private var showingDeliveryReceipt = false
+    @State private var pdfData: Data? = nil
+    @State private var pdfError: String? = nil
+    @State private var showingPDFError = false
+    @State private var showingSignatureSheet = false
+    @State private var fleetManagerSignature: Data? = nil
     
     // Location search state
     @State private var searchResults: [MKLocalSearchCompletion] = []
@@ -523,7 +541,7 @@ struct TripDetailView: View {
                             Text("Trip ID")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text(trip.name)
+                            Text(trip.id.uuidString)
                         }
                         
                         // Editable Destination
@@ -666,7 +684,7 @@ struct TripDetailView: View {
                             }
                         }
                     } else {
-                        TripDetailRow(icon: "number", title: "Trip ID", value: trip.name)
+                        TripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
                         TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
                         TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
                         if !trip.distance.isEmpty {
@@ -707,7 +725,15 @@ struct TripDetailView: View {
                 // Proof of Delivery Section (for completed trips)
                 if trip.status == .delivered {
                     Section(header: Text("PROOF OF DELIVERY")) {
-                        Button(action: {}) {
+                        Button(action: {
+                            do {
+                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip, signature: fleetManagerSignature)
+                                showingDeliveryReceipt = true
+                            } catch {
+                                pdfError = error.localizedDescription
+                                showingPDFError = true
+                            }
+                        }) {
                             HStack {
                                 Image(systemName: "doc.text.fill")
                                     .foregroundColor(.blue)
@@ -718,14 +744,33 @@ struct TripDetailView: View {
                             }
                         }
                         
-                        Button(action: {}) {
+                        Button(action: {
+                            showingSignatureSheet = true
+                        }) {
                             HStack {
                                 Image(systemName: "signature")
                                     .foregroundColor(.blue)
-                                Text("Customer Signature")
+                                Text("Fleet Manager Signature")
                                 Spacer()
+                                if fleetManagerSignature != nil {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                }
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
+                            }
+                        }
+                        
+                        if let pdfData = pdfData {
+                            ShareLink(item: pdfData, preview: SharePreview("Delivery Receipt", image: Image(systemName: "doc.fill"))) {
+                                HStack {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .foregroundColor(.blue)
+                                    Text("Download Receipt")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
                             }
                         }
                     }
@@ -745,7 +790,7 @@ struct TripDetailView: View {
                                     .padding(.bottom, 4)
                                 
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("Trip: \(trip.name)")
+                                    Text("Trip: \(trip.id.uuidString)")
                                     Text("From: \(trip.address)")
                                     Text("To: \(trip.destination)")
                                     
@@ -854,6 +899,48 @@ struct TripDetailView: View {
             .sheet(isPresented: $showingAssignSheet) {
                 AssignDriverView(trip: trip)
             }
+            .sheet(isPresented: $showingDeliveryReceipt) {
+                NavigationView {
+                    if let data = pdfData {
+                        PDFViewer(data: data)
+                            .navigationTitle("Delivery Receipt")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    Button("Done") {
+                                        showingDeliveryReceipt = false
+                                    }
+                                }
+                            }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingSignatureSheet) {
+                NavigationView {
+                    SignatureCaptureView(signature: $fleetManagerSignature)
+                        .navigationTitle("Fleet Manager Signature")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Cancel") {
+                                    showingSignatureSheet = false
+                                }
+                            }
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showingSignatureSheet = false
+                                }
+                            }
+                        }
+                }
+            }
+            .alert("Error", isPresented: $showingPDFError) {
+                Button("OK") {
+                    showingPDFError = false
+                }
+            } message: {
+                Text(pdfError ?? "Failed to generate delivery receipt")
+            }
         }
     }
     
@@ -862,6 +949,7 @@ struct TripDetailView: View {
         editedAddress = trip.address
         editedNotes = trip.notes ?? ""
         calculatedDistance = trip.distance
+        calculatedTime = trip.eta
         selectedDriverId = trip.driverId
         
         destinationEdited = false
@@ -975,9 +1063,19 @@ struct TripDetailView: View {
             let distanceInMeters = route.distance
             let distanceInKilometers = distanceInMeters / 1000
             
-            // Update the calculated distance variable
+            // Get estimated time in hours and minutes
+            let timeInSeconds = route.expectedTravelTime
+            let hours = Int(timeInSeconds / 3600)
+            let minutes = Int((timeInSeconds.truncatingRemainder(dividingBy: 3600)) / 60)
+            
+            // Update the calculated values
             DispatchQueue.main.async {
                 self.calculatedDistance = String(format: "%.1f km", distanceInKilometers)
+                if hours > 0 {
+                    self.calculatedTime = "\(hours)h \(minutes)m"
+                } else {
+                    self.calculatedTime = "\(minutes)m"
+                }
             }
         }
     }
@@ -1001,16 +1099,18 @@ struct TripDetailView: View {
         }
         
         let updatedNotes = """
-        Trip: \(trip.name)
+        Trip: \(trip.id.uuidString)
         From: \(editedAddress)
         To: \(editedDestination)
         Distance: \(calculatedDistance)
+        Estimated Time: \(calculatedTime)
         \(driverInfo)
         """
         updatedTrip.notes = updatedNotes
         
-        // Update distance if it has changed
+        // Update distance and time if they have changed
         let hasDistanceChanged = calculatedDistance != trip.distance && !calculatedDistance.isEmpty
+        let hasTimeChanged = calculatedTime != trip.eta && !calculatedTime.isEmpty
         
         // Check if driver assignment has changed
         let hasDriverChanged = selectedDriverId != trip.driverId
@@ -1023,7 +1123,8 @@ struct TripDetailView: View {
                     destination: editedDestination,
                     address: editedAddress,
                     notes: updatedNotes,
-                    distance: hasDistanceChanged ? calculatedDistance : nil
+                    distance: hasDistanceChanged ? calculatedDistance : nil,
+                    time: hasTimeChanged ? calculatedTime : nil
                 )
                 
                 // If driver assignment has changed, update it
@@ -1505,6 +1606,75 @@ class TripsSearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
     
     func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         print("Search completer error: \(error.localizedDescription)")
+    }
+}
+
+// Add SignatureCaptureView
+struct SignatureCaptureView: View {
+    @Binding var signature: Data?
+    @State private var currentDrawing: Path = Path()
+    @State private var drawings: [Path] = []
+    @GestureState private var isDrawing: Bool = false
+    
+    var body: some View {
+        VStack {
+            Text("Please sign below")
+                .font(.headline)
+                .padding()
+            
+            ZStack {
+                Rectangle()
+                    .fill(Color.white)
+                    .border(Color.gray, width: 1)
+                    .frame(height: 200)
+                
+                Path { path in
+                    path.addPath(currentDrawing)
+                    drawings.forEach { path.addPath($0) }
+                }
+                .stroke(Color.black, lineWidth: 2)
+                .background(Color.white)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let point = value.location
+                            if isDrawing {
+                                currentDrawing.addLine(to: point)
+                            } else {
+                                currentDrawing = Path()
+                                currentDrawing.move(to: point)
+                            }
+                        }
+                        .onEnded { _ in
+                            drawings.append(currentDrawing)
+                            currentDrawing = Path()
+                            
+                            // Convert drawing to image and then to Data
+                            let renderer = ImageRenderer(content: Path { path in
+                                drawings.forEach { path.addPath($0) }
+                            }.stroke(Color.black, lineWidth: 2))
+                            
+                            if let uiImage = renderer.uiImage {
+                                signature = uiImage.pngData()
+                            }
+                        }
+                        .updating($isDrawing) { (value, state, transaction) in
+                            state = true
+                        }
+                )
+            }
+            .padding()
+            
+            Button(action: {
+                currentDrawing = Path()
+                drawings = []
+                signature = nil
+            }) {
+                Text("Clear")
+                    .foregroundColor(.red)
+            }
+            .padding()
+        }
     }
 } 
 

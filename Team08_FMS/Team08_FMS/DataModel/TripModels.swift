@@ -12,7 +12,6 @@ enum TripStatus: String, Codable {
 // Trip Model
 struct Trip: Identifiable, Equatable {
     let id: UUID
-    let name: String
     var destination: String
     var address: String
     var eta: String
@@ -30,9 +29,13 @@ struct Trip: Identifiable, Equatable {
     let pickup: String?
     let driverId: UUID?
     
+    // Computed property for display purposes
+    var displayName: String {
+        pickup ?? "Trip-\(id.uuidString.prefix(8))"
+    }
+    
     static func == (lhs: Trip, rhs: Trip) -> Bool {
         return lhs.id == rhs.id &&
-               lhs.name == rhs.name &&
                lhs.destination == rhs.destination &&
                lhs.address == rhs.address &&
                lhs.eta == rhs.eta &&
@@ -53,81 +56,10 @@ struct Trip: Identifiable, Equatable {
                lhs.driverId == rhs.driverId
     }
     
-    init(id: UUID = UUID(), name: String, destination: String, address: String, eta: String, distance: String, status: TripStatus, hasCompletedPreTrip: Bool = false, hasCompletedPostTrip: Bool = false, vehicleDetails: Vehicle, sourceCoordinate: CLLocationCoordinate2D, destinationCoordinate: CLLocationCoordinate2D, startingPoint: String, notes: String? = nil, startTime: Date? = nil, endTime: Date? = nil, pickup: String? = nil, driverId: UUID? = nil) {
-        self.id = id
-        self.name = name
-        self.destination = destination
-        self.address = address
-        self.eta = eta
-        self.distance = distance
-        self.status = status
-        self.hasCompletedPreTrip = hasCompletedPreTrip
-        self.hasCompletedPostTrip = hasCompletedPostTrip
-        self.vehicleDetails = vehicleDetails
-        self.sourceCoordinate = sourceCoordinate
-        self.destinationCoordinate = destinationCoordinate
-        self.startingPoint = startingPoint
-        self.notes = notes
-        self.startTime = startTime
-        self.endTime = endTime
-        self.pickup = pickup
-        self.driverId = driverId
-    }
-    
-    static func mockCurrentTrip() -> Trip {
-        Trip(
-            id: UUID(),
-            name: "TRP-001",
-            destination: "Nhava Sheva Port Terminal",
-            address: "JNPT Port Road, Navi Mumbai, Maharashtra 400707",
-            eta: "25 mins",
-            distance: "8.5 km",
-            status: .inProgress,
-            vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available),
-            sourceCoordinate: CLLocationCoordinate2D(
-                latitude: 19.0178,  // Mumbai region
-                longitude: 72.8478
-            ),
-            destinationCoordinate: CLLocationCoordinate2D(
-                latitude: 18.9490,  // JNPT coordinates
-                longitude: 72.9492
-            ),
-            startingPoint: "Mumbai",
-            pickup: "Mumbai Central",
-            driverId: nil
-        )
-    }
-    
-    static func mockUpcomingTrips() -> [Trip] {
-        [
-            Trip(
-                id: UUID(),
-                name: "DEL-002",
-                destination: "ICD Tughlakabad",
-                address: "Tughlakabad, New Delhi, 110020",
-                eta: "1.5 hours",
-                distance: "22 km",
-                status: .pending,
-                vehicleDetails: Vehicle(name: "Volvo", year: 2004, make: "IDK", model: "CTY", vin: "sadds", licensePlate: "adsd", vehicleType: .truck, color: "White", bodyType: .cargo, bodySubtype: "IDK", msrp: 10.0, pollutionExpiry: Date(), insuranceExpiry: Date(), status: .available),
-                sourceCoordinate: CLLocationCoordinate2D(
-                    latitude: 28.5244,  // Delhi coordinates
-                    longitude: 77.2877
-                ),
-                destinationCoordinate: CLLocationCoordinate2D(
-                    latitude: 28.5085,  // ICD Tughlakabad coordinates
-                    longitude: 77.2626
-                ),
-                startingPoint: "New Delhi",
-                driverId: nil
-            )
-        ]
-    }
-    
     init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
         self.id = supabaseTrip.id
-        self.name = supabaseTrip.pickup ?? "Trip-\(supabaseTrip.id.uuidString.prefix(8))"
         self.destination = supabaseTrip.destination
-        self.address = supabaseTrip.pickup ?? "Unknown"
+        self.address = supabaseTrip.pickup ?? "N/A"
         self.status = TripStatus(rawValue: supabaseTrip.trip_status) ?? .pending
         self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
         self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
@@ -138,36 +70,36 @@ struct Trip: Identifiable, Equatable {
         self.pickup = supabaseTrip.pickup
         self.driverId = supabaseTrip.driver_id
         
-        // Extract distance and ETA from notes
-        if let notes = supabaseTrip.notes {
-            // Try both "Estimated Distance: " and "Distance: " formats
-            if let distanceRange = notes.range(of: "Estimated Distance: ") {
-                if let endOfDistance = notes[distanceRange.upperBound...].firstIndex(of: " ") {
-                    let distanceStr = notes[distanceRange.upperBound..<endOfDistance]
-                    self.distance = "\(distanceStr) km"
-                } else {
-                    self.distance = "Unknown"
-                }
-            } else if let distanceRange = notes.range(of: "Distance: ") {
-                if let endOfDistance = notes[distanceRange.upperBound...].firstIndex(of: " ") {
-                    let distanceStr = notes[distanceRange.upperBound..<endOfDistance]
-                    self.distance = "\(distanceStr) km"
-                } else {
-                    self.distance = "Unknown"
-                }
-            } else {
-                self.distance = "Unknown"
-            }
+        // Set distance using estimated_distance if available
+        if let estimatedDistance = supabaseTrip.estimated_distance {
+            self.distance = String(format: "%.1f km", estimatedDistance)
+        } else if let notes = supabaseTrip.notes,
+                  let distanceRange = notes.range(of: "Estimated Distance: "),
+                  let endRange = notes[distanceRange.upperBound...].range(of: "\n") {
+            // Try to extract distance from notes as fallback
+            let distanceStr = String(notes[distanceRange.upperBound..<endRange.lowerBound])
+            self.distance = distanceStr.trimmingCharacters(in: .whitespaces)
         } else {
-            self.distance = "Unknown"
+            self.distance = "N/A"
         }
         
-        // Calculate ETA based on start and end time
-        if let start = supabaseTrip.start_time, let end = supabaseTrip.end_time {
-            let duration = end.timeIntervalSince(start)
-            self.eta = duration.etaString
+        // Set ETA using estimated_time if available
+        if let estimatedTime = supabaseTrip.estimated_time {
+            let hours = Int(estimatedTime)
+            let minutes = Int((estimatedTime - Double(hours)) * 60)
+            if hours > 0 {
+                self.eta = "\(hours)h \(minutes)m"
+            } else {
+                self.eta = "\(minutes) mins"
+            }
+        } else if let notes = supabaseTrip.notes,
+                  let etaRange = notes.range(of: "Estimated Time: "),
+                  let endRange = notes[etaRange.upperBound...].range(of: "\n") {
+            // Try to extract ETA from notes as fallback
+            let etaStr = String(notes[etaRange.upperBound..<endRange.lowerBound])
+            self.eta = etaStr.trimmingCharacters(in: .whitespaces)
         } else {
-            self.eta = "Unknown"
+            self.eta = "N/A"
         }
         
         // Set coordinates from the trip data
@@ -179,7 +111,7 @@ struct Trip: Identifiable, Equatable {
             latitude: supabaseTrip.end_latitude ?? 0,
             longitude: supabaseTrip.end_longitude ?? 0
         )
-        self.startingPoint = supabaseTrip.pickup ?? "Unknown"
+        self.startingPoint = supabaseTrip.pickup ?? "N/A"
     }
 }
 
@@ -223,6 +155,7 @@ struct SupabaseTrip: Codable, Identifiable {
     let has_completed_post_trip: Bool
     let vehicle_id: UUID
     let driver_id: UUID?
+    let secondary_driver_id: UUID?
     let start_time: Date?
     let end_time: Date?
     let notes: String?
@@ -234,6 +167,8 @@ struct SupabaseTrip: Codable, Identifiable {
     let end_latitude: Double?
     let end_longitude: Double?
     let pickup: String?
+    let estimated_distance: Double?
+    let estimated_time: Double?
 }
 
 extension TimeInterval {

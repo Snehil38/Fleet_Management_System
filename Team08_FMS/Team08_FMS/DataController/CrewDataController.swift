@@ -17,6 +17,7 @@ class CrewDataController: ObservableObject {
     @Published var drivers: [Driver] = []
     @Published var maintenancePersonnel: [MaintenancePersonnel] = []
     @Published var trips: [Trip] = []
+    
     private init() {
         loadFleetManagers()
     }
@@ -173,9 +174,106 @@ class CrewDataController: ObservableObject {
     // MARK: - Update Operations
     
     // Update status for a driver with the given UUID
-    func updateDriverStatus(_ id: UUID, status: Status) {
+    func updateDriverStatus(_ id: UUID, status: Status) async throws {
+        // Update local state
         if let index = drivers.firstIndex(where: { $0.id == id }) {
             drivers[index].status = status
+        }
+        
+        // Update in Supabase
+        await SupabaseDataController.shared.updateDriverStatus(newStatus: status, userID: nil, id: id)
+    }
+    
+    // Get cached trips or fetch if needed
+    private func getTrips() async -> [Trip] {
+        return TripDataController.shared.getAllTrips()
+    }
+    
+    // Check and update driver trip status
+    func checkAndUpdateDriverTripStatus() async {
+        let trips = await getTrips()
+        var updatedDrivers: [(UUID, Status)] = []
+        
+        // Get all drivers in trips
+        let driversInTrips = trips
+            .filter { $0.status == .inProgress }
+            .compactMap { $0.driverId }
+        
+        // Collect all needed updates
+        for driver in drivers {
+            let shouldBeBusy = driversInTrips.contains(driver.userID!)
+            let needsUpdate = (shouldBeBusy && driver.status != .busy) ||
+                            (!shouldBeBusy && driver.status == .busy)
+            
+            if needsUpdate {
+                updatedDrivers.append((driver.id, shouldBeBusy ? .busy : .available))
+            }
+        }
+        
+        // Batch update all drivers at once
+        if !updatedDrivers.isEmpty {
+            do {
+                // Update Supabase
+                for (id, status) in updatedDrivers {
+                    await SupabaseDataController.shared.updateDriverStatus(newStatus: status, userID: nil, id: id)
+                }
+                
+                // Update local state in one UI refresh
+                await MainActor.run {
+                    for (id, status) in updatedDrivers {
+                        if let index = drivers.firstIndex(where: { $0.id == id }) {
+                            drivers[index].status = status
+                        }
+                    }
+                    self.objectWillChange.send()
+                }
+            } catch {
+                print("Error updating driver statuses: \(error)")
+            }
+        }
+    }
+    
+    // Check and update vehicle status based on trips
+    func checkAndUpdateVehicleStatus(vehicleManager: VehicleManager) async {
+        let trips = await getTrips()
+        var updatedVehicles: [(UUID, VehicleStatus)] = []
+        
+        // Get vehicles in active trips
+        let activeTrips = trips.filter { $0.status == .pending || $0.status == .assigned || $0.status == .inProgress }
+        let vehiclesInTrips = Set(activeTrips.map { $0.vehicleDetails.id })
+        
+        // Collect all needed updates
+        for vehicle in vehicleManager.vehicles {
+            if vehicle.status != .underMaintenance {
+                let shouldBeInService = vehiclesInTrips.contains(vehicle.id)
+                let needsUpdate = (shouldBeInService && vehicle.status != .inService) ||
+                                (!shouldBeInService && vehicle.status == .inService)
+                
+                if needsUpdate {
+                    updatedVehicles.append((vehicle.id, shouldBeInService ? .inService : .available))
+                }
+            }
+        }
+        
+        // Batch update all vehicles at once
+        if !updatedVehicles.isEmpty {
+            // Update Supabase
+            for (id, status) in updatedVehicles {
+                await SupabaseDataController.shared.updateVehicleStatus(
+                    newStatus: status,
+                    vehicleID: id
+                )
+            }
+            
+            // Update local state in one UI refresh
+            await MainActor.run {
+                for (id, status) in updatedVehicles {
+                    if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == id }) {
+                        vehicleManager.vehicles[index].status = status
+                    }
+                }
+                vehicleManager.objectWillChange.send()
+            }
         }
     }
     

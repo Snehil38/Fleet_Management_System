@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import PDFKit
 
 private struct BasicInformationSection: View {
     @Binding var name: String
@@ -101,7 +102,7 @@ private struct StatusSection: View {
 }
 
 // MARK: - Documents Section
-private struct DocumentsSection: View {
+struct DocumentsSection: View {
     @Binding var pollutionCertificate: Data?
     @Binding var rc: Data?
     @Binding var insurance: Data?
@@ -110,31 +111,54 @@ private struct DocumentsSection: View {
     @Binding var showingPollutionPicker: Bool
     @Binding var showingRCPicker: Bool
     @Binding var showingInsurancePicker: Bool
-
+    @Binding var showingDeliveryReceipt: Bool
+    @Binding var pdfData: Data?
+    @Binding var pdfError: String?
+    @Binding var showingPDFError: Bool
+    let currentTrip: Trip?
+    
     var body: some View {
-        Section("Required Documents") {
-            VStack(spacing: 16) {
-                DocumentUploadRow(
-                    title: "Pollution Certificate",
-                    data: pollutionCertificate,
-                    expiryDate: pollutionExpiry,
-                    showPicker: $showingPollutionPicker
-                )
+        Section("Documents") {
+            DocumentUploadRow(
+                title: "Pollution Certificate",
+                data: pollutionCertificate,
+                expiryDate: pollutionExpiry,
+                showPicker: $showingPollutionPicker
+            )
 
-                DocumentUploadRow(
-                    title: "RC",
-                    data: rc,
-                    showPicker: $showingRCPicker
-                )
+            DocumentUploadRow(
+                title: "RC",
+                data: rc,
+                showPicker: $showingRCPicker
+            )
 
-                DocumentUploadRow(
-                    title: "Insurance",
-                    data: insurance,
-                    expiryDate: insuranceExpiry,
-                    showPicker: $showingInsurancePicker
-                )
+            DocumentUploadRow(
+                title: "Insurance",
+                data: insurance,
+                expiryDate: insuranceExpiry,
+                showPicker: $showingInsurancePicker
+            )
+            
+            if let trip = currentTrip {
+                Button(action: {
+                    do {
+                        pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+                        showingDeliveryReceipt = true
+                    } catch {
+                        pdfError = error.localizedDescription
+                        showingPDFError = true
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(.blue)
+                        Text("Delivery Receipt")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                    }
+                }
             }
-            .padding(.vertical, 8)
         }
     }
 }
@@ -174,16 +198,32 @@ private struct DocumentUploadRow: View {
     }
 }
 
+struct PDFViewer: UIViewRepresentable {
+    let data: Data
+    
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.autoScales = true
+        return pdfView
+    }
+    
+    func updateUIView(_ pdfView: PDFView, context: Context) {
+        if let document = PDFDocument(data: data) {
+            pdfView.document = document
+        }
+    }
+}
+
 // MARK: - Main View
 struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var vehicleManager: VehicleManager
+    @EnvironmentObject var vehicleManager: VehicleManager
     @State private var isEditing = false
     @State private var isSaving = false
     @State private var isLoadingDetails = false
     @State private var detailLoadError: String? = nil
 
-    var vehicle: Vehicle?
+    let vehicle: Vehicle
     
     // Form fields
     @State private var name: String = ""
@@ -281,34 +321,34 @@ struct VehicleDetailView: View {
     }
     
     // Initialize with an existing vehicle if provided
-    init(vehicle: Vehicle? = nil, vehicleManager: VehicleManager) {
+    init(vehicle: Vehicle) {
         self.vehicle = vehicle
-        self.vehicleManager = vehicleManager
         
-        if let vehicle = vehicle {
-            _name = State(initialValue: vehicle.name)
-            _year = State(initialValue: String(vehicle.year))
-            _make = State(initialValue: vehicle.make)
-            _model = State(initialValue: vehicle.model)
-            _vin = State(initialValue: vehicle.vin)
-            _licensePlate = State(initialValue: vehicle.licensePlate)
-            _vehicleType = State(initialValue: vehicle.vehicleType)
-            _color = State(initialValue: vehicle.color)
-            _bodyType = State(initialValue: vehicle.bodyType)
-            _bodySubtype = State(initialValue: vehicle.bodySubtype)
-            _msrp = State(initialValue: String(vehicle.msrp))
-            _pollutionExpiry = State(initialValue: vehicle.pollutionExpiry)
-            _insuranceExpiry = State(initialValue: vehicle.insuranceExpiry)
-            
-//            _pollutionCertificate = State(initialValue: vehicle.documents?.pollutionCertificate)
-//            _rc = State(initialValue: vehicle.documents?.rc)
-//            _insurance = State(initialValue: vehicle.documents?.insurance)
-        }
+        // Initialize state properties with vehicle data
+        _name = State(initialValue: vehicle.name)
+        _year = State(initialValue: String(vehicle.year))
+        _make = State(initialValue: vehicle.make)
+        _model = State(initialValue: vehicle.model)
+        _vin = State(initialValue: vehicle.vin)
+        _licensePlate = State(initialValue: vehicle.licensePlate)
+        _vehicleType = State(initialValue: vehicle.vehicleType)
+        _color = State(initialValue: vehicle.color)
+        _bodyType = State(initialValue: vehicle.bodyType)
+        _bodySubtype = State(initialValue: vehicle.bodySubtype)
+        _msrp = State(initialValue: String(vehicle.msrp))
+        _pollutionExpiry = State(initialValue: vehicle.pollutionExpiry)
+        _insuranceExpiry = State(initialValue: vehicle.insuranceExpiry)
     }
+    
+    @State private var showingDeliveryReceipt = false
+    @State private var currentTrip: Trip?
+    @State private var pdfError: String? = nil
+    @State private var showingPDFError = false
+    @State private var pdfData: Data? = nil
     
     var body: some View {
         Form {
-            if vehicle == nil || isEditing {
+            if isEditing {
                 // Basic Information Section with inline errors.
                 basicInformationSection
                 vehicleDetailsSection
@@ -319,7 +359,6 @@ struct VehicleDetailView: View {
                 // View mode sections
                 readOnlyBasicInfoSection
                 readOnlyVehicleDetailsSection
-//                readOnlyDocumentsSection
             }
         }
         .navigationTitle("Vehicle Details")
@@ -351,13 +390,20 @@ struct VehicleDetailView: View {
                 }
             }
         }
-//        .onAppear {
-//            if let vehicle = vehicle {
-//                loadVehicleDetails()
-//            }
-//        }
+        .onAppear {
+            // Find if this vehicle has any current trip
+            currentTrip = TripDataController.shared.allTrips.first(where: { 
+                $0.vehicleDetails.id == vehicle.id && 
+                ($0.status == .inProgress || $0.status == .delivered)
+            })
+        }
+        .task {
+            // Initial load of vehicle data
+            vehicleManager.loadVehicles()
+            CrewDataController.shared.update()
+        }
         .overlay {
-            if isLoadingDetails && vehicle != nil && !isEditing {
+            if isLoadingDetails && !isEditing {
                 Color.black.opacity(0.1)
                     .ignoresSafeArea()
                 ProgressView("Loading vehicle details...")
@@ -367,35 +413,44 @@ struct VehicleDetailView: View {
                     .shadow(radius: 3)
             }
         }
+        .sheet(isPresented: $showingDeliveryReceipt) {
+            NavigationView {
+                if let data = pdfData {
+                    PDFViewer(data: data)
+                        .navigationTitle("Delivery Receipt")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showingDeliveryReceipt = false
+                                }
+                            }
+                        }
+                }
+            }
+        }
+        .alert("Error", isPresented: $showingPDFError) {
+            Button("OK") {
+                showingPDFError = false
+            }
+        } message: {
+            Text(pdfError ?? "Failed to generate delivery receipt")
+        }
     }
     
     // MARK: - UI Components
     
     private var toolbarItems: some ToolbarContent {
         Group {
-            if vehicle != nil {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if isEditing {
-                        Button("Save") {
-                            saveVehicle()
-                        }
-                        .disabled(!isFormValid || isSaving)
-                    } else {
-                        Button("Edit") {
-                            isEditing = true
-                        }
-                    }
-                }
-            } else {
-                ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if isEditing {
                     Button("Save") {
                         saveVehicle()
                     }
                     .disabled(!isFormValid || isSaving)
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                } else {
+                    Button("Edit") {
+                        isEditing = true
                     }
                 }
             }
@@ -411,108 +466,35 @@ struct VehicleDetailView: View {
             insuranceExpiry: $insuranceExpiry,
             showingPollutionPicker: $showingPollutionPicker,
             showingRCPicker: $showingRCPicker,
-            showingInsurancePicker: $showingInsurancePicker
+            showingInsurancePicker: $showingInsurancePicker,
+            showingDeliveryReceipt: $showingDeliveryReceipt,
+            pdfData: $pdfData,
+            pdfError: $pdfError,
+            showingPDFError: $showingPDFError,
+            currentTrip: currentTrip
         )
     }
     
     private var readOnlyBasicInfoSection: some View {
         Section("Basic Information") {
-            LabeledContent(label:"Name", value: vehicle?.name ?? "")
-            LabeledContent(label:"Year", value: "\(vehicle?.year ?? 0)")
-            LabeledContent(label:"Make", value: vehicle?.make ?? "")
-            LabeledContent(label:"Model", value: vehicle?.model ?? "")
-            LabeledContent(label:"VIN", value: vehicle?.vin ?? "")
-            LabeledContent(label:"License Plate", value: vehicle?.licensePlate ?? "")
+            LabeledContent(label: "Name", value: vehicle.name)
+            LabeledContent(label: "Year", value: "\(vehicle.year)")
+            LabeledContent(label: "Make", value: vehicle.make)
+            LabeledContent(label: "Model", value: vehicle.model)
+            LabeledContent(label: "VIN", value: vehicle.vin)
+            LabeledContent(label: "License Plate", value: vehicle.licensePlate)
         }
     }
     
     private var readOnlyVehicleDetailsSection: some View {
         Section("Vehicle Details") {
-            LabeledContent(label:"Vehicle Type", value: vehicle?.vehicleType.rawValue ?? "")
-            LabeledContent(label:"Color", value: vehicle?.color ?? "")
-            LabeledContent(label:"Body Type", value: vehicle?.bodyType.rawValue ?? "")
-            LabeledContent(label:"Body Subtype", value: vehicle?.bodySubtype ?? "")
-            LabeledContent(label:"MSRP", value: "$\(String(format: "%.2f", vehicle?.msrp ?? 0))")
+            LabeledContent(label: "Vehicle Type", value: vehicle.vehicleType.rawValue)
+            LabeledContent(label: "Color", value: vehicle.color)
+            LabeledContent(label: "Body Type", value: vehicle.bodyType.rawValue)
+            LabeledContent(label: "Body Subtype", value: vehicle.bodySubtype)
+            LabeledContent(label: "MSRP", value: "$\(String(format: "%.2f", vehicle.msrp))")
         }
     }
-    
-    // MARK: - Read-Only Document Section
-//    private var readOnlyDocumentsSection: some View {
-//        Section("Documents") {
-//            if isLoadingDetails {
-//                ProgressView("Loading documents...")
-//                    .frame(maxWidth: .infinity, alignment: .center)
-//                    .padding()
-//            } else if let error = detailLoadError {
-//                VStack(alignment: .center, spacing: 10) {
-//                    Text("Failed to load documents")
-//                        .foregroundColor(.red)
-//                    Text(error)
-//                        .font(.caption)
-//                        .foregroundColor(.secondary)
-//                    Button("Retry") {
-//                        loadVehicleDetails()
-//                    }
-//                    .buttonStyle(.bordered)
-//                }
-//                .frame(maxWidth: .infinity, alignment: .center)
-//                .padding()
-//            } else {
-//                // Display document information
-//                if let pollution = pollutionCertificate {
-//                    HStack {
-//                        Text("Pollution Certificate")
-//                        Spacer()
-//                        Image(systemName: "checkmark.circle.fill")
-//                            .foregroundColor(.green)
-//                    }
-//                    Text("Expires: \(pollutionExpiry.formatted(date: .long, time: .omitted))")
-//                        .font(.caption)
-//                } else {
-//                    HStack {
-//                        Text("Pollution Certificate")
-//                        Spacer()
-//                        Text("Not available")
-//                            .foregroundColor(.secondary)
-//                    }
-//                }
-//                
-//                if let rc = rc {
-//                    HStack {
-//                        Text("RC")
-//                        Spacer()
-//                        Image(systemName: "checkmark.circle.fill")
-//                            .foregroundColor(.green)
-//                    }
-//                } else {
-//                    HStack {
-//                        Text("RC")
-//                        Spacer()
-//                        Text("Not available")
-//                            .foregroundColor(.secondary)
-//                    }
-//                }
-//                
-//                if let insurance = insurance {
-//                    HStack {
-//                        Text("Insurance")
-//                        Spacer()
-//                        Image(systemName: "checkmark.circle.fill")
-//                            .foregroundColor(.green)
-//                    }
-//                    Text("Expires: \(insuranceExpiry.formatted(date: .long, time: .omitted))")
-//                        .font(.caption)
-//                } else {
-//                    HStack {
-//                        Text("Insurance")
-//                        Spacer()
-//                        Text("Not available")
-//                            .foregroundColor(.secondary)
-//                    }
-//                }
-//            }
-//        }
-//    }
     
     // Extract complex section into a separate computed property
     private var basicInformationSection: some View {
@@ -624,102 +606,37 @@ struct VehicleDetailView: View {
         guard !isSaving else { return }
         isSaving = true
         
-        if let originalVehicle = vehicle {
-            // Build an updated Vehicle using current state values.
-            let updatedVehicle = Vehicle(
-                id: originalVehicle.id,
-                name: name,
-                year: Int(year) ?? originalVehicle.year,
-                make: make,
-                model: model,
-                vin: vin,
-                licensePlate: licensePlate,
-                vehicleType: vehicleType,
-                color: color,
-                bodyType: bodyType,
-                bodySubtype: bodySubtype,
-                msrp: Double(msrp) ?? originalVehicle.msrp,
-                pollutionExpiry: pollutionExpiry,
-                insuranceExpiry: insuranceExpiry,
-                status: originalVehicle.status,
-                driverId: originalVehicle.driverId
-            )
-            
-            Task {
-                defer { isSaving = false }
-                do {
-                    try await SupabaseDataController.shared.updateVehicle(vehicle: updatedVehicle)
-                    await vehicleManager.loadVehiclesAsync()
-                } catch {
-                    print("Error updating vehicle: \(error.localizedDescription)")
-                }
-            }
-        } else {
-            let newVehicle = Vehicle(
-                name: name,
-                year: Int(year) ?? 0,
-                make: make,
-                model: model,
-                vin: vin,
-                licensePlate: licensePlate,
-                vehicleType: vehicleType,
-                color: color,
-                bodyType: bodyType,
-                bodySubtype: bodySubtype,
-                msrp: Double(msrp) ?? 0,
-                pollutionExpiry: pollutionExpiry,
-                insuranceExpiry: insuranceExpiry,
-                status: .available
-            )
-            Task {
-                defer { isSaving = false }
-                do {
-                    try await SupabaseDataController.shared.insertVehicle(vehicle: newVehicle)
-                    await vehicleManager.loadVehiclesAsync()
-                } catch {
-                    print("Error inserting vehicle: \(error.localizedDescription)")
-                }
-            }
-        }
+        // Build an updated Vehicle using current state values.
+        let updatedVehicle = Vehicle(
+            id: vehicle.id,
+            name: name,
+            year: Int(year) ?? vehicle.year,
+            make: make,
+            model: model,
+            vin: vin,
+            licensePlate: licensePlate,
+            vehicleType: vehicleType,
+            color: color,
+            bodyType: bodyType,
+            bodySubtype: bodySubtype,
+            msrp: Double(msrp) ?? vehicle.msrp,
+            pollutionExpiry: pollutionExpiry,
+            insuranceExpiry: insuranceExpiry,
+            status: vehicle.status,
+            driverId: vehicle.driverId
+        )
         
-        // Toggle back to view mode if editing; dismiss if adding a new vehicle.
-        if isEditing {
-            isEditing = false
-        } else {
-            dismiss()
+        Task {
+            defer { isSaving = false }
+            do {
+                try await SupabaseDataController.shared.updateVehicle(vehicle: updatedVehicle)
+                await vehicleManager.loadVehiclesAsync()
+                isEditing = false
+            } catch {
+                print("Error updating vehicle: \(error.localizedDescription)")
+            }
         }
     }
-
-//    private func loadVehicleDetails() {
-//        
-//        isLoadingDetails = true
-//        detailLoadError = nil
-        
-//        Task {
-//            do {
-//                if let fullDetails = try await SupabaseDataController.shared.fetchVehicleDetails(vehicleId: vehicle.id) {
-//                    await MainActor.run {
-//                        // Only update the document data
-//                        pollutionCertificate = fullDetails.documents?.pollutionCertificate
-//                        rc = fullDetails.documents?.rc
-//                        insurance = fullDetails.documents?.insurance
-//                        
-//                        isLoadingDetails = false
-//                    }
-//                } else {
-//                    await MainActor.run {
-//                        detailLoadError = "Could not find detailed vehicle information"
-//                        isLoadingDetails = false
-//                    }
-//                }
-//            } catch {
-//                await MainActor.run {
-//                    detailLoadError = error.localizedDescription
-//                    isLoadingDetails = false
-//                }
-//            }
-//        }
-//    }
 }
 
 struct VehicleSaveView: View {
@@ -747,6 +664,10 @@ struct VehicleSaveView: View {
     @State private var showingPollutionPicker = false
     @State private var showingRCPicker = false
     @State private var showingInsurancePicker = false
+    @State private var showingDeliveryReceipt = false
+    @State private var pdfData: Data? = nil
+    @State private var pdfError: String? = nil
+    @State private var showingPDFError = false
 
     @State private var selectedPollutionItem: PhotosPickerItem?
     @State private var selectedRCItem: PhotosPickerItem?
@@ -936,7 +857,12 @@ struct VehicleSaveView: View {
                     insuranceExpiry: $insuranceExpiry,
                     showingPollutionPicker: $showingPollutionPicker,
                     showingRCPicker: $showingRCPicker,
-                    showingInsurancePicker: $showingInsurancePicker
+                    showingInsurancePicker: $showingInsurancePicker,
+                    showingDeliveryReceipt: $showingDeliveryReceipt,
+                    pdfData: $pdfData,
+                    pdfError: $pdfError,
+                    showingPDFError: $showingPDFError,
+                    currentTrip: nil
                 )
             }
             .navigationTitle("Add Vehicle")
@@ -954,31 +880,6 @@ struct VehicleSaveView: View {
                     }
                 }
             }
-            // Document pickers for uploading attachments.
-//            .photosPicker(isPresented: $showingPollutionPicker, selection: $selectedPollutionItem)
-//            .photosPicker(isPresented: $showingRCPicker, selection: $selectedRCItem)
-//            .photosPicker(isPresented: $showingInsurancePicker, selection: $selectedInsuranceItem)
-//            .onChange(of: selectedPollutionItem) { _, newItem in
-//                Task {
-//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-//                        pollutionCertificate = data
-//                    }
-//                }
-//            }
-//            .onChange(of: selectedRCItem) { _, newItem in
-//                Task {
-//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-//                        rc = data
-//                    }
-//                }
-//            }
-//            .onChange(of: selectedInsuranceItem) { _, newItem in
-//                Task {
-//                    if let data = try? await newItem?.loadTransferable(type: Data.self) {
-//                        insurance = data
-//                    }
-//                }
-//            }
         }
     }
 
@@ -986,12 +887,6 @@ struct VehicleSaveView: View {
         // Prevent duplicate taps.
         guard !isSaving else { return }
         isSaving = true
-
-//        let documents = VehicleDocuments(
-//            pollutionCertificate: pollutionCertificate ?? Data(),
-//            rc: rc ?? Data(),
-//            insurance: insurance ?? Data()
-//        )
 
         let newVehicle = Vehicle(
             name: name,

@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 
 struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
@@ -129,70 +130,162 @@ struct TripsView: View {
         case .delivered:
             // Convert recent deliveries to Trip objects with improved information
             return tripController.recentDeliveries.map { delivery in
-                createTripFromDelivery(delivery)
+                createTripFromDelivery(delivery) ?? {
+                    // Create a fallback vehicle
+                    let vehicle = Vehicle(
+                        name: "Unknown Vehicle",
+                        year: 0,
+                        make: "Unknown",
+                        model: "Unknown",
+                        vin: "Unknown",
+                        licensePlate: "Unknown",
+                        vehicleType: .truck,
+                        color: "Unknown",
+                        bodyType: .cargo,
+                        bodySubtype: "Unknown",
+                        msrp: 0.0,
+                        pollutionExpiry: Date(),
+                        insuranceExpiry: Date(),
+                        status: .available
+                    )
+                    
+                    // Create a fallback SupabaseTrip
+                    let supabaseTrip = SupabaseTrip(
+                        id: UUID(),
+                        destination: "Unknown Location",
+                        trip_status: "pending",
+                        has_completed_pre_trip: false,
+                        has_completed_post_trip: false,
+                        vehicle_id: vehicle.id,
+                        driver_id: nil,
+                        secondary_driver_id: nil,
+                        start_time: nil,
+                        end_time: nil,
+                        notes: "No notes available",
+                        created_at: Date(),
+                        updated_at: Date(),
+                        is_deleted: false,
+                        start_latitude: 0,
+                        start_longitude: 0,
+                        end_latitude: 0,
+                        end_longitude: 0,
+                        pickup: "Unknown Address",
+                        estimated_distance: 0,
+                        estimated_time: nil
+                    )
+                    
+                    return Trip(from: supabaseTrip, vehicle: vehicle)
+                }()
             }
         }
     }
     
     // Helper function to create Trip from DeliveryDetails
-    private func createTripFromDelivery(_ delivery: DeliveryDetails) -> Trip {
-        // Extract information from delivery notes
-        let deliveryNotes = delivery.notes
-//        var cargoType = "General Cargo"
-        var tripName = "Trip-\(delivery.id.uuidString.prefix(4))"
-        var distance = ""
+    private func createTripFromDelivery(_ delivery: DeliveryDetails) -> Trip? {
+        var tripName = delivery.id.uuidString
+        var cargoType = "General Cargo"
+        var distance = "N/A"
         var startingPoint = ""
+        var deliveryNotes = delivery.notes
+        var estimatedDistance: Double? = nil
+        var estimatedTime: Double? = nil
         
-        // Parse notes to extract structured data
-        let lines = deliveryNotes.split(separator: "\n")
-        for line in lines {
+        // Parse notes for additional information
+        for line in delivery.notes.components(separatedBy: .newlines) {
             if line.hasPrefix("Trip:") {
                 tripName = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
-            }
-//            else if line.hasPrefix("Cargo:") {
-//                cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
-//            }
-        else if line.hasPrefix("Distance:") {
-                distance = String(line.dropFirst(9).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("Cargo:") {
+                cargoType = String(line.dropFirst(6).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("Distance:") || line.hasPrefix("Estimated Distance:") {
+                let prefix = line.hasPrefix("Distance:") ? "Distance:" : "Estimated Distance:"
+                distance = String(line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces))
+                // Extract numeric value for estimated_distance
+                if let numericDistance = Double(distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) {
+                    estimatedDistance = numericDistance
+                }
             } else if line.hasPrefix("From:") {
                 startingPoint = String(line.dropFirst(5).trimmingCharacters(in: .whitespaces))
+            } else if line.hasPrefix("ETA:") || line.hasPrefix("Estimated Time:") {
+                let prefix = line.hasPrefix("ETA:") ? "ETA:" : "Estimated Time:"
+                let etaString = String(line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces))
+                // Parse ETA string to get minutes
+                if let minutes = parseETAToMinutes(etaString) {
+                    estimatedTime = Double(minutes) / 60.0 // Convert to hours
+                }
             }
         }
         
-        // Create a Trip object with the delivery information
-        return Trip(
-            id: delivery.id,
-            name: tripName,
-            destination: delivery.location,
-            address: delivery.location,
-            eta: "",
-            distance: distance,
-            status: .delivered,
-            hasCompletedPreTrip: true,
-            hasCompletedPostTrip: true,
-            vehicleDetails: Vehicle(
-                name: "Vehicle",
-                year: 2023,
-                make: "Unknown",
-                model: "Unknown",
-                vin: "Unknown",
-                licensePlate: delivery.vehicle,
-                vehicleType: .truck,
-                color: "Unknown",
-                bodyType: .cargo,
-                bodySubtype: "Unknown",
-                msrp: 0.0,
-                pollutionExpiry: Date(),
-                insuranceExpiry: Date(),
-                status: .available
-            ),
-            sourceCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            destinationCoordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            startingPoint: startingPoint.isEmpty ? delivery.location : startingPoint,
-            notes: deliveryNotes,
-            startTime: nil,
-            endTime: nil
+        // Create a mock vehicle for the delivery
+        let vehicle = Vehicle(
+            name: "Vehicle",
+            year: 2023,
+            make: "Unknown",
+            model: "Unknown",
+            vin: "Unknown",
+            licensePlate: delivery.vehicle,
+            vehicleType: .truck,
+            color: "Unknown",
+            bodyType: .cargo,
+            bodySubtype: "Unknown",
+            msrp: 0.0,
+            pollutionExpiry: Date(),
+            insuranceExpiry: Date(),
+            status: .available
         )
+        
+        // Create a SupabaseTrip with the delivery information
+        let supabaseTrip = SupabaseTrip(
+            id: delivery.id,
+            destination: delivery.location,
+            trip_status: "delivered",
+            has_completed_pre_trip: true,
+            has_completed_post_trip: true,
+            vehicle_id: vehicle.id,
+            driver_id: nil,
+            secondary_driver_id: nil,
+            start_time: nil,
+            end_time: nil,
+            notes: """
+                   Trip: \(tripName)
+                   Cargo Type: \(cargoType)
+                   Estimated Distance: \(distance)
+                   Estimated Time: \(estimatedTime.map { "\(Int($0))h \(Int(($0 - Double(Int($0))) * 60))m" } ?? "N/A")
+                   From: \(startingPoint)
+                   \(deliveryNotes)
+                   """,
+            created_at: Date(),
+            updated_at: Date(),
+            is_deleted: false,
+            start_latitude: 0,
+            start_longitude: 0,
+            end_latitude: 0,
+            end_longitude: 0,
+            pickup: startingPoint.isEmpty ? delivery.location : startingPoint,
+            estimated_distance: estimatedDistance,
+            estimated_time: estimatedTime
+        )
+        
+        return Trip(from: supabaseTrip, vehicle: vehicle)
+    }
+    
+    // Helper function to parse ETA string to minutes
+    private func parseETAToMinutes(_ etaString: String) -> Int? {
+        let components = etaString.lowercased().components(separatedBy: CharacterSet.letters)
+        let numbers = components.compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        
+        if etaString.contains("h") && etaString.contains("m") {
+            // Format: "Xh Ym"
+            guard numbers.count >= 2 else { return nil }
+            return numbers[0] * 60 + numbers[1]
+        } else if etaString.contains("h") {
+            // Format: "Xh"
+            guard let hours = numbers.first else { return nil }
+            return hours * 60
+        } else {
+            // Format: "X mins" or "X min"
+            guard let minutes = numbers.first else { return nil }
+            return minutes
+        }
     }
 }
 
@@ -348,12 +441,25 @@ struct TripCard: View {
 struct TripDetailsView: View {
     @Environment(\.presentationMode) var presentationMode
     let trip: Trip
+    @StateObject private var chatViewModel: ChatViewModel
+    @State private var isGeneratingPDF = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    @State private var showingShareSheet = false
+    @State private var pdfURL: URL?
+    
+    init(trip: Trip) {
+        self.trip = trip
+        // Initialize ChatViewModel with a temporary UUID
+        // We'll update it with the correct fleet manager ID in onAppear
+        self._chatViewModel = StateObject(wrappedValue: ChatViewModel(recipientId: UUID(), recipientType: .driver))
+    }
     
     var body: some View {
         NavigationView {
             List {
                 Section(header: Text("Trip Information")) {
-                    TripDetailRow(icon: "number", title: "Trip ID", value: trip.name)
+                    TripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
                     TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
                     TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
                     if !trip.eta.isEmpty {
@@ -380,7 +486,6 @@ struct TripDetailsView: View {
                         TripDetailRow(icon: "checkmark.shield.fill", title: "Post-Trip Inspection", value: "Completed")
                     }
                     
-                    // Proof of delivery section for completed trips
                     Section(header: Text("Proof of Delivery")) {
                         Button(action: {}) {
                             HStack {
@@ -401,6 +506,23 @@ struct TripDetailsView: View {
                                     .foregroundColor(.gray)
                             }
                         }
+                        
+                        // Add Chat History Download Button
+                        Button(action: generateAndDownloadPDF) {
+                            HStack {
+                                Image(systemName: "arrow.down.doc.fill")
+                                Text("Download Chat History")
+                                Spacer()
+                                if isGeneratingPDF {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                        }
+                        .disabled(isGeneratingPDF)
                     }
                 } else {
                     // Status section for non-completed trips
@@ -443,7 +565,115 @@ struct TripDetailsView: View {
                     }
                 }
             }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") {
+                    showingError = false
+                }
+            } message: {
+                Text(errorMessage)
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let url = pdfURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
+            .task {
+                // Get fleet manager ID and load chat messages
+                do {
+                    let fleetManagers = try await SupabaseDataController.shared.fetchFleetManagers()
+                    if let fleetManager = fleetManagers.first,
+                       let fleetManagerId = fleetManager.userID {
+                        // Update the existing chatViewModel with the correct fleet manager ID
+                        await MainActor.run {
+                            // Create a new ChatViewModel with the correct fleet manager ID
+                            let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
+                            // Load messages
+                            Task {
+                                await newViewModel.loadMessages()
+                                // Update our chatViewModel with the loaded messages
+                                chatViewModel.messages = newViewModel.messages
+                            }
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Failed to load fleet manager: \(error.localizedDescription)"
+                        showingError = true
+                    }
+                }
+            }
         }
+    }
+    
+    private func generateAndDownloadPDF() {
+        isGeneratingPDF = true
+        
+        Task {
+            do {
+                // Create PDF content
+                let pdfContent = generatePDFContent()
+                
+                // Get the documents directory
+                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let fileName = "chat_history_\(trip.id.uuidString)_\(Date().formatted(.iso8601)).pdf"
+                let fileURL = documentsPath.appendingPathComponent(fileName)
+                
+                // Write PDF data to file
+                try pdfContent.write(to: fileURL)
+                
+                // Show share sheet
+                await MainActor.run {
+                    isGeneratingPDF = false
+                    pdfURL = fileURL
+                    showingShareSheet = true
+                }
+            } catch {
+                await MainActor.run {
+                    isGeneratingPDF = false
+                    errorMessage = "Failed to generate PDF: \(error.localizedDescription)"
+                    showingError = true
+                }
+            }
+        }
+    }
+    
+    private func generatePDFContent() -> Data {
+        // Create PDF content with better formatting
+        var content = """
+        TRIP CHAT HISTORY
+        =================
+        
+        Trip Details:
+        ------------
+        Trip ID: \(trip.id.uuidString)
+        From: \(trip.startingPoint)
+        To: \(trip.destination)
+        Status: Completed
+        Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
+        License Plate: \(trip.vehicleDetails.licensePlate)
+        Date: \(Date().formatted())
+        
+        Chat History:
+        ------------
+        
+        """
+        
+        // Sort messages by date
+        let sortedMessages = chatViewModel.messages.sorted { $0.created_at < $1.created_at }
+        
+        // Add each message with proper formatting
+        for message in sortedMessages {
+            let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
+            let timestamp = message.created_at.formatted(date: .complete, time: .standard)
+            content += "\n[\(timestamp)]\n\(sender): \(message.message_text)\n"
+            content += "----------------------------------------\n"
+        }
+        
+        if sortedMessages.isEmpty {
+            content += "\nNo messages found for this trip.\n"
+        }
+        
+        return Data(content.utf8)
     }
     
     private var statusText: String {
@@ -493,5 +723,21 @@ struct TripDetailRow: View {
                 .foregroundColor(.primary)
         }
     }
+}
+
+// ShareSheet view to handle sharing
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    let applicationActivities: [UIActivity]? = nil
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: applicationActivities
+        )
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 

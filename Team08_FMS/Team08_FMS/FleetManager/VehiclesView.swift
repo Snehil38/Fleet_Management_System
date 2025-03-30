@@ -12,7 +12,12 @@ private struct VehicleCard: View {
     @ObservedObject var vehicleManager: VehicleManager
     @State private var showingDeleteAlert = false
     @State private var showingOptions = false
-
+    @State private var showingDeliveryReceipt = false
+    @State private var currentTrip: Trip?
+    @State private var pdfData: Data? = nil
+    @State private var pdfError: String? = nil
+    @State private var showingPDFError = false
+    
     private var statusColor: Color {
         switch vehicle.status {
         case .available: return .green
@@ -85,18 +90,28 @@ private struct VehicleCard: View {
                     }
                 }
 
-                // Document status indicators
-//                HStack(spacing: 12) {
-//                    Label("RC", systemImage: vehicle.documents?.rc != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-//                        .foregroundColor(vehicle.documents?.rc != nil ? .green : .red)
-//
-//                    Label("Insurance", systemImage: vehicle.documents?.insurance != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-//                        .foregroundColor(vehicle.documents?.insurance != nil ? .green : .red)
-//
-//                    Label("Pollution", systemImage: vehicle.documents?.pollutionCertificate != nil ? "checkmark.circle.fill" : "xmark.circle.fill")
-//                        .foregroundColor(vehicle.documents?.pollutionCertificate != nil ? .green : .red)
-//                }
-//                .font(.caption)
+                if let trip = currentTrip {
+                    Button(action: {
+                        do {
+                            pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+                            showingDeliveryReceipt = true
+                        } catch {
+                            pdfError = error.localizedDescription
+                            showingPDFError = true
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "doc.text.fill")
+                                .foregroundColor(.blue)
+                            Text("Delivery Receipt")
+                                .foregroundColor(.blue)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.top, 8)
+                    }
+                }
             }
             .padding()
         }
@@ -110,45 +125,39 @@ private struct VehicleCard: View {
                 Label("Delete Vehicle", systemImage: "trash")
             }
 
-            if vehicle.status == .underMaintenance {
-                Button {
-                    Task {
-                        await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.available, vehicleID: vehicle.id)
-                    }
-                    if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-                        DispatchQueue.main.async {
-                            vehicleManager.vehicles[index].status = .underMaintenance
-                        }
-                    }
-                } label: {
-                    Label("Mark as available", systemImage: "checkmark.circle.fill")
-                }
-            }
-
-            if vehicle.status == .available {
-                Button {
-                    Task {
-                        // Update on the server
-                        await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
-                        
-                        // Update the local state immediately
-                        if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
-                            DispatchQueue.main.async {
-                                vehicleManager.vehicles[index].status = .underMaintenance
+            if vehicle.status != .inService {  // Only show status options if not in service
+                if vehicle.status == .underMaintenance {
+                    Button {
+                        Task {
+                            await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.available, vehicleID: vehicle.id)
+                            if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                                await MainActor.run {
+                                    vehicleManager.vehicles[index].status = .available
+                                }
                             }
                         }
-                        
-                        // Optionally, save the updated vehicles array to UserDefaults
-                        // vehicleManager.saveVehicles()   // Make sure this method is accessible if needed
+                    } label: {
+                        Label("Mark as available", systemImage: "checkmark.circle.fill")
                     }
-                } label: {
-                    Label("Mark as under maintenance", systemImage: "checkmark.circle.fill")
+                }
+
+                if vehicle.status == .available {
+                    Button {
+                        Task {
+                            await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
+                            if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                                await MainActor.run {
+                                    vehicleManager.vehicles[index].status = .underMaintenance
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Mark as under maintenance", systemImage: "checkmark.circle.fill")
+                    }
                 }
             }
 
-
             Button {
-                // Add share functionality here
                 showingOptions = true
             } label: {
                 Label("Share Details", systemImage: "square.and.arrow.up")
@@ -165,6 +174,36 @@ private struct VehicleCard: View {
         } message: {
             Text("Are you sure you want to delete this vehicle? This action cannot be undone.")
         }
+        .sheet(isPresented: $showingDeliveryReceipt) {
+            NavigationView {
+                if let data = pdfData {
+                    PDFViewer(data: data)
+                        .navigationTitle("Delivery Receipt")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showingDeliveryReceipt = false
+                                }
+                            }
+                        }
+                }
+            }
+        }
+        .alert("Error", isPresented: $showingPDFError) {
+            Button("OK") {
+                showingPDFError = false
+            }
+        } message: {
+            Text(pdfError ?? "Failed to generate delivery receipt")
+        }
+        .onAppear {
+            // Find if this vehicle has any current trip
+            currentTrip = TripDataController.shared.allTrips.first(where: { 
+                $0.vehicleDetails.id == vehicle.id && 
+                ($0.status == .inProgress || $0.status == .delivered)
+            })
+        }
     }
 }
 
@@ -178,7 +217,7 @@ private struct VehicleListView: View {
                 MaintenanceEmptyStateView()
             } else {
                 ForEach(vehicles) { vehicle in
-                    NavigationLink(destination: VehicleDetailView(vehicle: vehicle, vehicleManager: vehicleManager)) {
+                    NavigationLink(destination: VehicleDetailView(vehicle: vehicle)) {
                         VehicleCard(vehicle: vehicle, vehicleManager: vehicleManager)
                             .padding(.horizontal)
                     }
@@ -314,6 +353,7 @@ struct VehiclesView: View {
     @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: VehicleStatus?
+    @State private var isInTrip = false
 
     private func matchesSearch(_ vehicle: Vehicle) -> Bool {
         guard !searchText.isEmpty else { return true }
@@ -386,6 +426,11 @@ struct VehiclesView: View {
             .onAppear {
                 if vehicleManager.vehicles.isEmpty {
                     vehicleManager.loadVehicles()
+                }
+            }
+            .onAppear {
+                Task {
+                    await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
                 }
             }
             .navigationTitle("Vehicles")
