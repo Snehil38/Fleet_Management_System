@@ -488,6 +488,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_post_trip,
                     vehicle_id,
                     driver_id,
+                    secondary_driver_id,
                     start_time,
                     end_time,
                     notes,
@@ -536,6 +537,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let has_completed_post_trip: Bool
                 let vehicle_id: UUID
                 let driver_id: UUID?
+                let secondary_driver_id: UUID?
                 let start_time: Date?
                 let end_time: Date?
                 let notes: String?
@@ -586,7 +588,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_pre_trip: data.has_completed_pre_trip,
                     has_completed_post_trip: data.has_completed_post_trip,
                     vehicle_id: data.vehicle_id,
-                    driver_id: data.driver_id, secondary_driver_id: nil,
+                    driver_id: data.driver_id,
+                    secondary_driver_id: data.secondary_driver_id,
                     start_time: data.start_time,
                     end_time: data.end_time,
                     notes: data.notes,
@@ -659,9 +662,34 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 print("Failed to decode date string: \(dateString)")
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
             }
-            
-            // Start building the query
-            var query = supabaseController.supabase
+
+            // Define JoinedTripData struct
+            struct JoinedTripData: Codable {
+                let id: UUID
+                let destination: String
+                let trip_status: String
+                let has_completed_pre_trip: Bool
+                let has_completed_post_trip: Bool
+                let vehicle_id: UUID
+                let driver_id: UUID?
+                let secondary_driver_id: UUID?
+                let start_time: Date?
+                let end_time: Date?
+                let notes: String?
+                let created_at: Date
+                let updated_at: Date?
+                let is_deleted: Bool
+                let start_latitude: Double?
+                let start_longitude: Double?
+                let end_latitude: Double?
+                let end_longitude: Double?
+                let pickup: String?
+                let estimated_distance: Double?
+                let estimated_time: Double?
+                let vehicles: Vehicle
+            }
+
+            let query = supabaseController.supabase
                 .from("trips")
                 .select("""
                     id,
@@ -671,6 +699,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_post_trip,
                     vehicle_id,
                     driver_id,
+                    secondary_driver_id,
                     start_time,
                     end_time,
                     notes,
@@ -703,65 +732,14 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     )
                 """)
                 .eq("is_deleted", value: false)
-            
+
             // Add driver filter if driverId is set
             if let driverId = driverId {
-                query = query.eq("driver_id", value: driverId)
+                query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
             }
-            
+
             // Execute the query
             let response = try await query.execute()
-            
-            // Print raw response for debugging
-//            print("Raw response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
-            
-            // Define a nested struct to match the joined data structure
-            struct JoinedTripData: Codable {
-                let id: UUID
-                let destination: String
-                let trip_status: String
-                let has_completed_pre_trip: Bool
-                let has_completed_post_trip: Bool
-                let vehicle_id: UUID
-                let driver_id: UUID?
-                let start_time: Date?
-                let end_time: Date?
-                let notes: String?
-                let created_at: Date
-                let updated_at: Date?
-                let is_deleted: Bool
-                let start_latitude: Double?
-                let start_longitude: Double?
-                let end_latitude: Double?
-                let end_longitude: Double?
-                let pickup: String?
-                let estimated_distance: Double?
-                let estimated_time: Double?
-                let vehicles: Vehicle
-                
-                // Add computed properties to parse distance and fuel cost
-                var parsedDistance: String {
-                    if let estimatedDistance = estimated_distance {
-                        return String(format: "%.1f", estimatedDistance)
-                    }
-                    guard let notes = notes,
-                          let distanceRange = notes.range(of: "Distance: "),
-                          let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    return String(notes[distanceRange.upperBound..<endRange.lowerBound])
-                }
-                
-                var parsedFuelCost: String {
-                    guard let notes = notes,
-                          let fuelRange = notes.range(of: "Estimated Fuel Cost: "),
-                          let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    let dist = (Double(parsedDistance) ?? 0)*0.5
-                    return "\(dist) $"
-                }
-            }
             
             let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
             
@@ -774,7 +752,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_pre_trip: data.has_completed_pre_trip,
                     has_completed_post_trip: data.has_completed_post_trip,
                     vehicle_id: data.vehicle_id,
-                    driver_id: data.driver_id, secondary_driver_id: nil,
+                    driver_id: data.driver_id,
+                    secondary_driver_id: data.secondary_driver_id,
                     start_time: data.start_time,
                     end_time: data.end_time,
                     notes: data.notes,
@@ -791,104 +770,71 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
-            
+
             print("Successfully processed \(tripsWithVehicles.count) trips")
-            
+
             // Update published properties
             await MainActor.run {
                 // Find current trip (in progress)
-                if let currentTrip = tripsWithVehicles.first(where: { $0.status == TripStatus.inProgress }) {
+                if let currentTrip = tripsWithVehicles.first(where: { $0.status.rawValue == "current" }) {
                     self.currentTrip = currentTrip
                 } else {
                     self.currentTrip = nil
                 }
-                
+
                 // Filter upcoming trips (only pending or assigned)
                 self.upcomingTrips = tripsWithVehicles.filter { trip in
-                    trip.status == .pending || trip.status == .assigned
+                    trip.status.rawValue == "pending" || trip.status.rawValue == "assigned"
                 }
-                
+
                 // Convert completed/delivered trips to delivery details
                 let completedTrips = tripsWithVehicles.filter { trip in 
-                    trip.status == .delivered && trip.hasCompletedPostTrip
+                    trip.status.rawValue == "delivered"
                 }
-                
+
                 self.recentDeliveries = completedTrips.map { trip in
-                    let joinedData = joinedData.first(where: { $0.id == trip.id })!
-                    
-                    // Extract additional details from notes if available
-                    var cargoType = "General Cargo"
-                    if let notes = trip.notes,
-                       let cargoRange = notes.range(of: "Cargo Type: ") {
-                        let noteText = notes[cargoRange.upperBound...]
-                        if let endOfCargo = noteText.firstIndex(of: "\n") {
-                            cargoType = String(noteText[..<endOfCargo])
-                        } else {
-                            cargoType = String(noteText)
-                        }
-                    }
-                    
-                    // Include distance and fuel cost in the notes
-                    let distance = joinedData.parsedDistance
-                    let fuelCost = joinedData.parsedFuelCost
-                    
-                    return DeliveryDetails(
+                    DeliveryDetails(
                         id: trip.id,
                         location: trip.destination,
-                        date: formatDate(trip.endTime ?? joinedData.created_at),
+                        date: formatDate(trip.endTime ?? trip.startTime ?? Date()),
                         status: "Delivered",
                         driver: "Current Driver",
                         vehicle: trip.vehicleDetails.licensePlate,
-                        notes: """
-                               Trip Details
-                               ---------------
-                               Trip: \(trip.id.uuidString)
-                               From: \(trip.startingPoint)
-                               To: \(trip.destination)
-                               Distance: \(distance) km
-                               Estimated Fuel Cost: \(fuelCost)
-                               
-                               Timing
-                               ---------------
-                               Start: \(formatFullDate(trip.startTime ?? joinedData.created_at))
-                               End: \(formatFullDate(trip.endTime ?? joinedData.created_at))
-                               
-                               Additional Info
-                               ---------------
-                               Cargo Type: \(cargoType)
-                               \(trip.notes ?? "")
-                               """
+                        notes: trip.notes ?? "No notes available"
                     )
                 }
-                
+
                 // Sort recent deliveries by date (newest first)
                 self.recentDeliveries.sort { lhs, rhs in
-                    // Extract dates from formatted strings (basic parsing)
-                    let lhsIsToday = lhs.date.contains("Today")
-                    let rhsIsToday = rhs.date.contains("Today")
-                    let lhsIsYesterday = lhs.date.contains("Yesterday")
-                    let rhsIsYesterday = rhs.date.contains("Yesterday")
-                    
-                    if lhsIsToday && !rhsIsToday {
-                        return true
-                    } else if !lhsIsToday && rhsIsToday {
-                        return false
-                    } else if lhsIsYesterday && !rhsIsToday && !rhsIsYesterday {
-                        return true
-                    } else if !lhsIsYesterday && !lhsIsToday && (rhsIsToday || rhsIsYesterday) {
-                        return false
-                    }
-                    
-                    // If both are from the same period, compare the actual times
-                    return lhs.date > rhs.date
+                    let lhsDate = parseDate(lhs.date) ?? Date.distantPast
+                    let rhsDate = parseDate(rhs.date) ?? Date.distantPast
+                    return lhsDate > rhsDate
                 }
-                
-                self.error = nil
             }
         } catch {
             print("Error fetching trips: \(error)")
             throw TripError.fetchError("Failed to fetch trips: \(error.localizedDescription)")
         }
+    }
+    
+    private func parseDate(_ dateString: String) -> Date? {
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        // Try different date formats
+        let formats = [
+            "Today, h:mm a",
+            "Yesterday, h:mm a",
+            "MMM d, h:mm a"
+        ]
+        
+        for format in formats {
+            dateFormatter.dateFormat = format
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+        }
+        return nil
     }
     
     private func formatDate(_ date: Date) -> String {

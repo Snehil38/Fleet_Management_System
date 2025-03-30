@@ -28,7 +28,6 @@ struct Trip: Identifiable, Equatable {
     let startingPoint: String
     let pickup: String?
     let driverId: UUID?
-    let secondaryDriverId: UUID?
     
     // Computed property for display purposes
     var displayName: String {
@@ -54,8 +53,7 @@ struct Trip: Identifiable, Equatable {
                lhs.destinationCoordinate.longitude == rhs.destinationCoordinate.longitude &&
                lhs.startingPoint == rhs.startingPoint &&
                lhs.pickup == rhs.pickup &&
-               lhs.driverId == rhs.driverId &&
-               lhs.secondaryDriverId == rhs.secondaryDriverId
+               lhs.driverId == rhs.driverId
     }
     
     init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
@@ -71,7 +69,6 @@ struct Trip: Identifiable, Equatable {
         self.endTime = supabaseTrip.end_time
         self.pickup = supabaseTrip.pickup
         self.driverId = supabaseTrip.driver_id
-        self.secondaryDriverId = supabaseTrip.secondary_driver_id
         
         // Set distance using estimated_distance if available
         if let estimatedDistance = supabaseTrip.estimated_distance {
