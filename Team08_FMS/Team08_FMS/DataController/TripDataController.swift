@@ -1177,9 +1177,6 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         } ?? "Unassigned"
         
         let content = """
-        DELIVERY RECEIPT
-        ===============
-        
         Trip Details:
         ------------
         Trip ID: \(trip.name)
@@ -1221,61 +1218,102 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             context.beginPage()
             
             // Set up attributes for drawing
+            let titleStyle = NSMutableParagraphStyle()
+            titleStyle.alignment = .center
+            
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.alignment = .left
-            paragraphStyle.lineSpacing = 5.0
-            
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 12),
-                .paragraphStyle: paragraphStyle
-            ]
+            paragraphStyle.lineSpacing = 6.0
             
             let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 16),
-                .paragraphStyle: paragraphStyle
+                .font: UIFont.boldSystemFont(ofSize: 24),
+                .paragraphStyle: titleStyle,
+                .foregroundColor: UIColor.black
             ]
             
-            // Draw content
+            let contentAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .paragraphStyle: paragraphStyle,
+                .foregroundColor: UIColor.black
+            ]
+            
+            let subtitleAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 14),
+                .paragraphStyle: paragraphStyle,
+                .foregroundColor: UIColor.black
+            ]
+            
+            // Draw content with proper margins
             let contentRect = pageRect.insetBy(dx: 50, dy: 50)
             
-            // Draw title
+            // Draw title centered at the top
             let title = "DELIVERY RECEIPT"
-            title.draw(at: CGPoint(x: contentRect.minX, y: contentRect.minY), withAttributes: titleAttributes)
+            let titleSize = title.size(withAttributes: titleAttributes)
+            title.draw(at: CGPoint(x: (pageRect.width - titleSize.width) / 2, y: contentRect.minY),
+                      withAttributes: titleAttributes)
             
             // Draw main content
             content.draw(in: CGRect(x: contentRect.minX,
-                                  y: contentRect.minY + 40,
+                                  y: contentRect.minY + titleSize.height + 20,
                                   width: contentRect.width,
-                                  height: contentRect.height - 200), // Reduced height to make room for signature
-                        withAttributes: attributes)
+                                  height: contentRect.height - 200),
+                        withAttributes: contentAttributes)
             
-            // Draw signature section
-            let signatureY = contentRect.maxY - 150
-            "Fleet Manager's Signature:".draw(at: CGPoint(x: contentRect.minX, y: signatureY),
-                                           withAttributes: attributes)
+            // Draw signature section at the bottom
+            let signatureY = contentRect.maxY - 120
             
-            // Draw signature line
-            let signatureLine = UIBezierPath()
-            signatureLine.move(to: CGPoint(x: contentRect.minX, y: signatureY + 50))
-            signatureLine.addLine(to: CGPoint(x: contentRect.minX + 200, y: signatureY + 50))
-            signatureLine.stroke()
+            // Draw signature header
+            "Fleet Manager's Signature:".draw(
+                at: CGPoint(x: contentRect.minX, y: signatureY),
+                withAttributes: subtitleAttributes
+            )
             
             // Draw signature if available
             if let signatureData = signature,
                let signatureImage = UIImage(data: signatureData) {
-                let signatureRect = CGRect(x: contentRect.minX,
-                                         y: signatureY + 10,
-                                         width: 200,
-                                         height: 60)
+                let maxWidth: CGFloat = 200  // Reduced width for better appearance
+                let maxHeight: CGFloat = 60   // Reduced height for better appearance
+                
+                // Calculate signature size while maintaining aspect ratio
+                let aspectRatio = signatureImage.size.width / signatureImage.size.height
+                var finalWidth = maxWidth
+                var finalHeight = maxWidth / aspectRatio
+                
+                // Adjust if height exceeds maxHeight
+                if finalHeight > maxHeight {
+                    finalHeight = maxHeight
+                    finalWidth = maxHeight * aspectRatio
+                }
+                
+                let signatureRect = CGRect(
+                    x: contentRect.minX,
+                    y: signatureY + 20,
+                    width: finalWidth,
+                    height: finalHeight
+                )
+                
+                // Draw signature
                 signatureImage.draw(in: signatureRect)
+            }
+            
+            // Draw signature line if no signature is provided
+            if signature == nil {
+                let signatureLine = UIBezierPath()
+                signatureLine.move(to: CGPoint(x: contentRect.minX, y: signatureY + 40))
+                signatureLine.addLine(to: CGPoint(x: contentRect.minX + 200, y: signatureY + 40))
+                UIColor.black.setStroke()
+                signatureLine.lineWidth = 0.5
+                signatureLine.stroke()
             }
             
             // Draw date
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .long
             let dateString = "Date: \(dateFormatter.string(from: Date()))"
-            dateString.draw(at: CGPoint(x: contentRect.minX, y: signatureY + 70),
-                          withAttributes: attributes)
+            dateString.draw(
+                at: CGPoint(x: contentRect.minX, y: signatureY + 70),
+                withAttributes: contentAttributes
+            )
         }
         
         return data
