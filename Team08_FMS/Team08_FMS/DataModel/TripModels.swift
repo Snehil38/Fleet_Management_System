@@ -12,7 +12,6 @@ enum TripStatus: String, Codable {
 // Trip Model
 struct Trip: Identifiable, Equatable {
     let id: UUID
-    let name: String
     var destination: String
     var address: String
     var eta: String
@@ -30,9 +29,13 @@ struct Trip: Identifiable, Equatable {
     let pickup: String?
     let driverId: UUID?
     
+    // Computed property for display purposes
+    var displayName: String {
+        pickup ?? "Trip-\(id.uuidString.prefix(8))"
+    }
+    
     static func == (lhs: Trip, rhs: Trip) -> Bool {
         return lhs.id == rhs.id &&
-               lhs.name == rhs.name &&
                lhs.destination == rhs.destination &&
                lhs.address == rhs.address &&
                lhs.eta == rhs.eta &&
@@ -55,7 +58,6 @@ struct Trip: Identifiable, Equatable {
     
     init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
         self.id = supabaseTrip.id
-        self.name = supabaseTrip.pickup ?? "Trip-\(supabaseTrip.id.uuidString.prefix(8))"
         self.destination = supabaseTrip.destination
         self.address = supabaseTrip.pickup ?? "N/A"
         self.status = TripStatus(rawValue: supabaseTrip.trip_status) ?? .pending

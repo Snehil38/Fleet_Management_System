@@ -457,7 +457,7 @@ struct TripDetailsView: View {
         NavigationView {
             List {
                 Section(header: Text("Trip Information")) {
-                    TripDetailRow(icon: "number", title: "Trip ID", value: trip.name)
+                    TripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
                     TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
                     TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
                     if !trip.eta.isEmpty {
@@ -613,7 +613,7 @@ struct TripDetailsView: View {
                 
                 // Get the documents directory
                 let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                let fileName = "chat_history_\(trip.name)_\(Date().formatted(.iso8601)).pdf"
+                let fileName = "chat_history_\(trip.id.uuidString)_\(Date().formatted(.iso8601)).pdf"
                 let fileURL = documentsPath.appendingPathComponent(fileName)
                 
                 // Write PDF data to file
@@ -643,7 +643,7 @@ struct TripDetailsView: View {
         
         Trip Details:
         ------------
-        Trip ID: \(trip.name)
+        Trip ID: \(trip.id.uuidString)
         From: \(trip.startingPoint)
         To: \(trip.destination)
         Status: Completed

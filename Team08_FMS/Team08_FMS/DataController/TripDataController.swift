@@ -187,7 +187,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             )
             // Notify fleet manager through Supabase
             Task {
-                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.name ?? "Unknown")")
+                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.id.uuidString ?? "Unknown")")
             }
         }
         
@@ -207,7 +207,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             )
             // Notify fleet manager through Supabase
             Task {
-                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.name ?? "Unknown")")
+                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.id.uuidString ?? "Unknown")")
             }
         }
     }
@@ -305,7 +305,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let durationString = formatTimeRemaining(duration)
                 
                 Task {
-                    await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip.name). Trip duration: \(durationString)")
+                    await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip.id.uuidString). Trip duration: \(durationString)")
                 }
             }
             
@@ -842,7 +842,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                         notes: """
                                Trip Details
                                ---------------
-                               Trip: \(trip.name)
+                               Trip: \(trip.id.uuidString)
                                From: \(trip.startingPoint)
                                To: \(trip.destination)
                                Distance: \(distance) km
@@ -989,7 +989,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 notes: """
                        Trip Details
                        ---------------
-                       Trip: \(trip.name)
+                       Trip: \(trip.id.uuidString)
                        From: \(trip.startingPoint)
                        To: \(trip.destination)
                        Distance: \(trip.distance) km
@@ -1244,7 +1244,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             }
             
             // Draw fields
-            drawField(label: "Trip ID:", value: trip.name, at: &currentY)
+            drawField(label: "Trip ID:", value: trip.id.uuidString, at: &currentY)
             drawField(label: "Status:", value: trip.status.rawValue, at: &currentY)
             drawField(label: "Vehicle:", value: "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model)", at: &currentY)
             drawField(label: "License Plate:", value: trip.vehicleDetails.licensePlate, at: &currentY)

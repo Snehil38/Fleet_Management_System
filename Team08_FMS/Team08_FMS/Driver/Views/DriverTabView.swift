@@ -1211,7 +1211,7 @@ struct QueuedTripRow: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(trip.name)
+                    Text(trip.displayName)
                         .font(.caption)
                         .foregroundColor(.blue)
                     Text(trip.destination)
@@ -1287,7 +1287,7 @@ struct QueuedTripRow: View {
         .alert(isPresented: $showingDeclineAlert) {
             Alert(
                 title: Text("Decline Trip"),
-                message: Text("Are you sure you want to decline trip \(trip.name)?"),
+                message: Text("Are you sure you want to decline trip \(trip.displayName)?"),
                 primaryButton: .destructive(Text("Decline")) {
                     onDecline()
                 },

@@ -261,9 +261,8 @@ struct TripCardView: View {
             }
             
             // Trip name
-            Text(trip.name)
-                .font(.title3)
-                .fontWeight(.semibold)
+            Text(trip.displayName)
+                .font(.headline)
             
             // Destination
             HStack(spacing: 4) {
@@ -542,7 +541,7 @@ struct TripDetailView: View {
                             Text("Trip ID")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text(trip.name)
+                            Text(trip.id.uuidString)
                         }
                         
                         // Editable Destination
@@ -685,7 +684,7 @@ struct TripDetailView: View {
                             }
                         }
                     } else {
-                        TripDetailRow(icon: "number", title: "Trip ID", value: trip.name)
+                        TripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
                         TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
                         TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
                         if !trip.distance.isEmpty {
@@ -791,7 +790,7 @@ struct TripDetailView: View {
                                     .padding(.bottom, 4)
                                 
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("Trip: \(trip.name)")
+                                    Text("Trip: \(trip.id.uuidString)")
                                     Text("From: \(trip.address)")
                                     Text("To: \(trip.destination)")
                                     
@@ -1100,7 +1099,7 @@ struct TripDetailView: View {
         }
         
         let updatedNotes = """
-        Trip: \(trip.name)
+        Trip: \(trip.id.uuidString)
         From: \(editedAddress)
         To: \(editedDestination)
         Distance: \(calculatedDistance)
