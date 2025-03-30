@@ -1182,243 +1182,146 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
         
         let data = renderer.pdfData { context in
-            // Function to draw a section that handles page breaks
-            func drawSection(title: String, content: String, at yPosition: inout CGFloat, in rect: CGRect, context: UIGraphicsPDFRendererContext) -> CGFloat {
-                let headerHeight: CGFloat = 25
-                let contentSpacing: CGFloat = 10
-                let sectionSpacing: CGFloat = 30
-                
-                // Check if we need a new page
-                if yPosition + headerHeight + 50 > rect.maxY - 120 {
-                    context.beginPage()
-                    yPosition = rect.minY + 40
-                }
-                
-                // Draw section header with background
-                let headerRect = CGRect(x: rect.minX, y: yPosition, width: rect.width, height: headerHeight)
-                let path = UIBezierPath(roundedRect: headerRect, cornerRadius: 5)
-                UIColor(red: 0.95, green: 0.95, blue: 0.95, alpha: 1.0).setFill()
-                path.fill()
-                
-                let headerAttributes: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.boldSystemFont(ofSize: 16),
-                    .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
-                ]
-                
-                title.draw(at: CGPoint(x: rect.minX + 10, y: yPosition + 5),
-                          withAttributes: headerAttributes)
-                
-                // Draw content with proper spacing
-                let contentStyle = NSMutableParagraphStyle()
-                contentStyle.alignment = .left
-                contentStyle.lineSpacing = 8.0
-                
-                let contentAttributes: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 14),
-                    .paragraphStyle: contentStyle,
-                    .foregroundColor: UIColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1.0)
-                ]
-                
-                let contentRect = CGRect(x: rect.minX + 20,
-                                       y: yPosition + headerHeight + contentSpacing,
-                                       width: rect.width - 40,
-                                       height: 1000) // Large height for calculation
-                
-                let contentSize = (content as NSString).boundingRect(
-                    with: CGSize(width: contentRect.width, height: .greatestFiniteMagnitude),
-                    options: [.usesLineFragmentOrigin, .usesFontLeading],
-                    attributes: contentAttributes,
-                    context: nil
-                )
-                
-                // Check if content needs a new page
-                if yPosition + headerHeight + contentSpacing + contentSize.height + sectionSpacing > rect.maxY - 120 {
-                    context.beginPage()
-                    yPosition = rect.minY + 40
-                }
-                
-                content.draw(in: CGRect(x: contentRect.minX,
-                                      y: yPosition + headerHeight + contentSpacing,
-                                      width: contentRect.width,
-                                      height: contentSize.height),
-                           withAttributes: contentAttributes)
-                
-                return yPosition + headerHeight + contentSpacing + contentSize.height + sectionSpacing
-            }
-            
             context.beginPage()
             
             // Set up the content area with margins
             let contentRect = pageRect.insetBy(dx: 50, dy: 50)
             var currentY = contentRect.minY
             
-            // Draw title and header
+            // Title attributes
             let titleStyle = NSMutableParagraphStyle()
             titleStyle.alignment = .center
-            
             let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 28),
+                .font: UIFont.boldSystemFont(ofSize: 24),
                 .paragraphStyle: titleStyle,
                 .foregroundColor: UIColor.black
             ]
             
-            // Draw title centered at the top
+            // Header attributes
+            let headerStyle = NSMutableParagraphStyle()
+            headerStyle.alignment = .left
+            let headerAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 12),
+                .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
+            ]
+            
+            // Content attributes
+            let contentStyle = NSMutableParagraphStyle()
+            contentStyle.alignment = .left
+            let contentAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
+            ]
+            
+            // Draw title
             let title = "DELIVERY RECEIPT"
             let titleSize = title.size(withAttributes: titleAttributes)
             title.draw(at: CGPoint(x: (pageRect.width - titleSize.width) / 2, y: currentY),
                       withAttributes: titleAttributes)
+            currentY += titleSize.height + 20
             
-            // Draw decorative lines under title
-            let lineY = currentY + titleSize.height + 10
-            let linePath = UIBezierPath()
-            linePath.move(to: CGPoint(x: contentRect.minX, y: lineY))
-            linePath.addLine(to: CGPoint(x: contentRect.maxX, y: lineY))
-            UIColor(red: 0.8, green: 0.8, blue: 0.8, alpha: 1.0).setStroke()
-            linePath.lineWidth = 1.0
-            linePath.stroke()
+            // Function to draw a field with label
+            func drawField(label: String, value: String, at yPos: inout CGFloat) {
+                let fieldHeight: CGFloat = 25
+                let labelWidth: CGFloat = 150
+                
+                // Draw border
+                let fieldRect = CGRect(x: contentRect.minX, y: yPos, width: contentRect.width, height: fieldHeight)
+                let borderPath = UIBezierPath(rect: fieldRect)
+                UIColor.black.setStroke()
+                borderPath.lineWidth = 0.5
+                borderPath.stroke()
+                
+                // Draw label
+                label.draw(at: CGPoint(x: contentRect.minX + 5, y: yPos + 5),
+                         withAttributes: headerAttributes)
+                
+                // Draw value
+                value.draw(at: CGPoint(x: contentRect.minX + labelWidth + 5, y: yPos + 5),
+                         withAttributes: contentAttributes)
+                
+                yPos += fieldHeight
+            }
             
-            currentY = lineY + 30
+            // Draw fields
+            drawField(label: "Trip ID:", value: trip.name, at: &currentY)
+            drawField(label: "Status:", value: trip.status.rawValue, at: &currentY)
+            drawField(label: "Vehicle:", value: "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model)", at: &currentY)
+            drawField(label: "License Plate:", value: trip.vehicleDetails.licensePlate, at: &currentY)
+            drawField(label: "Driver:", value: driverName, at: &currentY)
             
-            // Draw sections with proper spacing and page breaks
-            currentY = drawSection(
-                title: "Trip Details",
-                content: """
-                Trip ID: \(trip.name)
-                Status: \(trip.status.rawValue)
-                """,
-                at: &currentY,
-                in: contentRect,
-                context: context
-            )
+            currentY += 20 // Add spacing
             
-            currentY = drawSection(
-                title: "Vehicle Information",
-                content: """
-                Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
-                License Plate: \(trip.vehicleDetails.licensePlate)
-                Driver: \(driverName)
-                """,
-                at: &currentY,
-                in: contentRect,
-                context: context
-            )
+            drawField(label: "Destination:", value: trip.destination, at: &currentY)
+            drawField(label: "Address:", value: trip.address, at: &currentY)
+            drawField(label: "Distance:", value: trip.distance, at: &currentY)
             
-            currentY = drawSection(
-                title: "Delivery Information",
-                content: """
-                Destination: \(trip.destination)
-                Address: \(trip.address)
-                Distance: \(trip.distance)
-                """,
-                at: &currentY,
-                in: contentRect,
-                context: context
-            )
+            currentY += 20 // Add spacing
             
-            currentY = drawSection(
-                title: "Timing",
-                content: """
-                Start Time: \(trip.startTime?.formatted() ?? "N/A")
-                End Time: \(trip.endTime?.formatted() ?? "N/A")
-                """,
-                at: &currentY,
-                in: contentRect,
-                context: context
-            )
+            drawField(label: "Start Time:", value: trip.startTime?.formatted() ?? "N/A", at: &currentY)
+            drawField(label: "End Time:", value: trip.endTime?.formatted() ?? "N/A", at: &currentY)
+            
+            currentY += 20 // Add spacing
             
             let estimatedFuelCost = Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0 * 0.5
             let totalRevenue = estimatedFuelCost + 50.0
             
-            currentY = drawSection(
-                title: "Cost Information",
-                content: """
-                Estimated Fuel Cost: $\(String(format: "%.2f", estimatedFuelCost))
-                Total Revenue: $\(String(format: "%.2f", totalRevenue))
-                """,
-                at: &currentY,
-                in: contentRect,
-                context: context
-            )
+            drawField(label: "Estimated Fuel Cost:", value: "$\(String(format: "%.2f", estimatedFuelCost))", at: &currentY)
+            drawField(label: "Total Revenue:", value: "$\(String(format: "%.2f", totalRevenue))", at: &currentY)
             
             if let notes = trip.notes, !notes.isEmpty {
-                currentY = drawSection(
-                    title: "Notes",
-                    content: notes,
-                    at: &currentY,
-                    in: contentRect,
-                    context: context
-                )
+                currentY += 20
+                "Notes:".draw(at: CGPoint(x: contentRect.minX, y: currentY),
+                            withAttributes: headerAttributes)
+                currentY += 20
+                
+                let notesRect = CGRect(x: contentRect.minX, y: currentY,
+                                     width: contentRect.width, height: 60)
+                let notesBorder = UIBezierPath(rect: notesRect)
+                UIColor.black.setStroke()
+                notesBorder.lineWidth = 0.5
+                notesBorder.stroke()
+                
+                notes.draw(in: notesRect.insetBy(dx: 5, dy: 5),
+                          withAttributes: contentAttributes)
+                currentY += 80
             }
             
-            // Check if we need a new page for signature
-            if currentY + 150 > contentRect.maxY {
-                context.beginPage()
-                currentY = contentRect.minY + 40
-            }
+            // Draw signature section at the bottom
+            let signatureY = contentRect.maxY - 100
             
-            // Draw signature section
-            let signatureHeaderAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 16),
-                .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
-            ]
-            
+            // Draw signature header
             "Fleet Manager's Signature:".draw(
-                at: CGPoint(x: contentRect.minX, y: currentY),
-                withAttributes: signatureHeaderAttributes
+                at: CGPoint(x: contentRect.minX, y: signatureY),
+                withAttributes: headerAttributes
             )
+            
+            // Draw signature box
+            let signatureRect = CGRect(
+                x: contentRect.minX,
+                y: signatureY + 20,
+                width: 200,
+                height: 60
+            )
+            
+            let signatureBox = UIBezierPath(rect: signatureRect)
+            UIColor.black.setStroke()
+            signatureBox.lineWidth = 0.5
+            signatureBox.stroke()
             
             // Draw signature if available
             if let signatureData = signature,
                let signatureImage = UIImage(data: signatureData) {
-                let maxWidth: CGFloat = 200
-                let maxHeight: CGFloat = 60
-                
-                // Calculate signature size while maintaining aspect ratio
-                let aspectRatio = signatureImage.size.width / signatureImage.size.height
-                var finalWidth = maxWidth
-                var finalHeight = maxWidth / aspectRatio
-                
-                if finalHeight > maxHeight {
-                    finalHeight = maxHeight
-                    finalWidth = maxHeight * aspectRatio
-                }
-                
-                let signatureRect = CGRect(
-                    x: contentRect.minX,
-                    y: currentY + 20,
-                    width: finalWidth,
-                    height: finalHeight
-                )
-                
-                // Draw signature with subtle border
-                let borderPath = UIBezierPath(rect: signatureRect)
-                UIColor(white: 0.9, alpha: 1.0).setStroke()
-                borderPath.lineWidth = 0.5
-                borderPath.stroke()
-                
-                signatureImage.draw(in: signatureRect)
-            } else {
-                // Draw signature line with subtle styling
-                let signatureLine = UIBezierPath()
-                signatureLine.move(to: CGPoint(x: contentRect.minX, y: currentY + 40))
-                signatureLine.addLine(to: CGPoint(x: contentRect.minX + 200, y: currentY + 40))
-                UIColor(red: 0.8, green: 0.8, blue: 0.8, alpha: 1.0).setStroke()
-                signatureLine.lineWidth = 0.5
-                signatureLine.stroke()
+                signatureImage.draw(in: signatureRect.insetBy(dx: 5, dy: 5))
             }
             
             // Draw date
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .long
             let dateString = "Date: \(dateFormatter.string(from: Date()))"
-            let dateAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 14),
-                .foregroundColor: UIColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1.0)
-            ]
-            
             dateString.draw(
-                at: CGPoint(x: contentRect.minX, y: currentY + 90),
-                withAttributes: dateAttributes
+                at: CGPoint(x: contentRect.maxX - 200, y: signatureY + 40),
+                withAttributes: contentAttributes
             )
         }
         
