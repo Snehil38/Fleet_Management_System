@@ -353,7 +353,6 @@ struct VehiclesView: View {
     @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: VehicleStatus?
-    @State private var isInTrip = false
 
     private func matchesSearch(_ vehicle: Vehicle) -> Bool {
         guard !searchText.isEmpty else { return true }
@@ -426,11 +425,6 @@ struct VehiclesView: View {
             .onAppear {
                 if vehicleManager.vehicles.isEmpty {
                     vehicleManager.loadVehicles()
-                }
-            }
-            .onAppear {
-                Task {
-                    await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
                 }
             }
             .navigationTitle("Vehicles")
