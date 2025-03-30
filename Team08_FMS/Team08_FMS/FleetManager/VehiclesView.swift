@@ -90,28 +90,28 @@ private struct VehicleCard: View {
                     }
                 }
 
-                if let trip = currentTrip {
-                    Button(action: {
-                        do {
-                            pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
-                            showingDeliveryReceipt = true
-                        } catch {
-                            pdfError = error.localizedDescription
-                            showingPDFError = true
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "doc.text.fill")
-                                .foregroundColor(.blue)
-                            Text("Delivery Receipt")
-                                .foregroundColor(.blue)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.top, 8)
-                    }
-                }
+//                if let trip = currentTrip {
+//                    Button(action: {
+//                        do {
+//                            pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+//                            showingDeliveryReceipt = true
+//                        } catch {
+//                            pdfError = error.localizedDescription
+//                            showingPDFError = true
+//                        }
+//                    }) {
+//                        HStack {
+//                            Image(systemName: "doc.text.fill")
+//                                .foregroundColor(.blue)
+//                            Text("Delivery Receipt")
+//                                .foregroundColor(.blue)
+//                            Spacer()
+//                            Image(systemName: "chevron.right")
+//                                .foregroundColor(.gray)
+//                        }
+//                        .padding(.top, 8)
+//                    }
+//                }
             }
             .padding()
         }
@@ -353,7 +353,6 @@ struct VehiclesView: View {
     @State private var showingMessages = false
     @State private var searchText = ""
     @State private var selectedStatus: VehicleStatus?
-    @State private var isInTrip = false
 
     private func matchesSearch(_ vehicle: Vehicle) -> Bool {
         guard !searchText.isEmpty else { return true }
@@ -426,11 +425,6 @@ struct VehiclesView: View {
             .onAppear {
                 if vehicleManager.vehicles.isEmpty {
                     vehicleManager.loadVehicles()
-                }
-            }
-            .onAppear {
-                Task {
-                    await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
                 }
             }
             .navigationTitle("Vehicles")

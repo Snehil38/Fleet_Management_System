@@ -36,9 +36,7 @@ struct ChatBubbleView: View {
             // Get current user ID when view appears
             Task {
                 do {
-                    currentUserId = try await supabaseController.getUserID()
-                } catch {
-                    print("Error getting user ID: \(error)")
+                    currentUserId = await supabaseController.getUserID()
                 }
             }
         }

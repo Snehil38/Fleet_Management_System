@@ -52,12 +52,12 @@ struct FleetManagerTabView: View {
             await refreshData()
             
             // Start periodic refresh
-            refreshTask = Task {
-                while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-                    await refreshData()
-                }
-            }
+//            refreshTask = Task {
+//                while !Task.isCancelled {
+//                    try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+//                    await refreshData()
+//                }
+//            }
         }
         .onDisappear {
             refreshTask?.cancel()
@@ -68,7 +68,6 @@ struct FleetManagerTabView: View {
         await TripDataController.shared.refreshAllTrips()
         await SupabaseDataController.shared.fetchGeofenceEvents()
         await dataManager.checkAndUpdateDriverTripStatus()
-        await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
     }
     
     func listenForGeofenceEvents() {

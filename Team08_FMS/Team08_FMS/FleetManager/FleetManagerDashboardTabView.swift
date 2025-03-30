@@ -433,7 +433,6 @@ struct AddTripView: View {
     
     // Trip details state
     @State private var selectedVehicle: Vehicle?
-    @State private var selectedDriverId: UUID?
     @State private var cargoType = "General Goods"
     @State private var startDate = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date()
     @State private var deliveryDate = Calendar.current.date(byAdding: .hour, value: 28, to: Date()) ?? Date()
@@ -463,10 +462,6 @@ struct AddTripView: View {
     
     private var isVehicleSelected: Bool {
         selectedVehicle != nil
-    }
-    
-    private var isDriverSelected: Bool {
-        selectedDriverId != nil
     }
     
     var isFormValid: Bool {
@@ -609,29 +604,54 @@ struct AddTripView: View {
                                 }
                                 
                                 if distance > 0 {
-                                    Divider()
-                                    
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Estimated Delivery")
-                                            .font(.subheadline)
-                                            .foregroundColor(.gray)
-                                        
-                                        HStack {
-                                            Image(systemName: "calendar")
-                                                .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
-                                            Text(deliveryDate, style: .date)
-                                                .font(.headline)
+                                    CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
+                                        VStack(spacing: 16) {
+                                            // First row: Distance and Travel Time
+                                            HStack(spacing: 20) {
+                                                EstimateItem(
+                                                    icon: "arrow.left.and.right",
+                                                    title: "Distance",
+                                                    value: String(format: "%.1f km", distance),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                                
+                                                Divider()
+                                                
+                                                EstimateItem(
+                                                    icon: "clock.fill",
+                                                    title: "Travel Time",
+                                                    value: String(format: "%.1f hours", distance / 40.0),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                            }
+                                            
+                                            Divider()
+                                            
+                                            // Second row: Fuel Cost and Trip Cost
+                                            HStack(spacing: 20) {
+                                                EstimateItem(
+                                                    icon: "fuelpump.fill",
+                                                    title: "Fuel Cost",
+                                                    value: String(format: "$%.2f", fuelCost),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                                
+                                                Divider()
+                                                
+                                                EstimateItem(
+                                                    icon: "dollarsign.circle.fill",
+                                                    title: "Trip Cost",
+                                                    value: String(format: "$%.2f", tripCost),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                            }
                                         }
-                                        
-                                        HStack {
-                                            Image(systemName: "clock")
-                                                .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
-                                            Text(deliveryDate, style: .time)
-                                                .font(.headline)
-                                        }
+                                        .padding()
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(10)
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
+
                             }
                             .padding()
                             .background(Color(.systemGray6))
@@ -689,80 +709,6 @@ struct AddTripView: View {
                                     availableVehicles: displayedVehicles
                                 )
                             }
-                            
-                            // Driver Selection - displayed after route calculation
-                            if let vehicle = selectedVehicle {
-                                CardView(title: "DRIVER ASSIGNMENT", systemImage: "person.fill") {
-                                    VStack {
-                                        Menu {
-                                            // Option to unassign driver
-                                            Button(action: {
-                                                selectedDriverId = nil
-                                            }) {
-                                                HStack {
-                                                    Text("Unassigned")
-                                                        .foregroundColor(.red)
-                                                    Spacer()
-                                                    if selectedDriverId == nil {
-                                                        Image(systemName: "checkmark")
-                                                    }
-                                                }
-                                            }
-                                            
-                                            Divider()
-                                            
-                                            // Available drivers (excluding those in current trips)
-                                            let availableDrivers = crewDataController.drivers.filter { driver in
-                                                // Check if driver is available and not in any current trip
-                                                let isAvailable = driver.status == .available
-                                                let isNotInCurrentTrip = !TripDataController.shared.getAllTrips()
-                                                    .filter { $0.status == .inProgress }
-                                                    .contains { trip in
-                                                        trip.driverId == driver.userID
-                                                    }
-                                                return isAvailable && isNotInCurrentTrip
-                                            }
-                                            
-                                            if availableDrivers.isEmpty {
-                                                Text("No available drivers")
-                                                    .foregroundColor(.gray)
-                                            } else {
-                                                ForEach(availableDrivers, id: \.userID) { driver in
-                                                    Button(action: {
-                                                        selectedDriverId = driver.userID
-                                                    }) {
-                                                        HStack {
-                                                            Text(driver.name)
-                                                            Spacer()
-                                                            if selectedDriverId == driver.userID {
-                                                                Image(systemName: "checkmark")
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } label: {
-                                            HStack {
-                                                if let driverId = selectedDriverId,
-                                                   let driver = crewDataController.drivers.first(where: { $0.userID == driverId }) {
-                                                    Text(driver.name)
-                                                        .foregroundColor(.primary)
-                                                } else {
-                                                    Text("Select Driver")
-                                                        .foregroundColor(.gray)
-                                                }
-                                                Image(systemName: "chevron.down")
-                                                    .font(.caption)
-                                                    .foregroundColor(.blue)
-                                            }
-                                            .padding()
-                                            .background(Color(.systemGray6))
-                                            .cornerRadius(10)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                    }
-                                }
-                            }
                         }
                         
                         Color.clear.frame(height: 100)
@@ -786,11 +732,11 @@ struct AddTripView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background((distance > 0 ? (isVehicleSelected && isDriverSelected) : isFormValid) ? Color.blue : Color.gray)
+                    .background((distance > 0 ? (isVehicleSelected) : isFormValid) ? Color.blue : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(distance > 0 ? (!isVehicleSelected || !isDriverSelected) : (!isFormValid || isCalculating))
+                .disabled(distance > 0 ? (!isVehicleSelected) : (!isFormValid || isCalculating))
                 .padding(16)
                 .background(
                     Rectangle()
@@ -952,12 +898,20 @@ struct AddTripView: View {
             // Get distance in kilometers
             self.distance = route.distance / 1000
             
-            // Calculate costs with $5 per km
-            let fuelRatio = 0.2 // 20% of cost is fuel
-            let costPerKm = 5.0 // $5 per km as requested
-            
-            self.tripCost = self.distance * costPerKm
-            self.fuelCost = (self.distance * 0.8) + 50.0
+            // Cost parameters
+            let costPerKm = 5.0         // Additional cost per kilometer (e.g., maintenance, driver, etc.)
+            let baseCost = 50.0         // Base cost for starting the trip
+
+            // Fuel efficiency parameters
+            let fuelConsumptionRate = 8.5   // Liters per 100 km (adjust as needed)
+            let fuelPricePerLiter = 1.50    // Price per liter in dollars (adjust as needed)
+
+            // Calculate fuel cost using realistic fuel consumption formula
+            // Fuel cost = (distance / 100) * fuelConsumptionRate * fuelPricePerLiter
+            fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
+
+            // Calculate total trip cost including the base cost, per km cost, and fuel cost
+            tripCost = baseCost + (distance * costPerKm) + fuelCost
             
             // Calculate estimated travel time and update delivery date
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
@@ -975,12 +929,20 @@ struct AddTripView: View {
         // Get distance in kilometers
         distance = locationA.distance(from: locationB) / 1000
         
-        // Calculate costs with $5 per km
-        let fuelRatio = 0.2 // 20% of cost is fuel
-        let costPerKm = 5.0 // $5 per km as requested
-        
-        tripCost = (distance * 0.8) + 50.0
-        fuelCost = (distance * 0.8) + 50.0
+        // Cost parameters
+        let costPerKm = 5.0         // Additional cost per kilometer (e.g., maintenance, driver, etc.)
+        let baseCost = 50.0         // Base cost for starting the trip
+
+        // Fuel efficiency parameters
+        let fuelConsumptionRate = 8.5   // Liters per 100 km (adjust as needed)
+        let fuelPricePerLiter = 1.50    // Price per liter in dollars (adjust as needed)
+
+        // Calculate fuel cost using realistic fuel consumption formula
+        // Fuel cost = (distance / 100) * fuelConsumptionRate * fuelPricePerLiter
+        fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
+
+        // Calculate total trip cost including the base cost, per km cost, and fuel cost
+        tripCost = baseCost + (distance * costPerKm) + fuelCost
         
         // Calculate estimated travel time and update delivery date
         let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
@@ -1002,7 +964,7 @@ struct AddTripView: View {
                     name: pickupLocation,
                     destination: dropoffLocation,
                     vehicleId: vehicle.id,
-                    driverId: selectedDriverId,
+                    driverId: nil,
                     startTime: startDate,
                     endTime: deliveryDate,
                     startLat: pickupCoordinate?.latitude,
@@ -1016,10 +978,6 @@ struct AddTripView: View {
                 )
                 
                 if success {
-                    // Update driver status to busy if a driver is assigned
-                    if let driverId = selectedDriverId {
-                        try await crewDataController.updateDriverStatus(driverId, status: .busy)
-                    }
                     try await TripDataController.shared.fetchAllTrips()
                     showingSuccessAlert = true
                 } else {
