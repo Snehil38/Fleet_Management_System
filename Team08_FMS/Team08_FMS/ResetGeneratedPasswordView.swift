@@ -152,16 +152,23 @@ struct ResetPasswordView: View {
     
     var body: some View {
         NavigationView {
-            Form {
+            VStack {
                 if !isCurrentPasswordVerified {
-                    Section(header: Text("Verify Current Password").font(.headline)) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Verify Current Password")
+                            .font(.headline)
+                        
                         TextField("Email", text: $email)
                             .keyboardType(.emailAddress)
                             .autocapitalization(.none)
-                            .modifier(FormFieldModifier())
+                            .padding(10)
+                            .background(Color(UIColor.systemGray6))
+                            .cornerRadius(8)
                         
                         SecureField("Enter current password", text: $currentPassword)
-                            .modifier(FormFieldModifier())
+                            .padding(10)
+                            .background(Color(UIColor.systemGray6))
+                            .cornerRadius(8)
                         
                         Button(action: {
                             SupabaseDataController.shared.verifyCurrentPassword(email: email, currentPassword: currentPassword) { success in
@@ -179,41 +186,51 @@ struct ResetPasswordView: View {
                         }
                         .buttonStyle(PrimaryButtonStyle())
                     }
+                    .padding()
                 } else {
-                    Section(header: Text("New Password").font(.headline)) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("New Password")
+                            .font(.headline)
+                        
                         // New Password Field with toggle to view/hide text
                         ZStack(alignment: .trailing) {
                             Group {
                                 if isNewPasswordVisible {
                                     TextField("Enter new password", text: $newPassword)
                                         .autocapitalization(.none)
-                                        .modifier(FormFieldModifier())
+                                        .padding(10)
+                                        .background(Color(UIColor.systemGray6))
+                                        .cornerRadius(8)
                                 } else {
                                     SecureField("Enter new password", text: $newPassword)
-                                        .modifier(FormFieldModifier())
+                                        .autocapitalization(.none)
+                                        .padding(10)
+                                        .background(Color(UIColor.systemGray6))
+                                        .cornerRadius(8)
                                 }
                             }
-                            Button {
+                            Button(action: {
                                 isNewPasswordVisible.toggle()
-                            } label: {
+                            }) {
                                 Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                     .foregroundColor(.gray)
+                                    .padding(.trailing, 30)
                             }
-                            .padding(.trailing, 8)
                         }
+                        .padding(.horizontal)
                         
                         SecureField("Confirm new password", text: $confirmPassword)
-                            .modifier(FormFieldModifier())
-                    }
-                    
-                    Section {
+                            .padding(10)
+                            .background(Color(UIColor.systemGray6))
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                        
                         ResetPasswordCriteriaView(newPassword: newPassword, confirmPassword: confirmPassword)
-                    }
-                    
-                    Section {
+                            .padding(.horizontal)
+                        
                         Button("Reset Password") {
                             Task {
-                                let updated = await SupabaseDataController.shared.updatePassword(newPassword: newPassword)
+                                let updated = await SupabaseDataController.shared.resetPassword(newPassword: newPassword)
                                 if updated {
                                     alertMessage = "Password successfully reset."
                                 } else {
@@ -225,8 +242,11 @@ struct ResetPasswordView: View {
                         .frame(maxWidth: .infinity)
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!isPasswordValid)
+                        .padding(.horizontal)
                     }
+                    .padding()
                 }
+                Spacer()
             }
             .navigationTitle("Reset Password")
             .navigationBarTitleDisplayMode(.inline)
@@ -245,16 +265,6 @@ struct ResetPasswordView: View {
     }
 }
 
-// Custom modifier to style form fields
-struct FormFieldModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(10)
-            .background(Color(UIColor.systemGray6))
-            .cornerRadius(8)
-            .padding(.vertical, 4)
-    }
-}
 
 // Custom button style for primary actions
 struct PrimaryButtonStyle: ButtonStyle {
