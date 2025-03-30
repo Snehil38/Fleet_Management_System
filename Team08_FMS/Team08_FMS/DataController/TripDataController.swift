@@ -1167,7 +1167,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         recentDeliveries.removeAll { $0.id == id }
     }
     
-    func generateDeliveryReceipt(for trip: Trip) throws -> Data {
+    func generateDeliveryReceipt(for trip: Trip, signature: Data? = nil) throws -> Data {
         guard trip.status == .delivered else {
             throw TripError.updateError("Cannot generate receipt for non-delivered trip")
         }
@@ -1246,8 +1246,36 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             content.draw(in: CGRect(x: contentRect.minX,
                                   y: contentRect.minY + 40,
                                   width: contentRect.width,
-                                  height: contentRect.height - 40),
+                                  height: contentRect.height - 200), // Reduced height to make room for signature
                         withAttributes: attributes)
+            
+            // Draw signature section
+            let signatureY = contentRect.maxY - 150
+            "Fleet Manager's Signature:".draw(at: CGPoint(x: contentRect.minX, y: signatureY),
+                                           withAttributes: attributes)
+            
+            // Draw signature line
+            let signatureLine = UIBezierPath()
+            signatureLine.move(to: CGPoint(x: contentRect.minX, y: signatureY + 50))
+            signatureLine.addLine(to: CGPoint(x: contentRect.minX + 200, y: signatureY + 50))
+            signatureLine.stroke()
+            
+            // Draw signature if available
+            if let signatureData = signature,
+               let signatureImage = UIImage(data: signatureData) {
+                let signatureRect = CGRect(x: contentRect.minX,
+                                         y: signatureY + 10,
+                                         width: 200,
+                                         height: 60)
+                signatureImage.draw(in: signatureRect)
+            }
+            
+            // Draw date
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .long
+            let dateString = "Date: \(dateFormatter.string(from: Date()))"
+            dateString.draw(at: CGPoint(x: contentRect.minX, y: signatureY + 70),
+                          withAttributes: attributes)
         }
         
         return data

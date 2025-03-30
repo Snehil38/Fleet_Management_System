@@ -464,6 +464,8 @@ struct TripDetailView: View {
     @State private var pdfData: Data? = nil
     @State private var pdfError: String? = nil
     @State private var showingPDFError = false
+    @State private var showingSignatureSheet = false
+    @State private var fleetManagerSignature: Data? = nil
     
     // Location search state
     @State private var searchResults: [MKLocalSearchCompletion] = []
@@ -726,7 +728,7 @@ struct TripDetailView: View {
                     Section(header: Text("PROOF OF DELIVERY")) {
                         Button(action: {
                             do {
-                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip, signature: fleetManagerSignature)
                                 showingDeliveryReceipt = true
                             } catch {
                                 pdfError = error.localizedDescription
@@ -743,14 +745,33 @@ struct TripDetailView: View {
                             }
                         }
                         
-                        Button(action: {}) {
+                        Button(action: {
+                            showingSignatureSheet = true
+                        }) {
                             HStack {
                                 Image(systemName: "signature")
                                     .foregroundColor(.blue)
-                                Text("Customer Signature")
+                                Text("Fleet Manager Signature")
                                 Spacer()
+                                if fleetManagerSignature != nil {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                }
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
+                            }
+                        }
+                        
+                        if let pdfData = pdfData {
+                            ShareLink(item: pdfData, preview: SharePreview("Delivery Receipt", image: Image(systemName: "doc.fill"))) {
+                                HStack {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .foregroundColor(.blue)
+                                    Text("Download Receipt")
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
                             }
                         }
                     }
@@ -893,6 +914,25 @@ struct TripDetailView: View {
                                 }
                             }
                     }
+                }
+            }
+            .sheet(isPresented: $showingSignatureSheet) {
+                NavigationView {
+                    SignatureCaptureView(signature: $fleetManagerSignature)
+                        .navigationTitle("Fleet Manager Signature")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Cancel") {
+                                    showingSignatureSheet = false
+                                }
+                            }
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showingSignatureSheet = false
+                                }
+                            }
+                        }
                 }
             }
             .alert("Error", isPresented: $showingPDFError) {
@@ -1567,6 +1607,75 @@ class TripsSearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
     
     func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         print("Search completer error: \(error.localizedDescription)")
+    }
+}
+
+// Add SignatureCaptureView
+struct SignatureCaptureView: View {
+    @Binding var signature: Data?
+    @State private var currentDrawing: Path = Path()
+    @State private var drawings: [Path] = []
+    @GestureState private var isDrawing: Bool = false
+    
+    var body: some View {
+        VStack {
+            Text("Please sign below")
+                .font(.headline)
+                .padding()
+            
+            ZStack {
+                Rectangle()
+                    .fill(Color.white)
+                    .border(Color.gray, width: 1)
+                    .frame(height: 200)
+                
+                Path { path in
+                    path.addPath(currentDrawing)
+                    drawings.forEach { path.addPath($0) }
+                }
+                .stroke(Color.black, lineWidth: 2)
+                .background(Color.white)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let point = value.location
+                            if isDrawing {
+                                currentDrawing.addLine(to: point)
+                            } else {
+                                currentDrawing = Path()
+                                currentDrawing.move(to: point)
+                            }
+                        }
+                        .onEnded { _ in
+                            drawings.append(currentDrawing)
+                            currentDrawing = Path()
+                            
+                            // Convert drawing to image and then to Data
+                            let renderer = ImageRenderer(content: Path { path in
+                                drawings.forEach { path.addPath($0) }
+                            }.stroke(Color.black, lineWidth: 2))
+                            
+                            if let uiImage = renderer.uiImage {
+                                signature = uiImage.pngData()
+                            }
+                        }
+                        .updating($isDrawing) { (value, state, transaction) in
+                            state = true
+                        }
+                )
+            }
+            .padding()
+            
+            Button(action: {
+                currentDrawing = Path()
+                drawings = []
+                signature = nil
+            }) {
+                Text("Clear")
+                    .foregroundColor(.red)
+            }
+            .padding()
+        }
     }
 } 
 
