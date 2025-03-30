@@ -90,28 +90,28 @@ private struct VehicleCard: View {
                     }
                 }
 
-                if let trip = currentTrip {
-                    Button(action: {
-                        do {
-                            pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
-                            showingDeliveryReceipt = true
-                        } catch {
-                            pdfError = error.localizedDescription
-                            showingPDFError = true
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "doc.text.fill")
-                                .foregroundColor(.blue)
-                            Text("Delivery Receipt")
-                                .foregroundColor(.blue)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.top, 8)
-                    }
-                }
+//                if let trip = currentTrip {
+//                    Button(action: {
+//                        do {
+//                            pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
+//                            showingDeliveryReceipt = true
+//                        } catch {
+//                            pdfError = error.localizedDescription
+//                            showingPDFError = true
+//                        }
+//                    }) {
+//                        HStack {
+//                            Image(systemName: "doc.text.fill")
+//                                .foregroundColor(.blue)
+//                            Text("Delivery Receipt")
+//                                .foregroundColor(.blue)
+//                            Spacer()
+//                            Image(systemName: "chevron.right")
+//                                .foregroundColor(.gray)
+//                        }
+//                        .padding(.top, 8)
+//                    }
+//                }
             }
             .padding()
         }
