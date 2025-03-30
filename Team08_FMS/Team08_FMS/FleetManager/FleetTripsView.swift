@@ -296,7 +296,7 @@ struct TripCardView: View {
                     Text("Vehicle:")
                         .font(.caption)
                         .foregroundColor(.gray)
-                    Text(trip.vehicleDetails.licensePlate)
+                    Text(trip.vehicleDetails.name)
                         .font(.subheadline)
                 }
                 

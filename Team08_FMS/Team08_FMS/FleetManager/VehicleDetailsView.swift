@@ -294,7 +294,9 @@ struct VehicleDetailView: View {
     }
     
     private var isLicensePlateValid: Bool {
-        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        // This regex matches two letters, two numbers, two letters, and four numbers.
+        let licensePlateRegex = "^[A-Za-z]{2}[0-9]{2}[A-Za-z]{2}[0-9]{4}$"
+        return NSPredicate(format: "SELF MATCHES %@", licensePlateRegex).evaluate(with: licensePlate)
     }
     
     private var isBodySubtypeValid: Bool {
@@ -354,7 +356,7 @@ struct VehicleDetailView: View {
                 vehicleDetailsSection
                 
                 // Documents Section
-                documentSection
+//                documentSection
             } else {
                 // View mode sections
                 readOnlyBasicInfoSection
@@ -553,8 +555,9 @@ struct VehicleDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 TextField("License Plate", text: $licensePlate)
                     .onChange(of: licensePlate) { _, _ in licensePlateEdited = true }
+                    .autocapitalization(.allCharacters)
                 if licensePlateEdited && !isLicensePlateValid {
-                    Text("License Plate cannot be empty.")
+                    Text("License Plate must follow the format KA01CA1111.")
                         .font(.caption)
                         .foregroundColor(.red)
                 }
@@ -719,7 +722,9 @@ struct VehicleSaveView: View {
     }
 
     private var isLicensePlateValid: Bool {
-        !licensePlate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        // This regex matches two letters, two numbers, two letters, and four numbers.
+        let licensePlateRegex = "^[A-Za-z]{2}[0-9]{2}[A-Za-z]{2}[0-9]{4}$"
+        return NSPredicate(format: "SELF MATCHES %@", licensePlateRegex).evaluate(with: licensePlate)
     }
 
     private var isBodySubtypeValid: Bool {
@@ -803,9 +808,9 @@ struct VehicleSaveView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         TextField("License Plate", text: $licensePlate)
                             .onChange(of: licensePlate) { _, _ in licensePlateEdited = true }
+                            .autocapitalization(.allCharacters)
                         if licensePlateEdited && !isLicensePlateValid {
-                            Text("License Plate cannot be empty.")
-                                .font(.caption)
+                            Text("License Plate must follow the format KA01CA1111.")                                .font(.caption)
                                 .foregroundColor(.red)
                         }
                     }
