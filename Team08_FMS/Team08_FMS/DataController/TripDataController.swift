@@ -1176,110 +1176,208 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             CrewDataController.shared.drivers.first { $0.userID == driverId }?.name
         } ?? "Unassigned"
         
-        let content = """
-        Trip Details:
-        ------------
-        Trip ID: \(trip.name)
-        Status: \(trip.status.rawValue)
-        
-        Vehicle Information:
-        ------------------
-        Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
-        License Plate: \(trip.vehicleDetails.licensePlate)
-        Driver: \(driverName)
-        
-        Delivery Information:
-        -------------------
-        Destination: \(trip.destination)
-        Address: \(trip.address)
-        Distance: \(trip.distance)
-        
-        Timing:
-        -------
-        Start Time: \(trip.startTime?.formatted() ?? "N/A")
-        End Time: \(trip.endTime?.formatted() ?? "N/A")
-        
-        Cost Information:
-        ---------------
-        Estimated Fuel Cost: $\(Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0 * 0.5)
-        Total Revenue: $\((Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0 * 0.5) + 50.0)
-        
-        Notes:
-        ------
-        \(trip.notes ?? "No additional notes")
-        """
-        
         // Create a PDF document
         let format = UIGraphicsPDFRendererFormat()
         let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
         
         let data = renderer.pdfData { context in
+            // Function to draw a section that handles page breaks
+            func drawSection(title: String, content: String, at yPosition: inout CGFloat, in rect: CGRect, context: UIGraphicsPDFRendererContext) -> CGFloat {
+                let headerHeight: CGFloat = 25
+                let contentSpacing: CGFloat = 10
+                let sectionSpacing: CGFloat = 30
+                
+                // Check if we need a new page
+                if yPosition + headerHeight + 50 > rect.maxY - 120 {
+                    context.beginPage()
+                    yPosition = rect.minY + 40
+                }
+                
+                // Draw section header with background
+                let headerRect = CGRect(x: rect.minX, y: yPosition, width: rect.width, height: headerHeight)
+                let path = UIBezierPath(roundedRect: headerRect, cornerRadius: 5)
+                UIColor(red: 0.95, green: 0.95, blue: 0.95, alpha: 1.0).setFill()
+                path.fill()
+                
+                let headerAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.boldSystemFont(ofSize: 16),
+                    .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
+                ]
+                
+                title.draw(at: CGPoint(x: rect.minX + 10, y: yPosition + 5),
+                          withAttributes: headerAttributes)
+                
+                // Draw content with proper spacing
+                let contentStyle = NSMutableParagraphStyle()
+                contentStyle.alignment = .left
+                contentStyle.lineSpacing = 8.0
+                
+                let contentAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 14),
+                    .paragraphStyle: contentStyle,
+                    .foregroundColor: UIColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1.0)
+                ]
+                
+                let contentRect = CGRect(x: rect.minX + 20,
+                                       y: yPosition + headerHeight + contentSpacing,
+                                       width: rect.width - 40,
+                                       height: 1000) // Large height for calculation
+                
+                let contentSize = (content as NSString).boundingRect(
+                    with: CGSize(width: contentRect.width, height: .greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    attributes: contentAttributes,
+                    context: nil
+                )
+                
+                // Check if content needs a new page
+                if yPosition + headerHeight + contentSpacing + contentSize.height + sectionSpacing > rect.maxY - 120 {
+                    context.beginPage()
+                    yPosition = rect.minY + 40
+                }
+                
+                content.draw(in: CGRect(x: contentRect.minX,
+                                      y: yPosition + headerHeight + contentSpacing,
+                                      width: contentRect.width,
+                                      height: contentSize.height),
+                           withAttributes: contentAttributes)
+                
+                return yPosition + headerHeight + contentSpacing + contentSize.height + sectionSpacing
+            }
+            
             context.beginPage()
             
-            // Set up attributes for drawing
+            // Set up the content area with margins
+            let contentRect = pageRect.insetBy(dx: 50, dy: 50)
+            var currentY = contentRect.minY
+            
+            // Draw title and header
             let titleStyle = NSMutableParagraphStyle()
             titleStyle.alignment = .center
             
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.alignment = .left
-            paragraphStyle.lineSpacing = 6.0
-            
             let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 24),
+                .font: UIFont.boldSystemFont(ofSize: 28),
                 .paragraphStyle: titleStyle,
                 .foregroundColor: UIColor.black
             ]
             
-            let contentAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 12),
-                .paragraphStyle: paragraphStyle,
-                .foregroundColor: UIColor.black
-            ]
-            
-            let subtitleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 14),
-                .paragraphStyle: paragraphStyle,
-                .foregroundColor: UIColor.black
-            ]
-            
-            // Draw content with proper margins
-            let contentRect = pageRect.insetBy(dx: 50, dy: 50)
-            
             // Draw title centered at the top
             let title = "DELIVERY RECEIPT"
             let titleSize = title.size(withAttributes: titleAttributes)
-            title.draw(at: CGPoint(x: (pageRect.width - titleSize.width) / 2, y: contentRect.minY),
+            title.draw(at: CGPoint(x: (pageRect.width - titleSize.width) / 2, y: currentY),
                       withAttributes: titleAttributes)
             
-            // Draw main content
-            content.draw(in: CGRect(x: contentRect.minX,
-                                  y: contentRect.minY + titleSize.height + 20,
-                                  width: contentRect.width,
-                                  height: contentRect.height - 200),
-                        withAttributes: contentAttributes)
+            // Draw decorative lines under title
+            let lineY = currentY + titleSize.height + 10
+            let linePath = UIBezierPath()
+            linePath.move(to: CGPoint(x: contentRect.minX, y: lineY))
+            linePath.addLine(to: CGPoint(x: contentRect.maxX, y: lineY))
+            UIColor(red: 0.8, green: 0.8, blue: 0.8, alpha: 1.0).setStroke()
+            linePath.lineWidth = 1.0
+            linePath.stroke()
             
-            // Draw signature section at the bottom
-            let signatureY = contentRect.maxY - 120
+            currentY = lineY + 30
             
-            // Draw signature header
+            // Draw sections with proper spacing and page breaks
+            currentY = drawSection(
+                title: "Trip Details",
+                content: """
+                Trip ID: \(trip.name)
+                Status: \(trip.status.rawValue)
+                """,
+                at: &currentY,
+                in: contentRect,
+                context: context
+            )
+            
+            currentY = drawSection(
+                title: "Vehicle Information",
+                content: """
+                Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
+                License Plate: \(trip.vehicleDetails.licensePlate)
+                Driver: \(driverName)
+                """,
+                at: &currentY,
+                in: contentRect,
+                context: context
+            )
+            
+            currentY = drawSection(
+                title: "Delivery Information",
+                content: """
+                Destination: \(trip.destination)
+                Address: \(trip.address)
+                Distance: \(trip.distance)
+                """,
+                at: &currentY,
+                in: contentRect,
+                context: context
+            )
+            
+            currentY = drawSection(
+                title: "Timing",
+                content: """
+                Start Time: \(trip.startTime?.formatted() ?? "N/A")
+                End Time: \(trip.endTime?.formatted() ?? "N/A")
+                """,
+                at: &currentY,
+                in: contentRect,
+                context: context
+            )
+            
+            let estimatedFuelCost = Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0 * 0.5
+            let totalRevenue = estimatedFuelCost + 50.0
+            
+            currentY = drawSection(
+                title: "Cost Information",
+                content: """
+                Estimated Fuel Cost: $\(String(format: "%.2f", estimatedFuelCost))
+                Total Revenue: $\(String(format: "%.2f", totalRevenue))
+                """,
+                at: &currentY,
+                in: contentRect,
+                context: context
+            )
+            
+            if let notes = trip.notes, !notes.isEmpty {
+                currentY = drawSection(
+                    title: "Notes",
+                    content: notes,
+                    at: &currentY,
+                    in: contentRect,
+                    context: context
+                )
+            }
+            
+            // Check if we need a new page for signature
+            if currentY + 150 > contentRect.maxY {
+                context.beginPage()
+                currentY = contentRect.minY + 40
+            }
+            
+            // Draw signature section
+            let signatureHeaderAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 16),
+                .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
+            ]
+            
             "Fleet Manager's Signature:".draw(
-                at: CGPoint(x: contentRect.minX, y: signatureY),
-                withAttributes: subtitleAttributes
+                at: CGPoint(x: contentRect.minX, y: currentY),
+                withAttributes: signatureHeaderAttributes
             )
             
             // Draw signature if available
             if let signatureData = signature,
                let signatureImage = UIImage(data: signatureData) {
-                let maxWidth: CGFloat = 200  // Reduced width for better appearance
-                let maxHeight: CGFloat = 60   // Reduced height for better appearance
+                let maxWidth: CGFloat = 200
+                let maxHeight: CGFloat = 60
                 
                 // Calculate signature size while maintaining aspect ratio
                 let aspectRatio = signatureImage.size.width / signatureImage.size.height
                 var finalWidth = maxWidth
                 var finalHeight = maxWidth / aspectRatio
                 
-                // Adjust if height exceeds maxHeight
                 if finalHeight > maxHeight {
                     finalHeight = maxHeight
                     finalWidth = maxHeight * aspectRatio
@@ -1287,21 +1385,24 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 
                 let signatureRect = CGRect(
                     x: contentRect.minX,
-                    y: signatureY + 20,
+                    y: currentY + 20,
                     width: finalWidth,
                     height: finalHeight
                 )
                 
-                // Draw signature
+                // Draw signature with subtle border
+                let borderPath = UIBezierPath(rect: signatureRect)
+                UIColor(white: 0.9, alpha: 1.0).setStroke()
+                borderPath.lineWidth = 0.5
+                borderPath.stroke()
+                
                 signatureImage.draw(in: signatureRect)
-            }
-            
-            // Draw signature line if no signature is provided
-            if signature == nil {
+            } else {
+                // Draw signature line with subtle styling
                 let signatureLine = UIBezierPath()
-                signatureLine.move(to: CGPoint(x: contentRect.minX, y: signatureY + 40))
-                signatureLine.addLine(to: CGPoint(x: contentRect.minX + 200, y: signatureY + 40))
-                UIColor.black.setStroke()
+                signatureLine.move(to: CGPoint(x: contentRect.minX, y: currentY + 40))
+                signatureLine.addLine(to: CGPoint(x: contentRect.minX + 200, y: currentY + 40))
+                UIColor(red: 0.8, green: 0.8, blue: 0.8, alpha: 1.0).setStroke()
                 signatureLine.lineWidth = 0.5
                 signatureLine.stroke()
             }
@@ -1310,9 +1411,14 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .long
             let dateString = "Date: \(dateFormatter.string(from: Date()))"
+            let dateAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 14),
+                .foregroundColor: UIColor(red: 0.3, green: 0.3, blue: 0.3, alpha: 1.0)
+            ]
+            
             dateString.draw(
-                at: CGPoint(x: contentRect.minX, y: signatureY + 70),
-                withAttributes: contentAttributes
+                at: CGPoint(x: contentRect.minX, y: currentY + 90),
+                withAttributes: dateAttributes
             )
         }
         
