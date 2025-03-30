@@ -609,7 +609,6 @@ struct TripDetailsView: View {
     private func generateDeliveryReceipt() {
         print("Generating delivery receipt...")
         do {
-            // Create a PDF document
             let pdfMetaData = [
                 kCGPDFContextCreator: "FMS App",
                 kCGPDFContextAuthor: "Driver App",
@@ -623,10 +622,7 @@ struct TripDetailsView: View {
             let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
             
             let pdfData = try renderer.pdfData { context in
-                // Begin the first page
                 context.beginPage()
-                
-                // Get the current graphics context
                 let ctx = UIGraphicsGetCurrentContext()!
                 
                 // Set up text attributes
@@ -652,24 +648,31 @@ struct TripDetailsView: View {
                 // Set up table drawing parameters
                 var yPosition: CGFloat = 100
                 let leftMargin: CGFloat = 50
-                let columnWidth: CGFloat = 200
+                let labelWidth: CGFloat = 150  // Width for labels
+                let valueWidth: CGFloat = 350  // Width for values
                 let rowHeight: CGFloat = 25
                 let padding: CGFloat = 5
                 
-                // Function to draw a table row
+                // Function to draw a table row with word wrap
                 func drawTableRow(label: String, value: String, atY y: CGFloat) -> CGFloat {
-                    let rect = CGRect(x: leftMargin, y: y, width: columnWidth * 2 + padding, height: rowHeight)
+                    let rect = CGRect(x: leftMargin, y: y, width: labelWidth + valueWidth, height: rowHeight)
                     ctx.stroke(rect)
                     
                     // Draw vertical line between columns
-                    let midX = leftMargin + columnWidth
+                    let midX = leftMargin + labelWidth
                     ctx.move(to: CGPoint(x: midX, y: y))
                     ctx.addLine(to: CGPoint(x: midX, y: y + rowHeight))
                     ctx.strokePath()
                     
-                    // Draw text
-                    label.draw(at: CGPoint(x: leftMargin + padding, y: y + padding), withAttributes: textAttributes)
-                    value.draw(at: CGPoint(x: midX + padding, y: y + padding), withAttributes: textAttributes)
+                    // Draw label
+                    let labelRect = CGRect(x: leftMargin + padding, y: y + padding, 
+                                         width: labelWidth - padding * 2, height: rowHeight - padding * 2)
+                    label.draw(in: labelRect, withAttributes: textAttributes)
+                    
+                    // Draw value with potential wrapping
+                    let valueRect = CGRect(x: midX + padding, y: y + padding,
+                                         width: valueWidth - padding * 2, height: rowHeight - padding * 2)
+                    value.draw(in: valueRect, withAttributes: textAttributes)
                     
                     return y + rowHeight
                 }
@@ -700,8 +703,16 @@ struct TripDetailsView: View {
                 "Timing Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
                 yPosition += 25
                 
-                yPosition = drawTableRow(label: "Start Time:", value: trip.startTime?.formatted() ?? "N/A", atY: yPosition)
-                yPosition = drawTableRow(label: "End Time:", value: trip.endTime?.formatted() ?? "N/A", atY: yPosition)
+                // Format dates properly
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateStyle = .medium
+                dateFormatter.timeStyle = .short
+                
+                let startTimeStr = trip.startTime.map { dateFormatter.string(from: $0) } ?? "N/A"
+                let endTimeStr = trip.endTime.map { dateFormatter.string(from: $0) } ?? "N/A"
+                
+                yPosition = drawTableRow(label: "Start Time:", value: startTimeStr, atY: yPosition)
+                yPosition = drawTableRow(label: "End Time:", value: endTimeStr, atY: yPosition)
                 
                 yPosition += 20
                 
@@ -737,8 +748,11 @@ struct TripDetailsView: View {
                 
                 yPosition += 80
                 
-                // Draw date
-                let dateString = "Date: \(Date().formatted(date: .long, time: .omitted))"
+                // Draw date with proper formatting
+                let currentDate = Date()
+                dateFormatter.dateStyle = .long
+                dateFormatter.timeStyle = .none
+                let dateString = "Date: \(dateFormatter.string(from: currentDate))"
                 dateString.draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: textAttributes)
             }
             
