@@ -57,7 +57,7 @@ struct DriverProfileView: View {
                 } else {
                     return Alert(
                         title: Text("Confirm Status Change"),
-                        message: Text("Are you sure you want to set your status to Off Duty?"),
+                        message: Text("Your status will be updated to Unavailable."),
                         primaryButton: .cancel(Text("Cancel")),
                         secondaryButton: .default(Text("Confirm"), action: {
                             Task {
@@ -130,30 +130,15 @@ struct DriverProfileView: View {
                 Text("Status")
                     .font(.headline)
                 Spacer()
-                Text(AppDataController.shared.getStatusString(status: driver.status))
+                Text(driver.status == .available ? "Available" : "Unavailable")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(driver.status.color)
+                    .foregroundColor(driver.status == .available ? .green : .red)
                 
                 Toggle("", isOn: statusToggleBinding(for: driver))
                     .tint(.green)
-                    .disabled(driver.status == .offDuty)
             }
             .padding(.horizontal)
-            
-            if driver.status == .offDuty {
-                Text("Your status will automatically change back to Available tomorrow.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .italic()
-            }
-            
-            else if driver.status == .busy {
-                Text("You cannot change status while you have a In-Progress Trip.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .italic()
-            }
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -290,19 +275,13 @@ struct DriverProfileView: View {
         Binding<Bool>(
             get: { driver.status == .available },
             set: { newValue in
-                // Prevent changes if driver is Off Duty.
-                if driver.status == .offDuty { return }
                 let newStatus: Status = newValue ? .available : .offDuty
                 if newStatus != driver.status {
-                    updatePendingStatus(newStatus: newStatus)
+                    pendingStatus = newStatus
+                    showingStatusChangeAlert = true
                 }
             }
         )
-    }
-    
-    private func updatePendingStatus(newStatus: Status) {
-        pendingStatus = newStatus
-        showingStatusChangeAlert = true
     }
     
     // Helper to format dates
