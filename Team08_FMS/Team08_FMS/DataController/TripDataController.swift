@@ -536,6 +536,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let has_completed_post_trip: Bool
                 let vehicle_id: UUID
                 let driver_id: UUID?
+                let secondary_driver_id: UUID?
                 let start_time: Date?
                 let end_time: Date?
                 let notes: String?
@@ -586,7 +587,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_pre_trip: data.has_completed_pre_trip,
                     has_completed_post_trip: data.has_completed_post_trip,
                     vehicle_id: data.vehicle_id,
-                    driver_id: data.driver_id, secondary_driver_id: nil,
+                    driver_id: data.driver_id, secondary_driver_id: data.secondary_driver_id,
                     start_time: data.start_time,
                     end_time: data.end_time,
                     notes: data.notes,
@@ -724,6 +725,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let has_completed_post_trip: Bool
                 let vehicle_id: UUID
                 let driver_id: UUID?
+                let secondary_driver_id: UUID?
                 let start_time: Date?
                 let end_time: Date?
                 let notes: String?
@@ -774,7 +776,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_pre_trip: data.has_completed_pre_trip,
                     has_completed_post_trip: data.has_completed_post_trip,
                     vehicle_id: data.vehicle_id,
-                    driver_id: data.driver_id, secondary_driver_id: nil,
+                    driver_id: data.driver_id, secondary_driver_id: data.secondary_driver_id,
                     start_time: data.start_time,
                     end_time: data.end_time,
                     notes: data.notes,

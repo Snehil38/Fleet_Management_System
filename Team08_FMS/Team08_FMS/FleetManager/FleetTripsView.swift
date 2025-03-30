@@ -694,19 +694,9 @@ struct TripDetailView: View {
                         // Driver information
                         if let driverId = trip.driverId,
                            let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
-                            TripDetailRow(icon: "person.fill", title: "Primary Driver", value: driver.name)
+                            TripDetailRow(icon: "person.fill", title: "Driver", value: driver.name)
                         } else {
-                            TripDetailRow(icon: "person.fill", title: "Primary Driver", value: "Unassigned")
-                        }
-                        
-                        // Secondary driver information for long trips
-                        if let distance = Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()), distance > 500 {
-                            if let secondaryDriverId = trip.secondaryDriverId,
-                               let secondaryDriver = CrewDataController.shared.drivers.first(where: { $0.userID == secondaryDriverId }) {
-                                TripDetailRow(icon: "person.2.fill", title: "Secondary Driver", value: secondaryDriver.name)
-                            } else {
-                                TripDetailRow(icon: "person.2.fill", title: "Secondary Driver", value: "Unassigned")
-                            }
+                            TripDetailRow(icon: "person.fill", title: "Driver", value: "Unassigned")
                         }
                     }
                 }

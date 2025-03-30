@@ -128,59 +128,56 @@ struct TripsView: View {
         case .upcoming:
             return availabilityManager.isAvailable ? tripController.upcomingTrips : []
         case .delivered:
-            return tripController.recentDeliveries.map { createTripFromDelivery($0) ?? createFallbackTrip() }
+            // Convert recent deliveries to Trip objects with improved information
+            return tripController.recentDeliveries.map { delivery in
+                createTripFromDelivery(delivery) ?? {
+                    // Create a fallback vehicle
+                    let vehicle = Vehicle(
+                        name: "Unknown Vehicle",
+                        year: 0,
+                        make: "Unknown",
+                        model: "Unknown",
+                        vin: "Unknown",
+                        licensePlate: "Unknown",
+                        vehicleType: .truck,
+                        color: "Unknown",
+                        bodyType: .cargo,
+                        bodySubtype: "Unknown",
+                        msrp: 0.0,
+                        pollutionExpiry: Date(),
+                        insuranceExpiry: Date(),
+                        status: .available
+                    )
+                    
+                    // Create a fallback SupabaseTrip
+                    let supabaseTrip = SupabaseTrip(
+                        id: UUID(),
+                        destination: "Unknown Location",
+                        trip_status: "pending",
+                        has_completed_pre_trip: false,
+                        has_completed_post_trip: false,
+                        vehicle_id: vehicle.id,
+                        driver_id: nil,
+                        secondary_driver_id: nil,
+                        start_time: nil,
+                        end_time: nil,
+                        notes: "No notes available",
+                        created_at: Date(),
+                        updated_at: Date(),
+                        is_deleted: false,
+                        start_latitude: 0,
+                        start_longitude: 0,
+                        end_latitude: 0,
+                        end_longitude: 0,
+                        pickup: "Unknown Address",
+                        estimated_distance: 0,
+                        estimated_time: nil
+                    )
+                    
+                    return Trip(from: supabaseTrip, vehicle: vehicle)
+                }()
+            }
         }
-    }
-    
-    private func createFallbackTrip() -> Trip {
-        let vehicle = createFallbackVehicle()
-        let supabaseTrip = createFallbackSupabaseTrip(vehicle: vehicle)
-        return Trip(from: supabaseTrip, vehicle: vehicle)
-    }
-    
-    private func createFallbackVehicle() -> Vehicle {
-        return Vehicle(
-            name: "Unknown Vehicle",
-            year: 0,
-            make: "Unknown",
-            model: "Unknown",
-            vin: "Unknown",
-            licensePlate: "Unknown",
-            vehicleType: .truck,
-            color: "Unknown",
-            bodyType: .cargo,
-            bodySubtype: "Unknown",
-            msrp: 0.0,
-            pollutionExpiry: Date(),
-            insuranceExpiry: Date(),
-            status: .available
-        )
-    }
-    
-    private func createFallbackSupabaseTrip(vehicle: Vehicle) -> SupabaseTrip {
-        return SupabaseTrip(
-            id: UUID(),
-            destination: "Unknown Location",
-            trip_status: "pending",
-            has_completed_pre_trip: false,
-            has_completed_post_trip: false,
-            vehicle_id: vehicle.id,
-            driver_id: nil,
-            secondary_driver_id: nil,
-            start_time: nil,
-            end_time: nil,
-            notes: "No notes available",
-            created_at: Date(),
-            updated_at: Date(),
-            is_deleted: false,
-            start_latitude: 0,
-            start_longitude: 0,
-            end_latitude: 0,
-            end_longitude: 0,
-            pickup: "Unknown Address",
-            estimated_distance: 0,
-            estimated_time: nil
-        )
     }
     
     // Helper function to create Trip from DeliveryDetails
@@ -236,26 +233,6 @@ struct TripsView: View {
             status: .available
         )
         
-        // Format estimated time string
-        let formattedTime: String
-        if let time = estimatedTime {
-            let hours = Int(time)
-            let minutes = Int((time - Double(hours)) * 60)
-            formattedTime = "\(hours)h \(minutes)m"
-        } else {
-            formattedTime = "N/A"
-        }
-        
-        // Build notes string
-        let notes = """
-        Trip: \(tripName)
-        Cargo Type: \(cargoType)
-        Estimated Distance: \(distance)
-        Estimated Time: \(formattedTime)
-        From: \(startingPoint)
-        \(deliveryNotes)
-        """
-        
         // Create a SupabaseTrip with the delivery information
         let supabaseTrip = SupabaseTrip(
             id: delivery.id,
@@ -268,7 +245,14 @@ struct TripsView: View {
             secondary_driver_id: nil,
             start_time: nil,
             end_time: nil,
-            notes: notes,
+            notes: """
+                   Trip: \(tripName)
+                   Cargo Type: \(cargoType)
+                   Estimated Distance: \(distance)
+                   Estimated Time: \(estimatedTime.map { "\(Int($0))h \(Int(($0 - Double(Int($0))) * 60))m" } ?? "N/A")
+                   From: \(startingPoint)
+                   \(deliveryNotes)
+                   """,
             created_at: Date(),
             updated_at: Date(),
             is_deleted: false,
