@@ -435,8 +435,8 @@ struct AddTripView: View {
     @State private var selectedVehicle: Vehicle?
     @State private var selectedDriverId: UUID?
     @State private var cargoType = "General Goods"
-    @State private var startDate = Date()
-    @State private var deliveryDate = Date().addingTimeInterval(86400)
+    @State private var startDate = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date()
+    @State private var deliveryDate = Calendar.current.date(byAdding: .hour, value: 28, to: Date()) ?? Date()
     @State private var distance: Double = 0.0
     @State private var fuelCost: Double = 0.0
     @State private var tripCost: Double = 0.0
@@ -445,6 +445,7 @@ struct AddTripView: View {
     @State private var notes: String = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var showingSuccessAlert = false
     
     // Fetched available vehicles after route calculation.
     @State private var fetchedAvailableVehicles: [Vehicle] = []
@@ -585,18 +586,27 @@ struct AddTripView: View {
                         // Schedule Card
                         CardView(title: "SCHEDULE", systemImage: "calendar") {
                             VStack(spacing: 16) {
-                                DatePicker("Start Date",
-                                           selection: $startDate,
-                                           in: Date()...,
-                                           displayedComponents: [.date, .hourAndMinute]
-                                )
-                                .onChange(of: startDate) { newDate, _ in
-                                    if distance > 0 {
-                                        let estimatedHours = distance / 40.0
-                                        deliveryDate = newDate.addingTimeInterval(estimatedHours * 3600)
+                                // Start Date Picker with minimum 4 hours from now
+                                let minStartDate = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date()
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    DatePicker("Start Date",
+                                             selection: $startDate,
+                                             in: minStartDate...,
+                                             displayedComponents: [.date, .hourAndMinute]
+                                    )
+                                    .onChange(of: startDate) { newDate, _ in
+                                        if distance > 0 {
+                                            let estimatedHours = distance / 40.0
+                                            deliveryDate = newDate.addingTimeInterval(estimatedHours * 3600)
+                                        }
                                     }
+                                    .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
+                                    
+                                    Text("Trip must start at least 4 hours from now")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
                                 }
-                                .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
                                 
                                 if distance > 0 {
                                     Divider()
@@ -782,10 +792,17 @@ struct AddTripView: View {
                 Button("Cancel") { dismiss() }
             }
         }
-        .alert(isPresented: $showingAlert) {
-            Alert(title: Text("Trip Creation"),
-                  message: Text(alertMessage),
-                  dismissButton: .default(Text("OK")))
+        .alert("Error", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
+        .alert("Success", isPresented: $showingSuccessAlert) {
+            Button("OK", role: .cancel) {
+                dismiss()
+            }
+        } message: {
+            Text("Trip has been successfully created!")
         }
         .onAppear {
             setupSearchCompleter()
@@ -984,14 +1001,14 @@ struct AddTripView: View {
                 
                 if success {
                     try await TripDataController.shared.fetchAllTrips()
-                    dismiss()
+                    showingSuccessAlert = true
                 } else {
-                    alertMessage = "Failed to create trip. Please try again."
                     showingAlert = true
+                    alertMessage = "Failed to create trip. Please try again."
                 }
             } catch {
-                alertMessage = "Error: \(error.localizedDescription)"
                 showingAlert = true
+                alertMessage = "Error: \(error.localizedDescription)"
             }
         }
     }

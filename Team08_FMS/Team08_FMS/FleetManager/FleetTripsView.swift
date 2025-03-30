@@ -128,6 +128,11 @@ struct FleetTripsView: View {
                     EmptyTripsView(filterType: selectedFilter)
                 } else {
                     ScrollView {
+                        RefreshableView {
+                            Task {
+                                await tripController.refreshAllTrips()
+                            }
+                        }
                         LazyVStack(spacing: 16) {
                             ForEach(filteredTrips) { trip in
                                 NavigationLink(destination: TripDetailView(trip: trip)) {
@@ -1530,6 +1535,31 @@ class TripsSearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
     
     func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         print("Search completer error: \(error.localizedDescription)")
+    }
+}
+
+struct RefreshableView: View {
+    let action: () async -> Void
+    @State private var isRefreshing = false
+    
+    init(action: @escaping () async -> Void) {
+        self.action = action
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            if geometry.frame(in: .global).minY > 50 && !isRefreshing {
+                ProgressView()
+                    .onAppear {
+                        isRefreshing = true
+                        Task {
+                            await action()
+                            isRefreshing = false
+                        }
+                    }
+            }
+        }
+        .frame(height: 0)
     }
 } 
 
