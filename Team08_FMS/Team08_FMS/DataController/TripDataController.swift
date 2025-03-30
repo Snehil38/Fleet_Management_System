@@ -297,6 +297,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             print("DEBUG: Entered destination region")
             let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) entered destination region"
             let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            supabaseController.insertIntoGeofenceEvents(event: event)
             tripTimer?.invalidate()
             tripTimer = nil
             
