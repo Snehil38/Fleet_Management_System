@@ -502,23 +502,19 @@ struct TripDetailsView: View {
                             }
                         }
                         
-                        Button(action: generateAndDownloadPDF) {
+                        Button(action: {
+                            generateChatHistoryPDF()
+                        }) {
                             HStack {
-                                Image(systemName: "arrow.down.doc.fill")
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
                                     .foregroundColor(.blue)
-                                Text("Download Chat History")
+                                Text("Chat History")
                                     .foregroundColor(.blue)
                                 Spacer()
-                                if isGeneratingPDF {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
                             }
                         }
-                        .disabled(isGeneratingPDF)
                     }
                 } else {
                     // Status section for non-completed trips
@@ -781,75 +777,138 @@ struct TripDetailsView: View {
         return calculateFuelCost() * 1.5 // 50% margin
     }
     
-    private func generateAndDownloadPDF() {
-        isGeneratingPDF = true
-        
-        Task {
-            do {
-                // Create PDF content
-                let pdfContent = generatePDFContent()
+    private func generateChatHistoryPDF() {
+        print("Generating chat history PDF...")
+        do {
+            let pdfMetaData = [
+                kCGPDFContextCreator: "FMS App",
+                kCGPDFContextAuthor: "Driver App",
+                kCGPDFContextTitle: "Chat History"
+            ]
+            
+            let format = UIGraphicsPDFRendererFormat()
+            format.documentInfo = pdfMetaData as [String: Any]
+            
+            let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
+            let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+            
+            let pdfData = try renderer.pdfData { context in
+                context.beginPage()
+                let ctx = UIGraphicsGetCurrentContext()!
                 
-                // Get the documents directory
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                let fileName = "chat_history_\(trip.id.uuidString)_\(Date().formatted(.iso8601)).pdf"
-                let fileURL = documentsPath.appendingPathComponent(fileName)
+                // Set up text attributes
+                let titleAttributes = [
+                    NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 24),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
+                let headerAttributes = [
+                    NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 14),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
+                let textAttributes = [
+                    NSAttributedString.Key.font: UIFont.systemFont(ofSize: 12),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
                 
-                // Write PDF data to file
-                try pdfContent.write(to: fileURL)
+                // Draw title
+                let title = "CHAT HISTORY"
+                let titleSize = title.size(withAttributes: titleAttributes)
+                let titleX = (pageRect.width - titleSize.width) / 2
+                title.draw(at: CGPoint(x: titleX, y: 40), withAttributes: titleAttributes)
                 
-                // Show share sheet
-                await MainActor.run {
-                    isGeneratingPDF = false
-                    pdfURL = fileURL
-                    showingShareSheet = true
+                // Set up table drawing parameters
+                var yPosition: CGFloat = 100
+                let leftMargin: CGFloat = 50
+                let contentWidth: CGFloat = 500
+                let padding: CGFloat = 10
+                
+                // Draw Trip Information section
+                "Trip Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                // Function to draw a table row
+                func drawTableRow(label: String, value: String, atY y: CGFloat) -> CGFloat {
+                    let rect = CGRect(x: leftMargin, y: y, width: contentWidth, height: 25)
+                    ctx.stroke(rect)
+                    
+                    let labelRect = CGRect(x: leftMargin + padding, y: y + padding/2,
+                                         width: 100, height: 20)
+                    label.draw(in: labelRect, withAttributes: textAttributes)
+                    
+                    let valueRect = CGRect(x: leftMargin + 120, y: y + padding/2,
+                                         width: contentWidth - 140, height: 20)
+                    value.draw(in: valueRect, withAttributes: textAttributes)
+                    
+                    return y + 25
                 }
-            } catch {
-                await MainActor.run {
-                    isGeneratingPDF = false
-                    errorMessage = "Failed to generate PDF: \(error.localizedDescription)"
-                    showingError = true
+                
+                // Draw trip details
+                yPosition = drawTableRow(label: "Trip ID:", value: trip.id.uuidString, atY: yPosition)
+                yPosition = drawTableRow(label: "From:", value: trip.startingPoint, atY: yPosition)
+                yPosition = drawTableRow(label: "To:", value: trip.destination, atY: yPosition)
+                yPosition = drawTableRow(label: "Status:", value: "Completed", atY: yPosition)
+                yPosition = drawTableRow(label: "Vehicle:", value: "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model)", atY: yPosition)
+                
+                yPosition += 30
+                
+                // Draw Chat Messages section
+                "Chat Messages".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                // Sort messages by date
+                let sortedMessages = chatViewModel.messages.sorted { $0.created_at < $1.created_at }
+                
+                if sortedMessages.isEmpty {
+                    let noMessagesRect = CGRect(x: leftMargin, y: yPosition, width: contentWidth, height: 30)
+                    ctx.stroke(noMessagesRect)
+                    "No messages found for this trip.".draw(in: CGRect(x: leftMargin + padding, y: yPosition + padding,
+                                                                     width: contentWidth - 2*padding, height: 20),
+                                                          withAttributes: textAttributes)
+                } else {
+                    // Draw each message
+                    for message in sortedMessages {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateStyle = .medium
+                        dateFormatter.timeStyle = .short
+                        let timestamp = dateFormatter.string(from: message.created_at)
+                        let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
+                        
+                        // Draw message box
+                        let messageHeight: CGFloat = 60
+                        let messageRect = CGRect(x: leftMargin, y: yPosition, width: contentWidth, height: messageHeight)
+                        ctx.stroke(messageRect)
+                        
+                        // Draw timestamp and sender
+                        let headerText = "[\(timestamp)] \(sender):"
+                        headerText.draw(at: CGPoint(x: leftMargin + padding, y: yPosition + padding),
+                                     withAttributes: [.font: UIFont.boldSystemFont(ofSize: 11),
+                                                    .foregroundColor: UIColor.black])
+                        
+                        // Draw message text
+                        message.message_text.draw(in: CGRect(x: leftMargin + padding, y: yPosition + 25,
+                                                           width: contentWidth - 2*padding, height: messageHeight - 30),
+                                                withAttributes: textAttributes)
+                        
+                        yPosition += messageHeight + 5
+                        
+                        // Check if we need a new page
+                        if yPosition > pageRect.height - 100 {
+                            context.beginPage()
+                            yPosition = 50
+                        }
+                    }
                 }
             }
+            
+            print("Chat history PDF generated")
+            receiptData = pdfData
+            showingDeliveryReceipt = true
+            
+        } catch {
+            print("Error generating chat history: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            showingError = true
         }
-    }
-    
-    private func generatePDFContent() -> Data {
-        // Create PDF content with better formatting
-        var content = """
-        TRIP CHAT HISTORY
-        =================
-        
-        Trip Details:
-        ------------
-        Trip ID: \(trip.id.uuidString)
-        From: \(trip.startingPoint)
-        To: \(trip.destination)
-        Status: Completed
-        Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
-        License Plate: \(trip.vehicleDetails.licensePlate)
-        Date: \(Date().formatted())
-        
-        Chat History:
-        ------------
-        
-        """
-        
-        // Sort messages by date
-        let sortedMessages = chatViewModel.messages.sorted { $0.created_at < $1.created_at }
-        
-        // Add each message with proper formatting
-        for message in sortedMessages {
-            let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
-            let timestamp = message.created_at.formatted(date: .complete, time: .standard)
-            content += "\n[\(timestamp)]\n\(sender): \(message.message_text)\n"
-            content += "----------------------------------------\n"
-        }
-        
-        if sortedMessages.isEmpty {
-            content += "\nNo messages found for this trip.\n"
-        }
-        
-        return Data(content.utf8)
     }
     
     private var statusText: String {
