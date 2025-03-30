@@ -434,6 +434,7 @@ struct AddTripView: View {
     // Trip details state
     @State private var selectedVehicle: Vehicle?
     @State private var selectedDriverId: UUID?
+    @State private var selectedSecondaryDriverId: UUID?
     @State private var cargoType = "General Goods"
     @State private var startDate = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date()
     @State private var deliveryDate = Calendar.current.date(byAdding: .hour, value: 28, to: Date()) ?? Date()
@@ -466,7 +467,10 @@ struct AddTripView: View {
     }
     
     private var isDriverSelected: Bool {
-        selectedDriverId != nil
+        if distance > 500 {
+            return selectedDriverId != nil && selectedSecondaryDriverId != nil
+        }
+        return selectedDriverId != nil
     }
     
     var isFormValid: Bool {
@@ -675,91 +679,128 @@ struct AddTripView: View {
                             }
                         }
                         
-                        // Vehicle Selection is displayed only after route calculation.
+                        // Driver selection
                         if distance > 0 {
-                            if displayedVehicles.isEmpty {
-                                Text("No vehicles available for the selected time range.")
-                                    .foregroundColor(.gray)
-                                    .padding()
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
-                            } else {
-                                VehicleSelectionView(
-                                    selectedVehicle: $selectedVehicle,
-                                    availableVehicles: displayedVehicles
-                                )
-                            }
-                            
-                            // Driver Selection - displayed after route calculation
-                            if let vehicle = selectedVehicle {
-                                CardView(title: "DRIVER ASSIGNMENT", systemImage: "person.fill") {
-                                    VStack {
-                                        Menu {
-                                            // Option to unassign driver
-                                            Button(action: {
+                            CardView(title: "DRIVER ASSIGNMENT", systemImage: "person.fill") {
+                                VStack(spacing: 16) {
+                                    // Primary driver selection
+                                    Menu {
+                                        ForEach(crewDataController.drivers.filter { $0.status == .available }, id: \.userID) { driver in
+                                            Button(driver.name) {
+                                                selectedDriverId = driver.userID
+                                            }
+                                        }
+                                        if selectedDriverId != nil {
+                                            Button("Clear Selection", role: .destructive) {
                                                 selectedDriverId = nil
-                                            }) {
-                                                HStack {
-                                                    Text("Unassigned")
-                                                        .foregroundColor(.red)
-                                                    Spacer()
-                                                    if selectedDriverId == nil {
-                                                        Image(systemName: "checkmark")
-                                                    }
+                                            }
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(selectedDriverId.flatMap { id in
+                                                crewDataController.drivers.first { $0.userID == id }?.name
+                                            } ?? "Select Primary Driver")
+                                            .foregroundColor(selectedDriverId != nil ? .primary : .gray)
+                                            Spacer()
+                                            Image(systemName: "chevron.down")
+                                                .foregroundColor(.gray)
+                                        }
+                                        .padding()
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(10)
+                                    }
+                                    
+                                    // Secondary driver selection for long trips
+                                    if distance > 500 {
+                                        Text("Long trip detected - Secondary driver required")
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
+                                        
+                                        Menu {
+                                            ForEach(crewDataController.drivers.filter { driver in
+                                                driver.status == .available && driver.userID != selectedDriverId
+                                            }, id: \.userID) { driver in
+                                                Button(driver.name) {
+                                                    selectedSecondaryDriverId = driver.userID
                                                 }
                                             }
-                                            
-                                            Divider()
-                                            
-                                            // Available drivers (excluding those in current trips)
-                                            let availableDrivers = crewDataController.drivers.filter { driver in
-                                                // Check if driver is available and not in any current trip
-                                                let isAvailable = driver.status == .available
-                                                let isNotInCurrentTrip = !TripDataController.shared.getAllTrips()
-                                                    .filter { $0.status == .inProgress }
-                                                    .contains { trip in
-                                                        trip.driverId == driver.userID
-                                                    }
-                                                return isAvailable && isNotInCurrentTrip
-                                            }
-                                            
-                                            if availableDrivers.isEmpty {
-                                                Text("No available drivers")
-                                                    .foregroundColor(.gray)
-                                            } else {
-                                                ForEach(availableDrivers, id: \.userID) { driver in
-                                                    Button(action: {
-                                                        selectedDriverId = driver.userID
-                                                    }) {
-                                                        HStack {
-                                                            Text(driver.name)
-                                                            Spacer()
-                                                            if selectedDriverId == driver.userID {
-                                                                Image(systemName: "checkmark")
-                                                            }
-                                                        }
-                                                    }
+                                            if selectedSecondaryDriverId != nil {
+                                                Button("Clear Selection", role: .destructive) {
+                                                    selectedSecondaryDriverId = nil
                                                 }
                                             }
                                         } label: {
                                             HStack {
-                                                if let driverId = selectedDriverId,
-                                                   let driver = crewDataController.drivers.first(where: { $0.userID == driverId }) {
-                                                    Text(driver.name)
-                                                        .foregroundColor(.primary)
-                                                } else {
-                                                    Text("Select Driver")
-                                                        .foregroundColor(.gray)
-                                                }
+                                                Text(selectedSecondaryDriverId.flatMap { id in
+                                                    crewDataController.drivers.first { $0.userID == id }?.name
+                                                } ?? "Select Secondary Driver")
+                                                .foregroundColor(selectedSecondaryDriverId != nil ? .primary : .gray)
+                                                Spacer()
                                                 Image(systemName: "chevron.down")
-                                                    .font(.caption)
-                                                    .foregroundColor(.blue)
+                                                    .foregroundColor(.gray)
                                             }
                                             .padding()
                                             .background(Color(.systemGray6))
                                             .cornerRadius(10)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
                                         }
+                                    }
+                                }
+                            }
+                            
+                            // Vehicle Selection Card
+                            CardView(title: "VEHICLE SELECTION", systemImage: "car.fill") {
+                                if displayedVehicles.isEmpty {
+                                    Text("No vehicles available for the selected time range.")
+                                        .foregroundColor(.gray)
+                                        .padding()
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(10)
+                                } else {
+                                    Menu {
+                                        ForEach(displayedVehicles, id: \.id) { vehicle in
+                                            Button(action: {
+                                                selectedVehicle = vehicle
+                                            }) {
+                                                HStack {
+                                                    VStack(alignment: .leading) {
+                                                        Text("\(vehicle.make) \(vehicle.model)")
+                                                        Text(vehicle.licensePlate)
+                                                            .font(.caption)
+                                                            .foregroundColor(.gray)
+                                                    }
+                                                    Spacer()
+                                                    if selectedVehicle?.id == vehicle.id {
+                                                        Image(systemName: "checkmark")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if selectedVehicle != nil {
+                                            Button("Clear Selection", role: .destructive) {
+                                                selectedVehicle = nil
+                                            }
+                                        }
+                                    } label: {
+                                        HStack {
+                                            if let vehicle = selectedVehicle {
+                                                VStack(alignment: .leading) {
+                                                    Text("\(vehicle.make) \(vehicle.model)")
+                                                        .foregroundColor(.primary)
+                                                    Text(vehicle.licensePlate)
+                                                        .font(.caption)
+                                                        .foregroundColor(.gray)
+                                                }
+                                            } else {
+                                                Text("Select Vehicle")
+                                                    .foregroundColor(.gray)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.down")
+                                                .foregroundColor(.gray)
+                                        }
+                                        .padding()
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(10)
                                     }
                                 }
                             }
@@ -1003,6 +1044,7 @@ struct AddTripView: View {
                     destination: dropoffLocation,
                     vehicleId: vehicle.id,
                     driverId: selectedDriverId,
+                    secondaryDriverId: selectedSecondaryDriverId,
                     startTime: startDate,
                     endTime: deliveryDate,
                     startLat: pickupCoordinate?.latitude,
@@ -1020,6 +1062,12 @@ struct AddTripView: View {
                     if let driverId = selectedDriverId {
                         try await crewDataController.updateDriverStatus(driverId, status: .busy)
                     }
+                    
+                    // Update secondary driver status if present
+                    if let secondaryDriverId = selectedSecondaryDriverId {
+                        try await crewDataController.updateDriverStatus(secondaryDriverId, status: .busy)
+                    }
+                    
                     try await TripDataController.shared.fetchAllTrips()
                     showingSuccessAlert = true
                 } else {

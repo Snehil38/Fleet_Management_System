@@ -1244,6 +1244,7 @@ class SupabaseDataController: ObservableObject {
         let destination: String
         let vehicle_id: UUID
         let driver_id: UUID?
+        let secondary_driver_id: UUID?
         let start_time: Date?
         let end_time: Date?
         let start_latitude: Double?
@@ -1257,11 +1258,12 @@ class SupabaseDataController: ObservableObject {
         let estimated_cost: Double?
     }
     
-    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?, distance: Double? = nil, time: Double? = nil, cost: Double? = nil) async throws -> Bool {
+    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, secondaryDriverId: UUID? = nil, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?, distance: Double? = nil, time: Double? = nil, cost: Double? = nil) async throws -> Bool {
         let payload = TripPayload(
             destination: destination,
             vehicle_id: vehicleId,
             driver_id: driverId,
+            secondary_driver_id: secondaryDriverId,
             start_time: startTime,
             end_time: endTime,
             start_latitude: startLat,
