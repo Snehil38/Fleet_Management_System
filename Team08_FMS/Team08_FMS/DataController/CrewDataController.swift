@@ -173,10 +173,14 @@ class CrewDataController: ObservableObject {
     // MARK: - Update Operations
     
     // Update status for a driver with the given UUID
-    func updateDriverStatus(_ id: UUID, status: Status) {
+    func updateDriverStatus(_ id: UUID, status: Status) async throws {
+        // Update local state
         if let index = drivers.firstIndex(where: { $0.id == id }) {
             drivers[index].status = status
         }
+        
+        // Update in Supabase
+        await SupabaseDataController.shared.updateDriverStatus(newStatus: status, userID: nil, id: id)
     }
     
     // Update status for maintenance personnel with the given UUID

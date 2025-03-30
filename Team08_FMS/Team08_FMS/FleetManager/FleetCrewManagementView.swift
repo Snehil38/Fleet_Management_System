@@ -275,13 +275,12 @@ struct CrewCardView: View {
             if currentCrew.status == .available {
                 Button {
                     Task {
-                        if currentCrew is Driver {
-                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
+                        do {
+                            try await updateCrewStatus(.offDuty)
+                            CrewDataController.shared.update()
+                        } catch {
+                            print("Error updating crew status: \(error)")
                         }
-                        else {
-                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
-                        }
-                        CrewDataController.shared.update()
                     }
                 } label: {
                     Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
@@ -291,13 +290,12 @@ struct CrewCardView: View {
             else if currentCrew.status == .offDuty {
                 Button {
                     Task {
-                        if currentCrew is Driver {
-                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
+                        do {
+                            try await updateCrewStatus(.available)
+                            CrewDataController.shared.update()
+                        } catch {
+                            print("Error updating crew status: \(error)")
                         }
-                        else {
-                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
-                        }
-                        CrewDataController.shared.update()
                     }
                 } label: {
                     Label("Mark as Available", systemImage: "checkmark.circle.fill")
@@ -357,9 +355,9 @@ struct CrewCardView: View {
         else { return "Maintenance" }
     }
     
-    private func updateCrewStatus(_ newStatus: Status) {
+    private func updateCrewStatus(_ newStatus: Status) async throws {
         if currentCrew is Driver {
-            dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
+            try await dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
         } else {
             dataManager.updateMaintenancePersonnelStatus(currentCrew.id, status: newStatus)
         }

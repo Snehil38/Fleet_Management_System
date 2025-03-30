@@ -711,16 +711,32 @@ struct AddTripView: View {
                                             
                                             Divider()
                                             
-                                            // Available drivers
-                                            ForEach(crewDataController.drivers.filter { $0.status == .available }, id: \.userID) { driver in
-                                                Button(action: {
-                                                    selectedDriverId = driver.userID
-                                                }) {
-                                                    HStack {
-                                                        Text(driver.name)
-                                                        Spacer()
-                                                        if selectedDriverId == driver.userID {
-                                                            Image(systemName: "checkmark")
+                                            // Available drivers (excluding those in current trips)
+                                            let availableDrivers = crewDataController.drivers.filter { driver in
+                                                // Check if driver is available and not in any current trip
+                                                let isAvailable = driver.status == .available
+                                                let isNotInCurrentTrip = !TripDataController.shared.getAllTrips()
+                                                    .filter { $0.status == .inProgress }
+                                                    .contains { trip in
+                                                        trip.driverId == driver.userID
+                                                    }
+                                                return isAvailable && isNotInCurrentTrip
+                                            }
+                                            
+                                            if availableDrivers.isEmpty {
+                                                Text("No available drivers")
+                                                    .foregroundColor(.gray)
+                                            } else {
+                                                ForEach(availableDrivers, id: \.userID) { driver in
+                                                    Button(action: {
+                                                        selectedDriverId = driver.userID
+                                                    }) {
+                                                        HStack {
+                                                            Text(driver.name)
+                                                            Spacer()
+                                                            if selectedDriverId == driver.userID {
+                                                                Image(systemName: "checkmark")
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -1000,6 +1016,10 @@ struct AddTripView: View {
                 )
                 
                 if success {
+                    // Update driver status to busy if a driver is assigned
+                    if let driverId = selectedDriverId {
+                        try await crewDataController.updateDriverStatus(driverId, status: .busy)
+                    }
                     try await TripDataController.shared.fetchAllTrips()
                     showingSuccessAlert = true
                 } else {
