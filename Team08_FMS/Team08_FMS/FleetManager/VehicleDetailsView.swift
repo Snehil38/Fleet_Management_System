@@ -351,11 +351,11 @@ struct VehicleDetailView: View {
                 }
             }
         }
-//        .onAppear {
-//            if let vehicle = vehicle {
-//                loadVehicleDetails()
-//            }
-//        }
+        .task {
+            // Initial load of vehicle data
+            vehicleManager.loadVehicles()
+            CrewDataController.shared.update()
+        }
         .overlay {
             if isLoadingDetails && vehicle != nil && !isEditing {
                 Color.black.opacity(0.1)

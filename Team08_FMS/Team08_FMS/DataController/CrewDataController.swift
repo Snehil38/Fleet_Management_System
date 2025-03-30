@@ -17,6 +17,7 @@ class CrewDataController: ObservableObject {
     @Published var drivers: [Driver] = []
     @Published var maintenancePersonnel: [MaintenancePersonnel] = []
     @Published var trips: [Trip] = []
+    
     private init() {
         loadFleetManagers()
     }
@@ -183,9 +184,14 @@ class CrewDataController: ObservableObject {
         await SupabaseDataController.shared.updateDriverStatus(newStatus: status, userID: nil, id: id)
     }
     
+    // Get cached trips or fetch if needed
+    private func getTrips() async -> [Trip] {
+        return TripDataController.shared.getAllTrips()
+    }
+    
     // Check and update driver trip status
     func checkAndUpdateDriverTripStatus() async {
-        let trips = TripDataController.shared.getAllTrips()
+        let trips = await getTrips()
         var updatedDrivers: [(UUID, Status)] = []
         
         // Get all drivers in trips
@@ -229,7 +235,7 @@ class CrewDataController: ObservableObject {
     
     // Check and update vehicle status based on trips
     func checkAndUpdateVehicleStatus(vehicleManager: VehicleManager) async {
-        let trips = TripDataController.shared.getAllTrips()
+        let trips = await getTrips()
         var updatedVehicles: [(UUID, VehicleStatus)] = []
         
         // Get vehicles in active trips

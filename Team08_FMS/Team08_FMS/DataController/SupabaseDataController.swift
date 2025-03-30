@@ -1431,7 +1431,7 @@ class SupabaseDataController: ObservableObject {
     
     func fetchAvailableVehicles(startDate: Date, endDate: Date) async throws -> [Vehicle] {
         let vehicles = try await fetchVehicles()
-        let trips = TripDataController.shared.getAllTrips()
+        let trips = TripDataController.shared.allTrips // Use existing trips instead of refreshing
         
         // Filter trips that overlap with the given date range.
         // This assumes each trip has an `endTime` property.
@@ -1454,9 +1454,6 @@ class SupabaseDataController: ObservableObject {
                 availableVehicles.append(vehicle)
             }
         }
-        
-        print(filteredTrips)
-        print("\n\(availableVehicles)")
         
         return availableVehicles
     }

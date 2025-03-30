@@ -10,6 +10,7 @@ import SwiftUI
 struct FleetManagerTabView: View {
     @StateObject private var vehicleManager = VehicleManager()
     @StateObject private var dataManager = CrewDataController.shared
+    @State private var refreshTask: Task<Void, Never>?
 
     var body: some View {
         TabView {
@@ -34,7 +35,7 @@ struct FleetManagerTabView: View {
                     Image(systemName: "car.fill")
                     Text("Vehicles")
                 }
-            // Crew Tab (only tab)
+            
             FleetCrewManagementView()
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
@@ -44,14 +45,30 @@ struct FleetManagerTabView: View {
                 }
         }
         .task {
+            // Initial load
             vehicleManager.loadVehicles()
             CrewDataController.shared.update()
             listenForGeofenceEvents()
-            await TripDataController.shared.refreshAllTrips()
-            await SupabaseDataController.shared.fetchGeofenceEvents()
-            await dataManager.checkAndUpdateDriverTripStatus()
-            await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
+            await refreshData()
+            
+            // Start periodic refresh
+            refreshTask = Task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+                    await refreshData()
+                }
+            }
         }
+        .onDisappear {
+            refreshTask?.cancel()
+        }
+    }
+    
+    private func refreshData() async {
+        await TripDataController.shared.refreshAllTrips()
+        await SupabaseDataController.shared.fetchGeofenceEvents()
+        await dataManager.checkAndUpdateDriverTripStatus()
+        await dataManager.checkAndUpdateVehicleStatus(vehicleManager: vehicleManager)
     }
     
     func listenForGeofenceEvents() {

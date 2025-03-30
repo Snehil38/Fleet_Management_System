@@ -1125,12 +1125,18 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     /// - Parameter id: The ID of the trip to delete
     /// - Returns: Void
     /// - Throws: Error if the deletion fails
+    @MainActor
     func deleteTrip(id: UUID) async throws {
         // Soft delete the trip in the database
         supabaseController.deleteTrip(tripID: id)
         
-        // Update local data
-        await refreshAllTrips()
+        // Update local state
+        allTrips.removeAll { $0.id == id }
+        upcomingTrips.removeAll { $0.id == id }
+        if let currentTrip = currentTrip, currentTrip.id == id {
+            self.currentTrip = nil
+        }
+        recentDeliveries.removeAll { $0.id == id }
     }
 } 
 
