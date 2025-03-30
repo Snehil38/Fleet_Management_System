@@ -504,72 +504,73 @@ struct DriverTabView: View {
     
     private func tripLocationsView(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Simplified container with integrated progress line
-            VStack(alignment: .leading, spacing: 20) {
-                // Starting Point section
-                HStack(alignment: .center, spacing: 18) {
-                    // Container for the circle and progress line
-                    ZStack(alignment: .top) {
-                        // Blue circle
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 20, height: 20)
-                        
-                        // Progress line from starting point to destination
-                        Rectangle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [Color.blue, Color.gray.opacity(0.4)]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ))
-                            .frame(width: 2, height: 75)
-                            .offset(y: 20)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Starting Point")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        Text(trip.startingPoint)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.primary)
-                        Text("Mumbai, Maharashtra")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                }
+            // Route Info Card
+            VStack(spacing: 16) {
+                // Title
+                Text("Route Information")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
                 
-                // Destination section - no spacing adjustment needed with the improved layout
-                HStack(alignment: .top, spacing: 18) {
-                    // Red location pin
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.red)
-                        .offset(x: -2) // Align with the line
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Destination")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        Text(trip.destination)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.primary)
-                        Text(trip.address)
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                // Pickup and Drop-off with connecting line
+                HStack(spacing: 20) {
+                    // Pickup Location
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 10, height: 10)
+                            Text(trip.startingPoint)
+                                .font(.system(size: 14, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        Text("Pickup")
+                            .font(.system(size: 12))
+                            .foregroundColor(.green)
+                            .lineLimit(1)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Connecting Line
+                    Rectangle()
+                        .fill(Color(uiColor: .systemGray3))
+                        .frame(height: 2)
+                        .frame(maxWidth: 80)
+                        .padding(.vertical, 14)
+                    
+                    // Drop-off Location
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Rectangle()
+                                .fill(Color.red)
+                                .frame(width: 10, height: 10)
+                            Text(trip.destination)
+                                .font(.system(size: 14, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        Text("Destination")
+                            .font(.system(size: 12))
+                            .foregroundColor(.red)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .padding(.horizontal, 4)
             }
+            .padding(16)
+            .background(Color(uiColor: .systemGray6))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
     }
     
     private func tripActionButtons(_ trip: Trip) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             if isCurrentTripDeclined {
                 // Show Accept/Decline buttons for declined trip
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ActionButton(
                         title: "Accept Trip",
                         icon: "checkmark",
@@ -584,7 +585,6 @@ struct DriverTabView: View {
                         color: .red
                     ) {
                         Task {
-                            // Remove from current and add to upcoming
                             if let index = tripQueue.firstIndex(where: { $0.id == trip.id }) {
                                 tripQueue.remove(at: index)
                             }
@@ -592,65 +592,97 @@ struct DriverTabView: View {
                     }
                 }
             } else {
-                // Show regular action buttons in a more compact layout
-                HStack(spacing: 10) {
-                    ActionButton(
-                        title: "Start\nNavigation",
-                        icon: "location.fill",
-                        color: trip.hasCompletedPreTrip ? .blue : .gray
-                    ) {
-                        if !trip.hasCompletedPreTrip {
-                            alertMessage = "Please complete pre-trip inspection before starting navigation"
-                            showingAlert = true
-                        } else {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingNavigation = true
-                            }
-                        }
-                    }
-                    
-                    ActionButton(
-                        title: "Pre-Trip Inspection",
-                        icon: "checklist",
-                        color: trip.hasCompletedPreTrip ? .gray : .orange
-                    ) {
-                        if !trip.hasCompletedPreTrip {
-                            showingPreTripInspection = true
-                        }
-                    }
-                }
-                
-                HStack(spacing: 10) {
-                    ActionButton(
-                        title: "Mark Delivered",
-                        icon: "checkmark.circle.fill",
-                        color: .green
-                    ) {
-                        if !trip.hasCompletedPreTrip {
-                            alertMessage = "Please complete pre-trip inspection before marking as delivered"
-                            showingAlert = true
-                        } else if trip.hasCompletedPostTrip {
-                            // Already completed post-trip
-                            // Use Task to handle the async call
-                            Task {
-                                await MainActor.run {
-                                    markCurrentTripDelivered()
+                // Show regular action buttons in a grid layout
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        // Start Navigation Button
+                        Button(action: {
+                            if !trip.hasCompletedPreTrip {
+                                alertMessage = "Please complete pre-trip inspection before starting navigation"
+                                showingAlert = true
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingNavigation = true
                                 }
                             }
-                        } else {
-                            showingPostTripInspection = true
+                        }) {
+                            HStack {
+                                Image(systemName: "location.fill")
+                                Text("Start Navigation")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(trip.hasCompletedPreTrip ? Color.blue : Color.gray)
+                            .cornerRadius(12)
+                        }
+                        
+                        // Pre-Trip Inspection Button
+                        Button(action: {
+                            if !trip.hasCompletedPreTrip {
+                                showingPreTripInspection = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "checklist")
+                                Text("Pre-Trip Inspection")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(trip.hasCompletedPreTrip ? Color.gray : Color.orange)
+                            .cornerRadius(12)
                         }
                     }
                     
-                    ActionButton(
-                        title: "SOS",
-                        icon: "exclamationmark.triangle.fill",
-                        color: .red
-                    ) {
-                        // Show the SOS modal instead of an alert
-                        showingSosModal = true
+                    HStack(spacing: 12) {
+                        // Mark Delivered Button
+                        Button(action: {
+                            if !trip.hasCompletedPreTrip {
+                                alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                                showingAlert = true
+                            } else if trip.hasCompletedPostTrip {
+                                Task {
+                                    await MainActor.run {
+                                        markCurrentTripDelivered()
+                                    }
+                                }
+                            } else {
+                                showingPostTripInspection = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Mark Delivered")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.green)
+                            .cornerRadius(12)
+                        }
+                        
+                        // SOS Button
+                        Button(action: {
+                            showingSosModal = true
+                        }) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text("SOS")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.red)
+                            .cornerRadius(12)
+                        }
                     }
                 }
+                .padding(.horizontal, 4)
             }
         }
     }
