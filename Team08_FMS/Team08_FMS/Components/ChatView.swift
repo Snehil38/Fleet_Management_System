@@ -25,6 +25,7 @@ struct ChatView: View {
     @FocusState private var isFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
     @StateObject private var tripController = TripDataController.shared
+    @Environment(\.dismiss) private var dismiss
     
     init(recipientType: RecipientType, recipientId: UUID, recipientName: String, tripId: UUID? = nil) {
         self.recipientType = recipientType
@@ -56,7 +57,13 @@ struct ChatView: View {
                 }
                 .onAppear {
                     scrollProxy = proxy
-                    viewModel.clearMessages() // Clear messages when view appears
+                    Task {
+                        await viewModel.loadMessages()
+                        // Scroll to bottom after loading messages
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            scrollToBottom()
+                        }
+                    }
                 }
                 .onChange(of: viewModel.messages) { _ in
                     scrollToBottom()
@@ -66,7 +73,7 @@ struct ChatView: View {
                 await viewModel.loadMessages()
             }
             
-            // Message input with trip details button for drivers
+            // Message input
             messageInputView
         }
         .sheet(isPresented: $isShowingEmergencySheet) {
@@ -86,7 +93,7 @@ struct ChatView: View {
         HStack {
             // Back button
             Button(action: {
-                // Handle back action
+                dismiss()
             }) {
                 Image(systemName: "chevron.left")
                     .font(.title3)

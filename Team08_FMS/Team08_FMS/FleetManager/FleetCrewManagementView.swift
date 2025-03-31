@@ -192,7 +192,7 @@ struct CrewCardView: View {
                             .fill(Color.blue.opacity(0.2))
                             .frame(width: 40, height: 40)
                             .overlay(
-                                Text(currentCrew.avatar)
+                                Text(String(currentCrew.name.prefix(2)).uppercased())
                                     .font(.headline)
                                     .foregroundColor(.blue)
                             )
@@ -200,7 +200,7 @@ struct CrewCardView: View {
                         VStack(alignment: .leading) {
                             Text(currentCrew.name)
                                 .font(.headline)
-                            Text(role)
+                            Text(crewMember is Driver ? "Driver" : "Maintenance")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                         }
@@ -208,219 +208,43 @@ struct CrewCardView: View {
                     
                     Spacer()
                     
-                    // Chat Button with Badge
-                    if currentCrew is Driver {
-                        Button(action: {
-                            showingMessageSheet = true
-                        }) {
-                            Image(systemName: "message.fill")
-                                .foregroundColor(.blue)
-                                .overlay(
-                                    Group {
-                                        if unreadMessageCount > 0 {
-                                            Text("\(unreadMessageCount)")
-                                                .font(.caption2)
-                                                .foregroundColor(.white)
-                                                .padding(4)
-                                                .background(Color.red)
-                                                .clipShape(Circle())
-                                                .offset(x: 10, y: -10)
-                                        }
-                                    }
-                                )
-                        }
-                        .padding(.horizontal, 8)
+                    // Message button
+                    Button {
+                        showingMessageSheet = true
+                    } label: {
+                        Image(systemName: "message.fill")
+                            .foregroundColor(.blue)
                     }
+                    .disabled(recipientId == nil)
                     
+                    // Status indicator
                     Text(AppDataController.shared.getStatusString(status: currentCrew.status))
-                        .font(.subheadline)
-                        .foregroundColor(.white)
+                        .font(.caption)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(currentCrew.status.color)
+                        .background(currentCrew.status.backgroundColor)
+                        .foregroundColor(currentCrew.status.color)
                         .clipShape(Capsule())
                 }
                 .padding()
-                
-                Divider()
-                
-                // Summary Details Section
-                VStack(spacing: 12) {
-                    if let driver = currentCrew as? Driver {
-                        HStack {
-                            Label("Experience: \(driver.yearsOfExperience) yrs", systemImage: "clock.fill")
-                                .font(.caption)
-                            Spacer()
-                            Label("License: \(driver.driverLicenseNumber)", systemImage: "car.fill")
-                                .font(.caption)
-                        }
-                    } else if let maintenance = currentCrew as? MaintenancePersonnel {
-                        HStack {
-                            Label("Experience: \(maintenance.yearsOfExperience) yrs", systemImage: "clock.fill")
-                                .font(.caption)
-                            Spacer()
-                            Label("Specialty: \(AppDataController.shared.getSpecialityString(speciality: maintenance.speciality))", systemImage: "wrench.fill")
-                                .font(.caption)
-                        }
-                    }
-                }
-                .padding()
+                .background(Color(.systemBackground))
             }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .cornerRadius(12)
             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
-        .contextMenu {
-            Button(role: .destructive) {
-                showingDeleteAlert = true
-            } label: {
-                Label("Delete Crew Member", systemImage: "trash")
-            }
-            
-            if let driver = currentCrew as? Driver {
-                if !isInTrip {  // Only show status change options if not in a trip
-                    if currentCrew.status == .available {
-                        Button {
-                            Task {
-                                do {
-                                    try await updateCrewStatus(.offDuty)
-                                    CrewDataController.shared.update()
-                                } catch {
-                                    print("Error updating crew status: \(error)")
-                                }
-                            }
-                        } label: {
-                            Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
-                        }
-                    }
-                    else if currentCrew.status == .offDuty {
-                        Button {
-                            Task {
-                                do {
-                                    try await updateCrewStatus(.available)
-                                    CrewDataController.shared.update()
-                                } catch {
-                                    print("Error updating crew status: \(error)")
-                                }
-                            }
-                        } label: {
-                            Label("Mark as Available", systemImage: "checkmark.circle.fill")
-                        }
-                    }
-                }
-            } else {
-                // For maintenance personnel, show status options as before
-                if currentCrew.status == .available {
-                    Button {
-                        Task {
-                            do {
-                                try await updateCrewStatus(.offDuty)
-                                CrewDataController.shared.update()
-                            } catch {
-                                print("Error updating crew status: \(error)")
-                            }
-                        }
-                    } label: {
-                        Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
-                    }
-                }
-                else if currentCrew.status == .offDuty {
-                    Button {
-                        Task {
-                            do {
-                                try await updateCrewStatus(.available)
-                                CrewDataController.shared.update()
-                            } catch {
-                                print("Error updating crew status: \(error)")
-                            }
-                        }
-                    } label: {
-                        Label("Mark as Available", systemImage: "checkmark.circle.fill")
-                    }
-                }
-            }
-            
-            if currentCrew is Driver {
-                Button {
-                    showingMessageSheet = true
-                } label: {
-                    Label("Send Message", systemImage: "message.fill")
-                }
-            }
-        }
-        .alert("Delete Crew Member", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                deleteCrew()
-            }
-        } message: {
-            Text("Are you sure you want to delete this crew member? This action cannot be undone.")
-        }
         .sheet(isPresented: $showingMessageSheet) {
-            if let id = recipientId {
+            if let recipientId = recipientId {
                 NavigationView {
                     ChatView(
-                        recipientType: .driver,
-                        recipientId: id,
+                        recipientType: crewMember is Driver ? .driver : .maintenance,
+                        recipientId: recipientId,
                         recipientName: currentCrew.name,
-                        tripId: currentCrew.currentTripId  // Add trip ID if available
+                        tripId: (currentCrew as? Driver)?.currentTripId
                     )
                 }
             }
         }
-        .onAppear {
-            // Only check for unread messages
-            if let id = recipientId {
-                Task {
-                    do {
-                        let response = try await SupabaseDataController.shared.supabase
-                            .from("chat_messages")
-                            .select()
-                            .eq("recipient_id", value: id)
-                            .eq("status", value: "sent")
-                            .execute()
-                        
-                        let count = response.count ?? 0
-                        await MainActor.run {
-                            unreadMessageCount = count
-                        }
-                    } catch {
-                        print("Error loading unread message count: \(error)")
-                    }
-                }
-            }
-        }
-    }
-    
-    // Determine the role based on the type.
-    var role: String {
-        if currentCrew is Driver { return "Driver" }
-        else { return "Maintenance" }
-    }
-    
-    private func updateCrewStatus(_ newStatus: Status) async throws {
-        if currentCrew is Driver {
-            try await dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
-        } else {
-            dataManager.updateMaintenancePersonnelStatus(currentCrew.id, status: newStatus)
-        }
-    }
-    
-    private func deleteCrew() {
-        if currentCrew is Driver {
-            Task {
-                await SupabaseDataController.shared.softDeleteDriver(for: currentCrew.id)
-                CrewDataController.shared.update()
-            }
-        }
-        else {
-            Task {
-                await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: currentCrew.id)
-                CrewDataController.shared.update()
-            }
-        }
-        CrewDataController.shared.update()
     }
 }
 

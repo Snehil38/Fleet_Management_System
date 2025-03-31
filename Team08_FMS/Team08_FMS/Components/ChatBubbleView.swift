@@ -7,7 +7,7 @@ struct ChatBubbleView: View {
     @State private var currentUserId: UUID?
     
     private var backgroundColor: Color {
-        message.isFromCurrentUser ? .blue : Color(.systemGray5)
+        message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray5)
     }
     
     private var textColor: Color {
@@ -35,9 +35,7 @@ struct ChatBubbleView: View {
             
             // Get current user ID when view appears
             Task {
-                do {
-                    currentUserId = await supabaseController.getUserID()
-                }
+                currentUserId = await supabaseController.getUserID()
             }
         }
     }
@@ -50,13 +48,20 @@ struct ChatBubbleView: View {
                 .padding(.vertical, 8)
                 .background(backgroundColor)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
+                .fixedSize(horizontal: false, vertical: true)
             
             HStack(spacing: 4) {
-                Text(formatDate(message.created_at))
-                    .font(.caption2)
-                    .foregroundColor(.gray)
+                if !message.isFromCurrentUser {
+                    Text(formatDate(message.created_at))
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                }
                 
                 if message.isFromCurrentUser {
+                    Text(formatDate(message.created_at))
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                    
                     Group {
                         switch message.status {
                         case .sent:

@@ -114,20 +114,32 @@ class ChatViewModel: ObservableObject {
         
         do {
             let currentUserId = try await supabaseDataController.getUserID()
+            let userRole = await supabaseDataController.userRole
             
+            // Build the base query
             var query = supabaseDataController.supabase
                 .from("chat_messages")
                 .select()
-                .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
+            
+            // Filter messages based on the conversation participants
+            if userRole == "fleet_manager" {
+                // For fleet manager: show messages where they are either sender or recipient
+                query = query.or("and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId)),and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId))")
+            } else {
+                // For driver: show messages where they are either sender or recipient
+                query = query.or("and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId)),and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId))")
+            }
             
             // Add trip_id filter if present
             if let tripId = tripId {
-                query = query.eq("trip_id", value: tripId)
+                query = query.eq("trip_id", value: tripId.uuidString)
             }
             
             let response = try await query
                 .order("created_at", ascending: true)
                 .execute()
+            
+            print("📥 Fetched messages response: \(String(data: response.data, encoding: .utf8) ?? "no data")")
             
             let decoder = JSONDecoder()
             
@@ -169,7 +181,11 @@ class ChatViewModel: ObservableObject {
                 // Update isFromCurrentUser for each message
                 for index in fetchedMessages.indices {
                     var message = fetchedMessages[index]
-                    message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                    if userRole == "fleet_manager" {
+                        message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                    } else {
+                        message.isFromCurrentUser = message.recipient_id == recipientId
+                    }
                     fetchedMessages[index] = message
                     
                     // Mark as read if needed
@@ -182,13 +198,18 @@ class ChatViewModel: ObservableObject {
                 
                 self.messages = fetchedMessages
                 self.isLoading = false
+                
+                print("📱 Loaded \(fetchedMessages.count) messages")
+                for message in fetchedMessages {
+                    print("Message: \(message.message_text) - isFromCurrentUser: \(message.isFromCurrentUser)")
+                }
             }
             
         } catch {
             await MainActor.run {
                 self.error = error
                 self.isLoading = false
-                print("Error loading messages: \(error)")
+                print("❌ Error loading messages: \(error)")
             }
         }
     }
