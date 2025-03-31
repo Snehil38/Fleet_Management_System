@@ -157,6 +157,13 @@ struct FleetManagerDashboardTabView: View {
                             amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
                             trend: .negative
                         )
+                        
+                        // Trip Revenue
+                        FinancialCard(
+                            title: "Trip Revenue",
+                            amount: "$\(String(format: "%.2f", totalTripRevenue))",
+                            trend: .positive
+                        )
 
                         // Total Revenue
                         FinancialCard(
