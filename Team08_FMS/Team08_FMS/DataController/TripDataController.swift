@@ -280,7 +280,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "sourceRegion":
             isInSourceRegion = true
             print("DEBUG: Entered source region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) entered source region"
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) entered source region"
             let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
             supabaseController.insertIntoGeofenceEvents(event: event)
             checkTripStartEligibility()
@@ -295,7 +295,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "destinationRegion":
             isInDestinationRegion = true
             print("DEBUG: Entered destination region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) entered destination region"
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) entered destination region"
             let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
             supabaseController.insertIntoGeofenceEvents(event: event)
             tripTimer?.invalidate()
@@ -335,7 +335,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "sourceRegion":
             isInSourceRegion = false
             print("DEBUG: Exited source region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) exited source region"
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) exited source region"
             let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
             supabaseController.insertIntoGeofenceEvents(event: event)
             checkTripStartEligibility()
@@ -343,7 +343,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "destinationRegion":
             isInDestinationRegion = false
             print("DEBUG: Exited destination region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) exited destination region"
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) exited destination region"
             let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
             supabaseController.insertIntoGeofenceEvents(event: event)
             
