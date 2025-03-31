@@ -144,10 +144,10 @@ struct FleetManagerDashboardTabView: View {
 
                     // Financial Summary
                     VStack(spacing: 16) {
-                        // Total Expenses
+                        // Monthly Fuel Expenses
                         FinancialCard(
-                            title: "Total Expenses",
-                            amount: "$\(String(format: "%.2f", totalExpenses))",
+                            title: "Monthly Fuel Expenses",
+                            amount: "$\(String(format: "%.2f", totalFuelCost))",
                             trend: .negative
                         )
 
@@ -155,6 +155,13 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Monthly Salary Expenses",
                             amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
+                            trend: .negative
+                        )
+                        
+                        // Total Expenses
+                        FinancialCard(
+                            title: "Total Expenses",
+                            amount: "$\(String(format: "%.2f", totalExpenses))",
                             trend: .negative
                         )
                         
@@ -666,41 +673,41 @@ struct AddTripView: View {
                         }
                         
                         // Trip Estimates Card
-                        if distance > 0 {
-                            CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
-                                VStack(spacing: 16) {
-                                    HStack(spacing: 20) {
-                                        EstimateItem(
-                                            icon: "arrow.left.and.right",
-                                            title: "Total Distance",
-                                            value: String(format: "%.1f km", distance),
-                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                        )
-                                        
-                                        Divider()
-                                        
-                                        EstimateItem(
-                                            icon: "clock.fill",
-                                            title: "Est. Travel Time",
-                                            value: String(format: "%.1f hours", distance / 40.0),
-                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                        )
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    EstimateItem(
-                                        icon: "fuelpump.fill",
-                                        title: "Est. Fuel Cost",
-                                        value: String(format: "$%.2f", fuelCost),
-                                        valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                    )
-                                }
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .cornerRadius(10)
-                            }
-                        }
+//                        if distance > 0 {
+//                            CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
+//                                VStack(spacing: 16) {
+//                                    HStack(spacing: 20) {
+//                                        EstimateItem(
+//                                            icon: "arrow.left.and.right",
+//                                            title: "Total Distance",
+//                                            value: String(format: "%.1f km", distance),
+//                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+//                                        )
+//                                        
+//                                        Divider()
+//                                        
+//                                        EstimateItem(
+//                                            icon: "clock.fill",
+//                                            title: "Est. Travel Time",
+//                                            value: String(format: "%.1f hours", distance / 40.0),
+//                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+//                                        )
+//                                    }
+//                                    
+//                                    Divider()
+//                                    
+//                                    EstimateItem(
+//                                        icon: "fuelpump.fill",
+//                                        title: "Est. Fuel Cost",
+//                                        value: String(format: "$%.2f", fuelCost),
+//                                        valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+//                                    )
+//                                }
+//                                .padding()
+//                                .background(Color(.systemGray6))
+//                                .cornerRadius(10)
+//                            }
+//                        }
                         
                         // Vehicle Selection is displayed only after route calculation.
                         if distance > 0 {
