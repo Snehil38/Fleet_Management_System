@@ -104,7 +104,27 @@ struct DriverTabView: View {
                                 // Current Delivery Card
                                 if let currentTrip = self.currentTrip,
                                    currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                                    currentDeliveryCard(currentTrip)
+                                    VStack(alignment: .leading, spacing: 20) {
+                                        HStack {
+                                            Text("Current Delivery")
+                                                .font(.system(size: 24, weight: .bold))
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal)
+                                        
+                                        VStack(alignment: .leading, spacing: 16) {
+                                            currentDeliveryContent(currentTrip)
+                                        }
+                                        .padding(16)
+                                        .background(Color.blue.opacity(0.05))
+                                        .cornerRadius(16)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Color(.systemGray4), lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+                                        .padding(.horizontal)
+                                    }
                                 }
                                 
                                 // Only show upcoming trips and trip queue if available
@@ -147,9 +167,13 @@ struct DriverTabView: View {
                                                     }
                                                 }
                                             }
-                                            .background(Color(.systemBackground))
+                                            .background(Color.orange.opacity(0.05))
                                             .cornerRadius(20)
-                                            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 20)
+                                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                                            )
+                                            .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
                                             .padding(.horizontal)
                                         }
                                     }
@@ -204,9 +228,13 @@ struct DriverTabView: View {
                                                 showingDeliveryDetails = true
                                             }
                                         }
-                                        .background(Color(.systemBackground))
+                                        .background(Color.green.opacity(0.05))
                                         .cornerRadius(20)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(Color(.systemGray4), lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
                                         .padding(.horizontal)
                                     }
                                 }
@@ -354,17 +382,27 @@ struct DriverTabView: View {
     }
     
     private func currentDeliveryCard(_ trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Current Delivery")
-                .font(.system(size: 22, weight: .bold))
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Current Delivery")
+                    .font(.system(size: 24, weight: .bold))
+                Spacer()
+            }
+            .padding(.horizontal)
             
-            currentDeliveryContent(trip)
+            VStack(alignment: .leading, spacing: 16) {
+                currentDeliveryContent(trip)
+            }
+            .padding(16)
+            .background(Color.blue.opacity(0.05))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(.systemGray4), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+            .padding(.horizontal)
         }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-        .padding(.horizontal)
     }
     
     private func currentDeliveryContent(_ trip: Trip) -> some View {
@@ -750,7 +788,11 @@ struct DriverTabView: View {
             }
             .background(Color(.systemBackground))
             .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color(.systemGray4), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
             .padding(.horizontal)
         }
     }
@@ -770,7 +812,11 @@ struct DriverTabView: View {
         .padding(40)
         .background(Color(.systemBackground))
         .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
     }
     
@@ -789,7 +835,11 @@ struct DriverTabView: View {
         .padding(40)
         .background(Color(.systemBackground))
         .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
     }
     
@@ -814,7 +864,11 @@ struct DriverTabView: View {
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
         .padding(.horizontal)
     }
     
