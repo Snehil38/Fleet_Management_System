@@ -57,12 +57,9 @@ struct ChatView: View {
                 }
                 .onAppear {
                     scrollProxy = proxy
-                    Task {
-                        await viewModel.loadMessages()
-                        // Scroll to bottom after loading messages
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            scrollToBottom()
-                        }
+                    // Scroll to bottom after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        scrollToBottom()
                     }
                 }
                 .onChange(of: viewModel.messages) { _ in
@@ -76,6 +73,24 @@ struct ChatView: View {
             // Message input
             messageInputView
         }
+        .overlay(
+            // Notification overlay
+            Group {
+                if viewModel.showNotification {
+                    VStack {
+                        Text(viewModel.notificationMessage)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(10)
+                            .padding()
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top))
+                    .animation(.easeInOut, value: viewModel.showNotification)
+                }
+            }
+        )
         .sheet(isPresented: $isShowingEmergencySheet) {
             EmergencyAssistanceView()
         }

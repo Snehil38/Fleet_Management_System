@@ -22,6 +22,8 @@ class ChatViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
     @Published var unreadCount: Int = 0
+    @Published var showNotification = false
+    @Published var notificationMessage = ""
     
     private var cancellables = Set<AnyCancellable>()
     private let supabaseDataController = SupabaseDataController.shared
@@ -36,11 +38,22 @@ class ChatViewModel: ObservableObject {
         self.recipientType = recipientType
         self.tripId = tripId
         
-        // Only set up realtime listener and refresh timer
+        // Load messages immediately
         Task { @MainActor in
+            await loadMessages()
             await setupMessageListener()
-            updateUnreadCount()
+            await updateUnreadCount()
             setupRefreshTimer()
+        }
+    }
+    
+    private func showTemporaryNotification(_ message: String) {
+        Task { @MainActor in
+            notificationMessage = message
+            showNotification = true
+            // Hide notification after 3 seconds
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            showNotification = false
         }
     }
     
@@ -142,30 +155,25 @@ class ChatViewModel: ObservableObject {
             print("📥 Fetched messages response: \(String(data: response.data, encoding: .utf8) ?? "no data")")
             
             let decoder = JSONDecoder()
-            
-            // Create date formatters for both formats
-            let basicFormatter = DateFormatter()
-            basicFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            basicFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            basicFormatter.locale = Locale(identifier: "en_US_POSIX")
-            
-            let fractionalFormatter = DateFormatter()
-            fractionalFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-            fractionalFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            fractionalFormatter.locale = Locale(identifier: "en_US_POSIX")
-            
             decoder.dateDecodingStrategy = .custom { decoder in
                 let container = try decoder.singleValueContainer()
                 let dateString = try container.decode(String.self)
                 
-                // Try parsing with fractional seconds first
-                if let date = fractionalFormatter.date(from: dateString) {
-                    return date
+                let formatters = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                    "yyyy-MM-dd'T'HH:mm:ss"
+                ].map { format -> DateFormatter in
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = format
+                    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    return formatter
                 }
                 
-                // If that fails, try without fractional seconds
-                if let date = basicFormatter.date(from: dateString) {
-                    return date
+                for formatter in formatters {
+                    if let date = formatter.date(from: dateString) {
+                        return date
+                    }
                 }
                 
                 throw DecodingError.dataCorruptedError(
@@ -200,9 +208,6 @@ class ChatViewModel: ObservableObject {
                 self.isLoading = false
                 
                 print("📱 Loaded \(fetchedMessages.count) messages")
-                for message in fetchedMessages {
-                    print("Message: \(message.message_text) - isFromCurrentUser: \(message.isFromCurrentUser)")
-                }
             }
             
         } catch {
@@ -243,18 +248,8 @@ class ChatViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 // Get the current user's ID
-                let userId: UUID
-                do {
-                    guard let id = try await supabaseDataController.getUserID() else {
-                        throw NSError(domain: "ChatError", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user ID found"])
-                    }
-                    userId = id
-                    print("✅ Current user ID retrieved: \(userId)")
-                } catch {
-                    print("❌ Error getting user ID: \(error)")
-                    self.error = error
-                    return
-                }
+                let userId = try await supabaseDataController.getUserID() ?? UUID()
+                let userRole = await supabaseDataController.userRole
                 
                 // Get the fleet manager's ID
                 let fleetManagerId: UUID
@@ -266,16 +261,11 @@ class ChatViewModel: ObservableObject {
                         throw NSError(domain: "ChatError", code: 2, userInfo: [NSLocalizedDescriptionKey: "No fleet manager found"])
                     }
                     fleetManagerId = managerId
-                    print("✅ Fleet manager ID retrieved: \(fleetManagerId)")
                 } catch {
                     print("❌ Error getting fleet manager: \(error)")
                     self.error = error
                     return
                 }
-                
-                // Get the current user's role
-                let userRole = await supabaseDataController.userRole
-                print("👤 Current user role: \(userRole)")
                 
                 // Determine message direction based on user role
                 let (messageFleetManagerId, messageRecipientId, messageRecipientType): (UUID, UUID, String)
@@ -290,29 +280,8 @@ class ChatViewModel: ObservableObject {
                     messageRecipientType = "driver"
                 }
                 
-                print("📤 Sending message with:")
-                print("Fleet Manager ID: \(messageFleetManagerId)")
-                print("Recipient ID: \(messageRecipientId)")
-                print("Recipient Type: \(messageRecipientType)")
-                print("Trip ID: \(String(describing: tripId))")
-                
-                // Format dates with fractional seconds for consistency
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-                dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-                dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-                let currentDate = dateFormatter.string(from: Date())
-                
                 let messageId = UUID()
-                
-                // Debug trip_id handling
-                print("🔍 Trip ID Debug:")
-                print("  - Current tripId: \(String(describing: tripId))")
-                print("  - tripId?.uuidString: \(String(describing: tripId?.uuidString))")
-                
-                // Create message payload for Supabase
-                let tripIdString = tripId?.uuidString
-                print("  - Final tripIdString: \(String(describing: tripIdString))")
+                let currentDate = ISO8601DateFormatter().string(from: Date())
                 
                 let payload = MessagePayload(
                     id: messageId.uuidString,
@@ -326,81 +295,45 @@ class ChatViewModel: ObservableObject {
                     is_deleted: false,
                     attachment_url: nil,
                     attachment_type: nil,
-                    trip_id: tripIdString
+                    trip_id: tripId?.uuidString
                 )
                 
-                print("📦 Message payload being sent to Supabase:")
-                dump(payload)
+                // Insert message into database
+                let response = try await supabaseDataController.supabase
+                    .from("chat_messages")
+                    .insert(payload)
+                    .execute()
                 
-                // Convert payload to JSON for debugging
-                if let jsonData = try? JSONEncoder().encode(payload),
-                   let jsonString = String(data: jsonData, encoding: .utf8) {
-                    print("📝 JSON Payload:")
-                    print(jsonString)
+                if response.status == 201 {
+                    showTemporaryNotification("Message sent successfully")
                 }
                 
-                // Insert message into database using the payload
-                do {
-                    let response = try await supabaseDataController.supabase
-                        .from("chat_messages")
-                        .insert(payload)
-                        .execute()
-                    
-                    // Try to decode and print the response for debugging
-                    if let responseString = String(data: response.data, encoding: .utf8) {
-                        print("✅ Supabase response data: \(responseString)")
-                    }
-                    
-                    // Create message object for local state
-                    let message = ChatMessage(
-                        id: messageId,
-                        fleet_manager_id: messageFleetManagerId,
-                        recipient_id: messageRecipientId,
-                        recipient_type: messageRecipientType,
-                        message_text: text,
-                        status: .sent,
-                        created_at: Date(),
-                        updated_at: Date(),
-                        is_deleted: false,
-                        attachment_url: nil,
-                        attachment_type: nil,
-                        trip_id: tripId,
-                        isFromCurrentUser: true
-                    )
-                    
-                    // Add message to local state
-                    self.messages.append(message)
-                    
-                    // Verify the message was saved by trying to fetch it
-                    do {
-                        let verifyResponse = try await supabaseDataController.supabase
-                            .from("chat_messages")
-                            .select()
-                            .eq("id", value: messageId.uuidString)
-                            .execute()
-                        
-                        if let verifyString = String(data: verifyResponse.data, encoding: .utf8) {
-                            print("✅ Verification fetch response: \(verifyString)")
-                        }
-                    } catch {
-                        print("❌ Error verifying message save: \(error)")
-                    }
-                    
-                    // Trigger a message reload to ensure consistency
-                    await self.loadMessages()
-                    
-                } catch {
-                    print("❌ Error inserting message into Supabase: \(error)")
-                    print("Error details: \(error.localizedDescription)")
-                    if let data = try? JSONSerialization.data(withJSONObject: ["error": error.localizedDescription], options: .prettyPrinted),
-                       let errorString = String(data: data, encoding: .utf8) {
-                        print("Error JSON: \(errorString)")
-                    }
-                    self.error = error
-                }
+                // Create message object for local state
+                let message = ChatMessage(
+                    id: messageId,
+                    fleet_manager_id: messageFleetManagerId,
+                    recipient_id: messageRecipientId,
+                    recipient_type: messageRecipientType,
+                    message_text: text,
+                    status: .sent,
+                    created_at: Date(),
+                    updated_at: Date(),
+                    is_deleted: false,
+                    attachment_url: nil,
+                    attachment_type: nil,
+                    trip_id: tripId,
+                    isFromCurrentUser: true
+                )
+                
+                // Add message to local state
+                self.messages.append(message)
+                
+                // Reload messages to ensure consistency
+                await self.loadMessages()
                 
             } catch {
-                print("❌ Unexpected error: \(error)")
+                print("❌ Error sending message: \(error)")
+                showTemporaryNotification("Failed to send message")
                 self.error = error
             }
         }
