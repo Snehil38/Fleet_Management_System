@@ -584,12 +584,6 @@ struct TripDetailsView: View {
                         await MainActor.run {
                             // Create a new ChatViewModel with the correct fleet manager ID
                             let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
-                            // Load messages
-                            Task {
-                                await newViewModel.loadMessages()
-                                // Update our chatViewModel with the loaded messages
-                                chatViewModel.messages = newViewModel.messages
-                            }
                         }
                     }
                 } catch {

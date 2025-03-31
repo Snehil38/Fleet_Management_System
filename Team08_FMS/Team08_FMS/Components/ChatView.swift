@@ -50,7 +50,6 @@ struct ChatView: View {
                 }
                 .onAppear {
                     scrollProxy = proxy
-                    viewModel.clearMessages() // Clear messages when view appears
                 }
                 .onChange(of: viewModel.messages) { _ in
                     scrollToBottom()

@@ -28,10 +28,16 @@ class ChatViewModel: ObservableObject {
     private let recipientType: RecipientType
     private var realtimeChannel: RealtimeChannel?
     private var refreshTimer: Timer?
+    private var hasLoadedMessages = false
     
     init(recipientId: UUID, recipientType: RecipientType) {
         self.recipientId = recipientId
         self.recipientType = recipientType
+        
+        // Load messages immediately when initialized
+        Task {
+            await loadMessages()
+        }
         
         // Only set up realtime listener and refresh timer
         Task { @MainActor in
@@ -105,6 +111,9 @@ class ChatViewModel: ObservableObject {
     }
     
     func loadMessages() async {
+        // If messages are already loaded, don't load again
+        guard !hasLoadedMessages else { return }
+        
         await MainActor.run {
             self.isLoading = true
         }
@@ -172,6 +181,7 @@ class ChatViewModel: ObservableObject {
                 
                 self.messages = fetchedMessages
                 self.isLoading = false
+                self.hasLoadedMessages = true
             }
             
         } catch {
