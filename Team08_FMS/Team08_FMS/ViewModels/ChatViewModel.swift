@@ -134,18 +134,25 @@ class ChatViewModel: ObservableObject {
                 .from("chat_messages")
                 .select()
             
-            // Filter messages based on the conversation participants
-            if userRole == "fleet_manager" {
-                // For fleet manager: show messages where they are either sender or recipient
-                query = query.or("and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId)),and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId))")
-            } else {
-                // For driver: show messages where they are either sender or recipient
-                query = query.or("and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId)),and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId))")
-            }
-            
             // Add trip_id filter if present
             if let tripId = tripId {
+                // For trip-specific chats, only show messages for this trip
                 query = query.eq("trip_id", value: tripId.uuidString)
+                
+                // For both fleet manager and driver, show all messages in this trip
+                // This ensures all trip messages are loaded regardless of sender/recipient
+                query = query.or("trip_id.eq.\(tripId.uuidString)")
+            } else {
+                // For non-trip chats, filter messages based on the conversation participants
+                if userRole == "fleet_manager" {
+                    // For fleet manager: show messages where they are either sender or recipient
+                    query = query.or("and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId)),and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId))")
+                } else {
+                    // For driver: show messages where they are either sender or recipient
+                    query = query.or("and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId)),and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId))")
+                }
+                // Exclude trip-specific messages from general chat
+                query = query.is("trip_id", value: nil)
             }
             
             let response = try await query
@@ -186,27 +193,33 @@ class ChatViewModel: ObservableObject {
             
             // Update messages on main thread
             await MainActor.run {
-                // Update isFromCurrentUser for each message
-                for index in fetchedMessages.indices {
-                    var message = fetchedMessages[index]
-                    if userRole == "fleet_manager" {
-                        message.isFromCurrentUser = message.fleet_manager_id == currentUserId
-                    } else {
-                        message.isFromCurrentUser = message.recipient_id == recipientId
-                    }
-                    fetchedMessages[index] = message
-                    
-                    // Mark as read if needed
-                    if message.recipient_id == currentUserId && message.status == .sent {
-                        Task {
-                            await self.markMessageAsRead(message.id)
+                // Only update messages if we have new ones and not empty
+                if !fetchedMessages.isEmpty {
+                    // Update isFromCurrentUser for each message
+                    for index in fetchedMessages.indices {
+                        var message = fetchedMessages[index]
+                        if userRole == "fleet_manager" {
+                            message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                        } else {
+                            message.isFromCurrentUser = message.recipient_id == recipientId
                         }
+                        fetchedMessages[index] = message
+                        
+                        // Mark as read if needed
+                        if message.recipient_id == currentUserId && message.status == .sent {
+                            Task {
+                                await self.markMessageAsRead(message.id)
+                            }
+                        }
+                    }
+                    
+                    // Only update if we have new messages or different content
+                    if self.messages != fetchedMessages {
+                        self.messages = fetchedMessages
                     }
                 }
                 
-                self.messages = fetchedMessages
                 self.isLoading = false
-                
                 print("📱 Loaded \(fetchedMessages.count) messages")
             }
             
@@ -405,5 +418,12 @@ class ChatViewModel: ObservableObject {
                 try? await channel.unsubscribe()
             }
         }
+    }
+    
+    // Add message equality comparison
+    private func areMessagesEqual(_ message1: ChatMessage, _ message2: ChatMessage) -> Bool {
+        return message1.id == message2.id &&
+               message1.message_text == message2.message_text &&
+               message1.status == message2.status
     }
 } 
