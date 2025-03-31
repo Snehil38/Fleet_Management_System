@@ -1376,6 +1376,8 @@ struct SOSModalView: View {
     @State private var showingChat = false
     @State private var selectedOption: SOSOption = .emergency
     
+
+    
     enum SOSOption {
         case emergency
         case chat
@@ -1487,8 +1489,9 @@ class ProfileManager: ObservableObject {
     static let shared = ProfileManager()
     
     @Published var fleetManager: FleetManager?
-    @Published var fleetManagerName: String = "John Smith"
-    @Published var fleetManagerPhone: String = "+1 (555) 123-4567"
+    @Published var fleetManagerName: String = "Snehil Rai"
+    @Published var fleetManagerPhone: String = "9302399874"
+    @Published var fleetManagers: [FleetManager] = []
     
     private init() {
         // Load fleet manager details from local storage or fetch from server
@@ -1499,7 +1502,7 @@ class ProfileManager: ObservableObject {
     
     private func loadFleetManagerDetails() async {
         do {
-            let fleetManagers = try await SupabaseDataController.shared.fetchFleetManagers()
+            fleetManagers = try await SupabaseDataController.shared.fetchFleetManagers()
             if !fleetManagers.isEmpty {
                 await MainActor.run {
                     self.fleetManager = fleetManagers[0]

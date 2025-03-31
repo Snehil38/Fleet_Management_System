@@ -5,6 +5,8 @@ import SwiftSMTP
 
 struct GeofenceEvents: Codable, Identifiable {
     
+    let id: UUID
+    
     // The ID for the trip
     let tripId: UUID
     
@@ -17,11 +19,9 @@ struct GeofenceEvents: Codable, Identifiable {
     // Whether the event has been read
     var isRead: Bool = false
     
-    // Conformance to Identifiable
-    var id: UUID { tripId }
-    
     // Map the Swift property names to your database column names
     enum CodingKeys: String, CodingKey {
+        case id
         case tripId
         case message
         case timestamp

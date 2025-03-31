@@ -17,9 +17,9 @@ struct AlertsView: View {
                     ScrollView {
                         VStack(spacing: 16) {
                             // Summary Cards Section
-                            SummarySection()
-                                .padding(.top, 8)
-                                .padding(.horizontal)
+//                            SummarySection()
+//                                .padding(.top, 8)
+//                                .padding(.horizontal)
                             
                             // Alerts List
                             AlertsListView()
@@ -210,7 +210,7 @@ struct AlertRow: View {
                     .foregroundColor(.primary)
                     .lineLimit(2)
 
-                Text("Trip: \(event.tripId.uuidString.prefix(8))")
+                Text("Trip: \(event.tripId.uuidString)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
