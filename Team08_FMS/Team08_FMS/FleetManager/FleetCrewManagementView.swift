@@ -360,7 +360,12 @@ struct CrewCardView: View {
         .sheet(isPresented: $showingMessageSheet) {
             if let id = recipientId {
                 NavigationView {
-                    ChatView(recipientType: .driver, recipientId: id, recipientName: currentCrew.name)
+                    ChatView(
+                        recipientType: .driver,
+                        recipientId: id,
+                        recipientName: currentCrew.name,
+                        tripId: currentCrew.currentTripId  // Add trip ID if available
+                    )
                 }
             }
         }

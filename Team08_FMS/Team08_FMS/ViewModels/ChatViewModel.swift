@@ -14,6 +14,7 @@ private struct MessagePayload: Encodable {
     let is_deleted: Bool
     let attachment_url: String?
     let attachment_type: String?
+    let trip_id: String?
 }
 
 class ChatViewModel: ObservableObject {
@@ -26,12 +27,14 @@ class ChatViewModel: ObservableObject {
     private let supabaseDataController = SupabaseDataController.shared
     private let recipientId: UUID
     private let recipientType: RecipientType
+    private let tripId: UUID?
     private var realtimeChannel: RealtimeChannel?
     private var refreshTimer: Timer?
     
-    init(recipientId: UUID, recipientType: RecipientType) {
+    init(recipientId: UUID, recipientType: RecipientType, tripId: UUID? = nil) {
         self.recipientId = recipientId
         self.recipientType = recipientType
+        self.tripId = tripId
         
         // Only set up realtime listener and refresh timer
         Task { @MainActor in
@@ -112,10 +115,17 @@ class ChatViewModel: ObservableObject {
         do {
             let currentUserId = try await supabaseDataController.getUserID()
             
-            let response = try await supabaseDataController.supabase
+            var query = supabaseDataController.supabase
                 .from("chat_messages")
                 .select()
                 .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
+            
+            // Add trip_id filter if present
+            if let tripId = tripId {
+                query = query.eq("trip_id", value: tripId)
+            }
+            
+            let response = try await query
                 .order("created_at", ascending: true)
                 .execute()
             
@@ -212,42 +222,58 @@ class ChatViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 // Get the current user's ID
-                guard let userId = try? await supabaseDataController.getUserID() else {
-                    print("No user ID found")
+                let userId: UUID
+                do {
+                    guard let id = try await supabaseDataController.getUserID() else {
+                        throw NSError(domain: "ChatError", code: 1, userInfo: [NSLocalizedDescriptionKey: "No user ID found"])
+                    }
+                    userId = id
+                    print("✅ Current user ID retrieved: \(userId)")
+                } catch {
+                    print("❌ Error getting user ID: \(error)")
+                    self.error = error
                     return
                 }
                 
                 // Get the fleet manager's ID
-                guard let fleetManagers = try? await supabaseDataController.fetchFleetManagers(),
-                      let firstManager = fleetManagers.first,
-                      let fleetManagerId = firstManager.userID else {
-                    print("No fleet manager found")
+                let fleetManagerId: UUID
+                do {
+                    let managers = try await supabaseDataController.fetchFleetManagers()
+                    guard !managers.isEmpty,
+                          let firstManager = managers.first,
+                          let managerId = firstManager.userID else {
+                        throw NSError(domain: "ChatError", code: 2, userInfo: [NSLocalizedDescriptionKey: "No fleet manager found"])
+                    }
+                    fleetManagerId = managerId
+                    print("✅ Fleet manager ID retrieved: \(fleetManagerId)")
+                } catch {
+                    print("❌ Error getting fleet manager: \(error)")
+                    self.error = error
                     return
                 }
                 
                 // Get the current user's role
                 let userRole = await supabaseDataController.userRole
-                print("Current user role: \(userRole)")
+                print("👤 Current user role: \(userRole)")
                 
                 // Determine message direction based on user role
                 let (messageFleetManagerId, messageRecipientId, messageRecipientType): (UUID, UUID, String)
                 
                 if userRole == "fleet_manager" {
-                    // Fleet manager sending to driver/maintenance
                     messageFleetManagerId = userId
                     messageRecipientId = recipientId
                     messageRecipientType = recipientType.rawValue
                 } else {
-                    // Driver/maintenance sending to fleet manager
                     messageFleetManagerId = fleetManagerId
                     messageRecipientId = userId
                     messageRecipientType = "driver"
                 }
                 
-                print("Sending message with:")
+                print("📤 Sending message with:")
                 print("Fleet Manager ID: \(messageFleetManagerId)")
                 print("Recipient ID: \(messageRecipientId)")
                 print("Recipient Type: \(messageRecipientType)")
+                print("Trip ID: \(String(describing: tripId))")
                 
                 // Format dates with fractional seconds for consistency
                 let dateFormatter = DateFormatter()
@@ -256,38 +282,104 @@ class ChatViewModel: ObservableObject {
                 dateFormatter.locale = Locale(identifier: "en_US_POSIX")
                 let currentDate = dateFormatter.string(from: Date())
                 
-                // Create message payload
-                let message = ChatMessage(
-                    id: UUID(),
-                    fleet_manager_id: messageFleetManagerId,
-                    recipient_id: messageRecipientId,
+                let messageId = UUID()
+                
+                // Debug trip_id handling
+                print("🔍 Trip ID Debug:")
+                print("  - Current tripId: \(String(describing: tripId))")
+                print("  - tripId?.uuidString: \(String(describing: tripId?.uuidString))")
+                
+                // Create message payload for Supabase
+                let tripIdString = tripId?.uuidString
+                print("  - Final tripIdString: \(String(describing: tripIdString))")
+                
+                let payload = MessagePayload(
+                    id: messageId.uuidString,
+                    fleet_manager_id: messageFleetManagerId.uuidString,
+                    recipient_id: messageRecipientId.uuidString,
                     recipient_type: messageRecipientType,
                     message_text: text,
-                    status: .sent,
-                    created_at: Date(),
-                    updated_at: Date(),
+                    status: MessageStatus.sent.rawValue,
+                    created_at: currentDate,
+                    updated_at: currentDate,
                     is_deleted: false,
                     attachment_url: nil,
                     attachment_type: nil,
-                    isFromCurrentUser: true
+                    trip_id: tripIdString
                 )
                 
-                // Insert message into database
-                let response = try await supabaseDataController.supabase
-                    .from("chat_messages")
-                    .insert(message)
-                    .execute()
+                print("📦 Message payload being sent to Supabase:")
+                dump(payload)
                 
-                print("Message sent successfully: \(response)")
+                // Convert payload to JSON for debugging
+                if let jsonData = try? JSONEncoder().encode(payload),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    print("📝 JSON Payload:")
+                    print(jsonString)
+                }
                 
-                // Add message to local state (already on main thread due to @MainActor)
-                self.messages.append(message)
-                
-                // Trigger a message reload to ensure consistency
-                await self.loadMessages()
+                // Insert message into database using the payload
+                do {
+                    let response = try await supabaseDataController.supabase
+                        .from("chat_messages")
+                        .insert(payload)
+                        .execute()
+                    
+                    // Try to decode and print the response for debugging
+                    if let responseString = String(data: response.data, encoding: .utf8) {
+                        print("✅ Supabase response data: \(responseString)")
+                    }
+                    
+                    // Create message object for local state
+                    let message = ChatMessage(
+                        id: messageId,
+                        fleet_manager_id: messageFleetManagerId,
+                        recipient_id: messageRecipientId,
+                        recipient_type: messageRecipientType,
+                        message_text: text,
+                        status: .sent,
+                        created_at: Date(),
+                        updated_at: Date(),
+                        is_deleted: false,
+                        attachment_url: nil,
+                        attachment_type: nil,
+                        trip_id: tripId,
+                        isFromCurrentUser: true
+                    )
+                    
+                    // Add message to local state
+                    self.messages.append(message)
+                    
+                    // Verify the message was saved by trying to fetch it
+                    do {
+                        let verifyResponse = try await supabaseDataController.supabase
+                            .from("chat_messages")
+                            .select()
+                            .eq("id", value: messageId.uuidString)
+                            .execute()
+                        
+                        if let verifyString = String(data: verifyResponse.data, encoding: .utf8) {
+                            print("✅ Verification fetch response: \(verifyString)")
+                        }
+                    } catch {
+                        print("❌ Error verifying message save: \(error)")
+                    }
+                    
+                    // Trigger a message reload to ensure consistency
+                    await self.loadMessages()
+                    
+                } catch {
+                    print("❌ Error inserting message into Supabase: \(error)")
+                    print("Error details: \(error.localizedDescription)")
+                    if let data = try? JSONSerialization.data(withJSONObject: ["error": error.localizedDescription], options: .prettyPrinted),
+                       let errorString = String(data: data, encoding: .utf8) {
+                        print("Error JSON: \(errorString)")
+                    }
+                    self.error = error
+                }
                 
             } catch {
-                print("Error sending message: \(error)")
+                print("❌ Unexpected error: \(error)")
                 self.error = error
             }
         }

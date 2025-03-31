@@ -98,6 +98,7 @@ struct ChatBubbleView_Previews: PreviewProvider {
                 is_deleted: false,
                 attachment_url: nil,
                 attachment_type: nil,
+                trip_id: UUID(),
                 isFromCurrentUser: true
             ))
             
@@ -113,6 +114,7 @@ struct ChatBubbleView_Previews: PreviewProvider {
                 is_deleted: false,
                 attachment_url: nil,
                 attachment_type: nil,
+                trip_id: nil,
                 isFromCurrentUser: false
             ))
         }

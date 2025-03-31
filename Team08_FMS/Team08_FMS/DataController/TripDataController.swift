@@ -909,6 +909,15 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let id = await supabaseController.getUserID()
                 await supabaseController.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
                 await supabaseController.updateDriverStatus(newStatus: .available, userID: id, id: nil)
+                
+                // Clear driver's currentTripId
+                if let driverId = trip.driverId {
+                    let driver = CrewDataController.shared.drivers.first { $0.id == driverId }
+                    if var driver = driver {
+                        driver.currentTripId = nil
+                        await supabaseController.updateDriver(driver: driver)
+                    }
+                }
             }
             
             // Update end time in Supabase
@@ -1002,6 +1011,15 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 updatedTrip.status = .inProgress
                 self.currentTrip = updatedTrip
                 upcomingTrips.remove(at: index)
+                
+                // Update driver's currentTripId
+                if let driverId = updatedTrip.driverId {
+                    let driver = CrewDataController.shared.drivers.first { $0.id == driverId }
+                    if var driver = driver {
+                        driver.currentTripId = trip.id
+                        await supabaseController.updateDriver(driver: driver)
+                    }
+                }
             }
             
             // Refresh trips to ensure everything is in sync with server

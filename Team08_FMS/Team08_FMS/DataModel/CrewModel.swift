@@ -91,6 +91,7 @@ struct Driver: Identifiable, Codable {
     var updatedAt: Date?
     var isDeleted: Bool = false
     var status: Status
+    var currentTripId: UUID?
 }
 
 struct MaintenancePersonnel: Identifiable, Codable {
@@ -119,6 +120,7 @@ protocol CrewMemberProtocol {
     var phoneNumber: Int { get }
     var salary: Double { get }
     var status: Status { get set }
+    var currentTripId: UUID? { get }
 }
 
 extension Driver: CrewMemberProtocol {
@@ -132,5 +134,9 @@ extension MaintenancePersonnel: CrewMemberProtocol {
     var avatar: String {
         get { profileImage ?? "" }
         set { profileImage = newValue }
+    }
+    
+    var currentTripId: UUID? {
+        get { nil } // Maintenance personnel don't have current trips
     }
 }

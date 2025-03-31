@@ -35,6 +35,10 @@ struct DriverTabView: View {
     ]
     @State private var selectedRouteId: String = "1"
     
+    @State private var currentTrip: Trip?
+    @State private var upcomingTrips: [Trip] = []
+    @State private var recentDeliveries: [DeliveryDetails] = []
+    
     var body: some View {
         TabView(selection: $selectedTab) {
             mainContentView
@@ -51,13 +55,26 @@ struct DriverTabView: View {
             }
             .tag(1)
         }
-        .environmentObject(tripController)
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
-        .task {
-            // Set the driver ID and load trips
-            tripController.setDriverId(driverId)
-            await tripController.refreshTrips()
-            TripDataController.shared.startMonitoringRegions()
+        .onChange(of: tripController.currentTrip) { newTrip in
+            currentTrip = newTrip
+        }
+        .onChange(of: tripController.upcomingTrips) { newTrips in
+            upcomingTrips = newTrips
+        }
+        .onChange(of: tripController.recentDeliveries) { newDeliveries in
+            recentDeliveries = newDeliveries
+        }
+        .onAppear {
+            currentTrip = tripController.currentTrip
+            upcomingTrips = tripController.upcomingTrips
+            recentDeliveries = tripController.recentDeliveries
+            Task {
+                await tripController.refreshTrips()
+            }
+        }
+        .alert(alertMessage, isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
         }
     }
     
@@ -85,7 +102,7 @@ struct DriverTabView: View {
                         ScrollView(.vertical, showsIndicators: false) {
                             VStack(spacing: 24) {
                                 // Current Delivery Card
-                                if let currentTrip = tripController.currentTrip,
+                                if let currentTrip = self.currentTrip,
                                    currentTrip.status == .inProgress && availabilityManager.isAvailable {
                                     currentDeliveryCard(currentTrip)
                                 }
@@ -103,8 +120,8 @@ struct DriverTabView: View {
                                             Text("Upcoming Trips")
                                                 .font(.system(size: 24, weight: .bold))
                                             
-                                            if !tripController.upcomingTrips.isEmpty {
-                                                Text("\(tripController.upcomingTrips.count)")
+                                            if !upcomingTrips.isEmpty {
+                                                Text("\(upcomingTrips.count)")
                                                     .font(.system(size: 16, weight: .semibold))
                                                     .foregroundColor(.white)
                                                     .padding(.horizontal, 10)
@@ -117,14 +134,14 @@ struct DriverTabView: View {
                                         }
                                         .padding(.horizontal)
 
-                                        if tripController.upcomingTrips.isEmpty {
+                                        if upcomingTrips.isEmpty {
                                             emptyUpcomingTripsView
                                         } else {
                                             VStack(spacing: 0) {
-                                                ForEach(tripController.upcomingTrips) { trip in
+                                                ForEach(upcomingTrips) { trip in
                                                     UpcomingTripRow(trip: trip)
                                                         .environmentObject(tripController)
-                                                    if trip.id != tripController.upcomingTrips.last?.id {
+                                                    if trip.id != upcomingTrips.last?.id {
                                                         Divider()
                                                             .padding(.horizontal)
                                                     }
@@ -147,8 +164,8 @@ struct DriverTabView: View {
                                         Text("Recent Deliveries")
                                             .font(.system(size: 24, weight: .bold))
                                         
-                                        if !tripController.recentDeliveries.isEmpty {
-                                            Text("\(tripController.recentDeliveries.count)")
+                                        if !recentDeliveries.isEmpty {
+                                            Text("\(recentDeliveries.count)")
                                                 .font(.system(size: 16, weight: .semibold))
                                                 .foregroundColor(.white)
                                                 .padding(.horizontal, 10)
@@ -161,11 +178,11 @@ struct DriverTabView: View {
                                     }
                                     .padding(.horizontal)
                                     
-                                    if tripController.recentDeliveries.isEmpty {
+                                    if recentDeliveries.isEmpty {
                                         emptyRecentDeliveriesView
                                     } else {
                                         VStack(spacing: 0) {
-                                            ForEach(tripController.recentDeliveries) { delivery in
+                                            ForEach(recentDeliveries) { delivery in
                                                 Button {
                                                     selectedDelivery = delivery
                                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -176,7 +193,7 @@ struct DriverTabView: View {
                                                 }
                                                 .buttonStyle(PlainButtonStyle())
 
-                                                if delivery.id != tripController.recentDeliveries.last?.id {
+                                                if delivery.id != recentDeliveries.last?.id {
                                                     Divider()
                                                         .padding(.horizontal)
                                                 }
@@ -242,14 +259,19 @@ struct DriverTabView: View {
             VehicleInspectionView(isPreTrip: true) { success in
                 if success {
                     // Only mark as completed if successful
-                    if let currentTrip = tripController.currentTrip {
+                    if let updatedTrip = self.currentTrip {
                         Task {
                             do {
                                 try await tripController.updateTripInspectionStatus(
-                                    tripId: currentTrip.id,
+                                    tripId: updatedTrip.id,
                                     isPreTrip: true,
                                     completed: true
                                 )
+                                // Update local state after Supabase is updated
+                                if var trip = self.currentTrip {
+                                    trip.hasCompletedPreTrip = true
+                                    currentTrip = trip
+                                }
                             } catch {
                                 alertMessage = "Failed to update pre-trip inspection status: \(error.localizedDescription)"
                                 showingAlert = true
@@ -257,6 +279,7 @@ struct DriverTabView: View {
                         }
                     }
                 } else {
+                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before starting the trip"
                     showingAlert = true
                 }
@@ -265,17 +288,25 @@ struct DriverTabView: View {
         .sheet(isPresented: $showingPostTripInspection) {
             VehicleInspectionView(isPreTrip: false) { success in
                 if success {
-                    // Only mark as completed if successful
-                    if let currentTrip = tripController.currentTrip {
+                    // Only mark as completed and mark delivered if successful
+                    if var updatedTrip = self.currentTrip {
                         Task {
                             do {
                                 try await tripController.updateTripInspectionStatus(
-                                    tripId: currentTrip.id,
+                                    tripId: updatedTrip.id,
                                     isPreTrip: false,
                                     completed: true
                                 )
-                                await MainActor.run {
-                                    markCurrentTripDelivered()
+                                // Update local state after Supabase is updated
+                                if var trip = self.currentTrip {
+                                    trip.hasCompletedPostTrip = true
+                                    currentTrip = trip
+                                    // Use Task to call the async method
+                                    Task {
+                                        await MainActor.run {
+                                            markCurrentTripDelivered()
+                                        }
+                                    }
                                 }
                             } catch {
                                 alertMessage = "Failed to update post-trip inspection status: \(error.localizedDescription)"
@@ -284,25 +315,19 @@ struct DriverTabView: View {
                         }
                     }
                 } else {
+                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before completing delivery"
                     showingAlert = true
                 }
             }
         }
         .sheet(isPresented: $showingVehicleDetails) {
-            if let currentTrip = tripController.currentTrip {
+            if let currentTrip = self.currentTrip {
                 VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
             }
         }
         .sheet(isPresented: $showingSosModal) {
-            SOSModalView(isPresented: $showingSosModal)
-        }
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Action Required"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+            SOSEmergencyView(isPresented: $showingSosModal, currentTrip: $currentTrip)
         }
         .sheet(isPresented: $showingDeliveryDetails) {
             if let delivery = selectedDelivery {
@@ -313,10 +338,10 @@ struct DriverTabView: View {
     
     private var navigationOverlay: some View {
         RealTimeNavigationView(
-            destination: tripController.currentTrip?.destinationCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            destinationName: tripController.currentTrip?.destination ?? "",
-            address: tripController.currentTrip?.address ?? "",
-            sourceCoordinate: tripController.currentTrip?.sourceCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            destination: self.currentTrip?.destinationCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            destinationName: self.currentTrip?.destination ?? "",
+            address: self.currentTrip?.address ?? "",
+            sourceCoordinate: self.currentTrip?.sourceCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
             onDismiss: { 
                 withAnimation(.easeInOut(duration: 0.3)) {
                     showingNavigation = false 
@@ -794,7 +819,7 @@ struct DriverTabView: View {
     }
     
     private func markCurrentTripDelivered() {
-        if let trip = tripController.currentTrip, trip.hasCompletedPostTrip {
+        if let trip = self.currentTrip, trip.hasCompletedPostTrip {
             // Create a Task to handle the async operation
             Task {
                 do {
@@ -842,12 +867,12 @@ struct DriverTabView: View {
             }
         } else {
             // If pre-trip not completed, show alert
-            if let trip = tripController.currentTrip, !trip.hasCompletedPreTrip {
+            if let trip = self.currentTrip, !trip.hasCompletedPreTrip {
                 alertMessage = "Please complete pre-trip inspection before marking as delivered"
                 showingAlert = true
             }
             // If post-trip not completed, show post-trip inspection
-            else if let trip = tripController.currentTrip, !trip.hasCompletedPostTrip {
+            else if let trip = self.currentTrip, !trip.hasCompletedPostTrip {
                 showingPostTripInspection = true
             } else {
                 print("Cannot mark as delivered: trip is nil")
@@ -1367,13 +1392,13 @@ struct MapPolyline: View {
     }
 }
 
-struct SOSModalView: View {
+struct SOSEmergencyView: View {
     @Binding var isPresented: Bool
-    @StateObject private var profileManager = ProfileManager.shared
-    @State private var emergencySubject: String = ""
+    @Binding var currentTrip: Trip?
+    @State private var emergencySubject = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
-    @State private var showingChat = false
+    @StateObject private var profileManager = ProfileManager.shared
     @State private var selectedOption: SOSOption = .emergency
     
     enum SOSOption {
@@ -1449,7 +1474,7 @@ struct SOSModalView: View {
                     // Chat View
                     if let manager = profileManager.fleetManager {
                         if let userID = manager.userID {
-                            ChatView(recipientType: .maintenance, recipientId: userID, recipientName: manager.name)
+                            ChatView(recipientType: .maintenance, recipientId: userID, recipientName: manager.name, tripId: self.currentTrip?.id)
                                 .frame(maxHeight: .infinity)
                         } else {
                             Text("Unable to start chat: Fleet manager information is incomplete")

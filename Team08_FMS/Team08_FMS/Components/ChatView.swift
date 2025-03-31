@@ -18,6 +18,7 @@ struct ChatView: View {
     let recipientType: RecipientType
     let recipientId: UUID
     let recipientName: String
+    let tripId: UUID?
     @StateObject private var viewModel: ChatViewModel
     @State private var messageText = ""
     @State private var isShowingEmergencySheet = false
@@ -25,11 +26,16 @@ struct ChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @StateObject private var tripController = TripDataController.shared
     
-    init(recipientType: RecipientType, recipientId: UUID, recipientName: String) {
+    init(recipientType: RecipientType, recipientId: UUID, recipientName: String, tripId: UUID? = nil) {
         self.recipientType = recipientType
         self.recipientId = recipientId
         self.recipientName = recipientName
-        self._viewModel = StateObject(wrappedValue: ChatViewModel(recipientId: recipientId, recipientType: recipientType))
+        self.tripId = tripId
+        self._viewModel = StateObject(wrappedValue: ChatViewModel(
+            recipientId: recipientId,
+            recipientType: recipientType,
+            tripId: tripId
+        ))
     }
     
     var body: some View {
@@ -95,6 +101,11 @@ struct ChatView: View {
                 Text(recipientType.displayName)
                     .font(.caption)
                     .foregroundColor(.gray)
+                if tripId != nil {
+                    Text("Trip Chat")
+                        .font(.caption2)
+                        .foregroundColor(ChatThemeColors.primary)
+                }
             }
             
             Spacer()
@@ -209,6 +220,11 @@ struct ChatView: View {
 // Preview provider
 struct ChatView_Previews: PreviewProvider {
     static var previews: some View {
-        ChatView(recipientType: .driver, recipientId: UUID(), recipientName: "John Smith")
+        ChatView(
+            recipientType: .driver,
+            recipientId: UUID(),
+            recipientName: "John Smith",
+            tripId: UUID()
+        )
     }
 } 

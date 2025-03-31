@@ -756,12 +756,12 @@ struct TripDetailsView: View {
             receiptData = pdfData
             showingDeliveryReceipt = true
             
-        } catch {
+            } catch {
             print("Error generating receipt: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
-            showingError = true
-        }
-    }
+                    showingError = true
+                }
+            }
     
     private func calculateFuelCost() -> Double {
         let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
@@ -854,10 +854,10 @@ struct TripDetailsView: View {
                 // Draw Chat Messages section
                 "Chat Messages".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
                 yPosition += 25
-                
-                // Sort messages by date
-                let sortedMessages = chatViewModel.messages.sorted { $0.created_at < $1.created_at }
-                
+        
+        // Sort messages by date
+        let sortedMessages = chatViewModel.messages.sorted { $0.created_at < $1.created_at }
+        
                 if sortedMessages.isEmpty {
                     let noMessagesRect = CGRect(x: leftMargin, y: yPosition, width: contentWidth, height: 30)
                     ctx.stroke(noMessagesRect)
@@ -866,12 +866,12 @@ struct TripDetailsView: View {
                                                           withAttributes: textAttributes)
                 } else {
                     // Draw each message
-                    for message in sortedMessages {
+        for message in sortedMessages {
                         let dateFormatter = DateFormatter()
                         dateFormatter.dateStyle = .medium
                         dateFormatter.timeStyle = .short
                         let timestamp = dateFormatter.string(from: message.created_at)
-                        let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
+            let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
                         
                         // Draw message box
                         let messageHeight: CGFloat = 60
