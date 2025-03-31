@@ -141,20 +141,20 @@ class ChatViewModel: ObservableObject {
             
             // Add trip_id filter if present
             if let tripId = tripId {
+                print("🔍 Loading trip-specific messages for trip: \(tripId.uuidString)")
                 // For trip-specific chats, only show messages for this trip
                 query = query.eq("trip_id", value: tripId.uuidString)
+                
+                // For trip chats, we want all messages between these participants
+                query = query.or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserIdString)),and(fleet_manager_id.eq.\(currentUserIdString),recipient_id.eq.\(recipientId.uuidString))")
             } else {
                 // For non-trip chats, filter messages based on the conversation participants
-                if userRole == "fleet_manager" {
-                    // For fleet manager: show messages where they are either sender or recipient
-                    query = query.or("and(fleet_manager_id.eq.\(currentUserIdString),recipient_id.eq.\(recipientId.uuidString)),and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserIdString))")
-                } else {
-                    // For driver: show messages where they are either sender or recipient
-                    query = query.or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserIdString)),and(fleet_manager_id.eq.\(currentUserIdString),recipient_id.eq.\(recipientId.uuidString))")
-                }
+                query = query.or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserIdString)),and(fleet_manager_id.eq.\(currentUserIdString),recipient_id.eq.\(recipientId.uuidString))")
                 // Exclude trip-specific messages from general chat
                 query = query.is("trip_id", value: nil)
             }
+            
+            print("🔍 Loading messages with query filters: trip_id=\(String(describing: tripId)), userRole=\(userRole), currentUser=\(currentUserIdString)")
             
             let response = try await query
                 .order("created_at", ascending: true)
@@ -199,14 +199,24 @@ class ChatViewModel: ObservableObject {
                     // Update isFromCurrentUser for each message
                     for index in fetchedMessages.indices {
                         var message = fetchedMessages[index]
+                        
                         if userRole == "fleet_manager" {
                             // For fleet manager: message is from current user if they are the fleet_manager_id
                             message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserIdString
                         } else {
-                            // For driver: message is from current user if they are NOT the fleet_manager_id
-                            message.isFromCurrentUser = message.fleet_manager_id.uuidString != recipientId.uuidString
+                            // For driver: message is from current user if they are the recipient_id
+                            message.isFromCurrentUser = message.recipient_id.uuidString == currentUserIdString
                         }
+                        
                         fetchedMessages[index] = message
+                        
+                        print("📱 Message ownership - ID: \(message.id), Text: \(message.message_text)")
+                        print("📱 Message details - Fleet Manager ID: \(message.fleet_manager_id.uuidString)")
+                        print("📱 Message details - Recipient ID: \(message.recipient_id.uuidString)")
+                        print("📱 Message details - Current User: \(currentUserIdString)")
+                        print("📱 Message details - Recipient: \(recipientId.uuidString)")
+                        print("📱 Message details - Is From Current User: \(message.isFromCurrentUser)")
+                        print("📱 Message details - User Role: \(userRole)")
                         
                         // Mark as read if needed
                         if message.recipient_id.uuidString == currentUserIdString && message.status == .sent {
@@ -268,37 +278,78 @@ class ChatViewModel: ObservableObject {
                 }
                 let userRole = await supabaseDataController.userRole
                 
-                // Get the fleet manager's ID
-                let fleetManagerId: UUID
-                do {
-                    let managers = try await supabaseDataController.fetchFleetManagers()
-                    guard !managers.isEmpty,
-                          let firstManager = managers.first,
-                          let managerId = firstManager.userID else {
-                        throw NSError(domain: "ChatError", code: 2, userInfo: [NSLocalizedDescriptionKey: "No fleet manager found"])
-                    }
-                    fleetManagerId = managerId
-                } catch {
-                    print("❌ Error getting fleet manager: \(error)")
-                    self.error = error
-                    return
-                }
-                
                 // Determine message direction based on user role
                 let (messageFleetManagerId, messageRecipientId, messageRecipientType): (UUID, UUID, String)
                 
                 if userRole == "fleet_manager" {
+                    // If sender is fleet manager, they are the fleet_manager_id and recipient is the driver
                     messageFleetManagerId = userId
                     messageRecipientId = recipientId
                     messageRecipientType = recipientType.rawValue
                 } else {
-                    messageFleetManagerId = fleetManagerId
-                    messageRecipientId = userId
+                    // If sender is driver, the recipientId (which is fleet manager's ID) becomes fleet_manager_id
+                    // and the driver (current user) becomes the recipient
+                    messageFleetManagerId = recipientId  // recipientId is the fleet manager's ID
+                    messageRecipientId = userId         // current user (driver) is the recipient
                     messageRecipientType = "driver"
+                }
+                
+                // Get driver's current trip ID if applicable
+                var messageTripId = tripId?.uuidString
+                if userRole == "fleet_manager" {
+                    // If fleet manager is sending, use the driver's current trip ID
+                    do {
+                        let response = try await supabaseDataController.supabase
+                            .from("driver")
+                            .select("currentTripId")
+                            .eq("userID", value: recipientId.uuidString)
+                            .single()
+                            .execute()
+                        
+                        struct DriverData: Codable {
+                            let currentTripId: String?
+                        }
+                        
+                        if let driverData = try? JSONDecoder().decode(DriverData.self, from: response.data),
+                           let currentTripId = driverData.currentTripId {
+                            messageTripId = currentTripId
+                            print("📱 Found driver's current trip ID: \(currentTripId)")
+                        }
+                    } catch {
+                        print("⚠️ Could not fetch driver's current trip ID: \(error)")
+                    }
+                } else {
+                    // If driver is sending, get their own current trip ID
+                    do {
+                        let response = try await supabaseDataController.supabase
+                            .from("driver")
+                            .select("currentTripId")
+                            .eq("userID", value: userId.uuidString)
+                            .single()
+                            .execute()
+                        
+                        struct DriverData: Codable {
+                            let currentTripId: String?
+                        }
+                        
+                        if let driverData = try? JSONDecoder().decode(DriverData.self, from: response.data),
+                           let currentTripId = driverData.currentTripId {
+                            messageTripId = currentTripId
+                            print("📱 Found driver's current trip ID: \(currentTripId)")
+                        }
+                    } catch {
+                        print("⚠️ Could not fetch driver's current trip ID: \(error)")
+                    }
                 }
                 
                 let messageId = UUID()
                 let currentDate = ISO8601DateFormatter().string(from: Date())
+                
+                print("📝 Sending message with tripId: \(String(describing: messageTripId))")
+                print("📝 Message direction - From: \(userRole) (ID: \(userId))")
+                print("📝 Message direction - Fleet Manager ID: \(messageFleetManagerId)")
+                print("📝 Message direction - Recipient ID: \(messageRecipientId)")
+                print("📝 Message direction - Trip ID: \(String(describing: messageTripId))")
                 
                 let payload = MessagePayload(
                     id: messageId.uuidString,
@@ -312,7 +363,7 @@ class ChatViewModel: ObservableObject {
                     is_deleted: false,
                     attachment_url: nil,
                     attachment_type: nil,
-                    trip_id: tripId?.uuidString
+                    trip_id: messageTripId
                 )
                 
                 // Insert message into database
@@ -320,6 +371,8 @@ class ChatViewModel: ObservableObject {
                     .from("chat_messages")
                     .insert(payload)
                     .execute()
+                
+                print("📤 Message sent with payload: \(payload)")
                 
                 if response.status == 201 {
                     showTemporaryNotification("Message sent successfully")
@@ -338,8 +391,8 @@ class ChatViewModel: ObservableObject {
                     is_deleted: false,
                     attachment_url: nil,
                     attachment_type: nil,
-                    trip_id: tripId,
-                    isFromCurrentUser: userRole == "fleet_manager" ? messageFleetManagerId == userId : messageFleetManagerId != fleetManagerId
+                    trip_id: UUID(uuidString: messageTripId ?? ""),
+                    isFromCurrentUser: true  // Message is always from current user when sending
                 )
                 
                 // Add message to local state
