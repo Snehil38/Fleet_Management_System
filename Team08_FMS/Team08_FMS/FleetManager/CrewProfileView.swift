@@ -150,16 +150,17 @@ struct CrewProfileView: View {
                                 .foregroundColor(.red)
                         }
                     }
-                    VStack(alignment: .leading, spacing: 4) {
-                        TextField("Email", text: $editedEmail)
-                            .keyboardType(.emailAddress)
-                            .onChange(of: editedEmail) { _, _ in emailEdited = true }
-                        if emailEdited && !isEmailValid {
-                            Text("Enter a valid email address.")
-                                .font(.caption)
-                                .foregroundColor(.red)
-                        }
-                    }
+//                    VStack(alignment: .leading, spacing: 4) {
+//                        TextField("Email", text: $editedEmail)
+//                            .keyboardType(.emailAddress)
+//                            .onChange(of: editedEmail) { _, _ in emailEdited = true }
+//                        if emailEdited && !isEmailValid {
+//                            Text("Enter a valid email address.")
+//                                .font(.caption)
+//                                .foregroundColor(.red)
+//                        }
+//                    }
+                    LabeledContent(label:"Email", value: crewMember.email)
                 } else {
                     LabeledContent(label:"Phone", value: "\(crewMember.phoneNumber)")
                     LabeledContent(label:"Email", value: crewMember.email)

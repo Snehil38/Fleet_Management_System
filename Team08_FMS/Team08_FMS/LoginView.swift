@@ -107,7 +107,7 @@ struct LoginView: View {
                         .padding(.trailing, 30)
                 }
             }
-            .onChange(of: isPasswordFocused) { newValue in
+            .onChange(of: isPasswordFocused) { oldValue, newValue in
                 if newValue {
                     passwordFieldHasBeenFocused = true
                 }

@@ -6,30 +6,24 @@ struct AlertsView: View {
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             Color(UIColor.systemGroupedBackground)
                 .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Navigation Header
-                NavigationHeader()
-                
-                // Content
+
+            VStack {
                 if events.isEmpty {
                     EmptysStateView()
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
-                            // Summary Cards with adjusted padding
-                            VStack(spacing: 0) {
-                                SummarySection()
-                                    .padding(.top, 8) // Reduced top padding
-                                    .padding(.horizontal)
-                                
-                                // Alerts List
-                                AlertsListView()
-                                    .padding(.top, 16)
-                            }
+                            // Summary Cards Section
+//                            SummarySection()
+//                                .padding(.top, 8)
+//                                .padding(.horizontal)
+                            
+                            // Alerts List
+                            AlertsListView()
+                                .padding(.top, 16)
                         }
                     }
                     .refreshable {
@@ -38,7 +32,19 @@ struct AlertsView: View {
                 }
             }
         }
-        .navigationBarHidden(true)
+        .navigationTitle("Alerts")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Back Button for modal views
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                    }
+                }
+            }
+        }
         .onAppear {
             loadData()
         }
@@ -59,30 +65,8 @@ struct AlertsView: View {
     func deleteEvent(_ event: GeofenceEvents) {
         events.removeAll { $0.id == event.id }
     }
-
-    // MARK: - UI Components
     
-    @ViewBuilder
-    private func NavigationHeader() -> some View {
-        HStack {
-            Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("Back")
-                        .font(.system(size: 16))
-                }
-                .foregroundColor(.blue)
-            }
-            Spacer()
-            Text("Alerts")
-                .font(.headline)
-            Spacer()
-        }
-        .padding()
-        .background(Color(UIColor.systemBackground))
-        .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
-    }
+    // MARK: - UI Components
     
     @ViewBuilder
     private func SummarySection() -> some View {
@@ -146,7 +130,7 @@ struct EmptysStateView: View {
                 Circle()
                     .fill(Color.gray.opacity(0.1))
                     .frame(width: 100, height: 100)
-
+                
                 Image(systemName: "bell.slash.circle.fill")
                     .font(.system(size: 50))
                     .symbolRenderingMode(.hierarchical)
@@ -157,7 +141,7 @@ struct EmptysStateView: View {
                 Text("No Alerts")
                     .font(.title2.weight(.semibold))
                     .foregroundColor(.primary)
-
+                
                 Text("You're all caught up!")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -226,7 +210,7 @@ struct AlertRow: View {
                     .foregroundColor(.primary)
                     .lineLimit(2)
 
-                Text("Trip: \(event.tripId.uuidString.prefix(8))")
+                Text("Trip: \(event.tripId.uuidString)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

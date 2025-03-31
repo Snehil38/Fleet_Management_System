@@ -5,6 +5,8 @@ import SwiftSMTP
 
 struct GeofenceEvents: Codable, Identifiable {
     
+    let id: UUID
+    
     // The ID for the trip
     let tripId: UUID
     
@@ -17,11 +19,9 @@ struct GeofenceEvents: Codable, Identifiable {
     // Whether the event has been read
     var isRead: Bool = false
     
-    // Conformance to Identifiable
-    var id: UUID { tripId }
-    
     // Map the Swift property names to your database column names
     enum CodingKeys: String, CodingKey {
+        case id
         case tripId
         case message
         case timestamp
@@ -449,6 +449,16 @@ class SupabaseDataController: ObservableObject {
                 self.isGenPass = false  // This will trigger the UI update
             }
             return true  // Successfully updated
+        } catch {
+            print("Error updating password: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    func resetPassword(newPassword: String) async -> Bool {
+        do {
+            try await supabase.auth.update(user: UserAttributes(password: newPassword))
+            return true
         } catch {
             print("Error updating password: \(error.localizedDescription)")
             return false
@@ -1301,7 +1311,7 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    public func updateTripDetails(id: UUID, destination: String, address: String, notes: String, distance: String? = nil) async throws {
+    public func updateTripDetails(id: UUID, destination: String, address: String, notes: String, distance: String? = nil, time: String? = nil) async throws {
         do {
             // First update the basic trip info
             try await databaseFrom("trips")
@@ -1322,6 +1332,22 @@ class SupabaseDataController: ObservableObject {
                 if let distanceValue = Double(numericDistance) {
                     try await databaseFrom("trips")
                         .update(["estimated_distance": distanceValue])
+                        .eq("id", value: id)
+                        .execute()
+                }
+            }
+            
+            // If time is provided, update it separately
+            if let time = time {
+                // Extract hours and minutes from time string (e.g., "2h 30m" or "45m")
+                let components = time.lowercased().components(separatedBy: CharacterSet.letters)
+                let hours = components.first?.trimmingCharacters(in: .whitespaces) ?? "0"
+                let minutes = components.last?.trimmingCharacters(in: .whitespaces) ?? "0"
+                
+                if let hoursValue = Double(hours), let minutesValue = Double(minutes) {
+                    let totalHours = hoursValue + (minutesValue / 60.0)
+                    try await databaseFrom("trips")
+                        .update(["estimated_time": totalHours])
                         .eq("id", value: id)
                         .execute()
                 }
@@ -1427,7 +1453,7 @@ class SupabaseDataController: ObservableObject {
     
     func fetchAvailableVehicles(startDate: Date, endDate: Date) async throws -> [Vehicle] {
         let vehicles = try await fetchVehicles()
-        let trips = TripDataController.shared.getAllTrips()
+        let trips = TripDataController.shared.allTrips // Use existing trips instead of refreshing
         
         // Filter trips that overlap with the given date range.
         // This assumes each trip has an `endTime` property.
@@ -1450,9 +1476,6 @@ class SupabaseDataController: ObservableObject {
                 availableVehicles.append(vehicle)
             }
         }
-        
-        print(filteredTrips)
-        print("\n\(availableVehicles)")
         
         return availableVehicles
     }
@@ -1484,5 +1507,132 @@ class SupabaseDataController: ObservableObject {
         
         return availableDrivers
     }
+    
+//    func fetchTripByID(tripID: UUID) async throws -> Trip {
+//        let decoder = JSONDecoder()
+//        let dateFormatter = DateFormatter()
+//        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+//        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+//        
+//        decoder.dateDecodingStrategy = .custom { decoder in
+//            let container = try decoder.singleValueContainer()
+//            let dateString = try container.decode(String.self)
+//            let formats = [
+//                "yyyy-MM-dd'T'HH:mm:ss",
+//                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
+//                "yyyy-MM-dd'T'HH:mm:ssZ",
+//                "yyyy-MM-dd"
+//            ]
+//            for format in formats {
+//                dateFormatter.dateFormat = format
+//                if let date = dateFormatter.date(from: dateString) {
+//                    return date
+//                }
+//            }
+//            if let dotIndex = dateString.firstIndex(of: ".") {
+//                let truncated = String(dateString[..<dotIndex])
+//                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+//                if let date = dateFormatter.date(from: truncated) {
+//                    return date
+//                }
+//            }
+//            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
+//        }
+//        
+//        let query = supabase
+//            .from("trips")
+//            .select("""
+//                id,
+//                destination,
+//                trip_status,
+//                has_completed_pre_trip,
+//                has_completed_post_trip,
+//                vehicle_id,
+//                driver_id,
+//                start_time,
+//                end_time,
+//                notes,
+//                created_at,
+//                updated_at,
+//                is_deleted,
+//                start_latitude,
+//                start_longitude,
+//                end_latitude,
+//                end_longitude,
+//                pickup,
+//                vehicles (
+//                    id,
+//                    name,
+//                    year,
+//                    make,
+//                    model,
+//                    vin,
+//                    license_plate,
+//                    vehicle_type,
+//                    color,
+//                    body_type,
+//                    body_subtype,
+//                    msrp,
+//                    pollution_expiry,
+//                    insurance_expiry,
+//                    status
+//                )
+//            """)
+//            .eq("is_deleted", value: false)
+//            .eq("id", value: tripID)
+//        
+//        let response = try await query.execute()
+//        
+//        struct JoinedTripData: Codable {
+//            let id: UUID
+//            let destination: String
+//            let trip_status: String
+//            let has_completed_pre_trip: Bool
+//            let has_completed_post_trip: Bool
+//            let vehicle_id: UUID
+//            let driver_id: UUID?
+//            let start_time: Date?
+//            let end_time: Date?
+//            let notes: String?
+//            let created_at: Date
+//            let updated_at: Date?
+//            let is_deleted: Bool
+//            let start_latitude: Double?
+//            let start_longitude: Double?
+//            let end_latitude: Double?
+//            let end_longitude: Double?
+//            let pickup: String?
+//            let vehicles: Vehicle
+//        }
+//        
+//        let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
+//        guard let data = joinedData.first else {
+//            throw TripError.fetchError("No trip found with the given ID.")
+//        }
+//        
+//        let supabaseTrip = SupabaseTrip(
+//            id: data.id,
+//            destination: data.destination,
+//            trip_status: data.trip_status,
+//            has_completed_pre_trip: data.has_completed_pre_trip,
+//            has_completed_post_trip: data.has_completed_post_trip,
+//            vehicle_id: data.vehicle_id,
+//            driver_id: data.driver_id,
+//            start_time: data.start_time,
+//            end_time: data.end_time,
+//            notes: data.notes,
+//            created_at: data.created_at,
+//            updated_at: data.updated_at ?? data.created_at,
+//            is_deleted: data.is_deleted,
+//            start_latitude: data.start_latitude,
+//            start_longitude: data.start_longitude,
+//            end_latitude: data.end_latitude,
+//            end_longitude: data.end_longitude,
+//            pickup: data.pickup
+//        )
+//        
+//        return Trip(from: supabaseTrip, vehicle: data.vehicles)
+//    }
+
 
 }

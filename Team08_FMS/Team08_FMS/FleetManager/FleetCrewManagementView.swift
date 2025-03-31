@@ -176,6 +176,12 @@ struct CrewCardView: View {
         return nil
     }
     
+    // Check if driver is in a trip
+    private var isInTrip: Bool {
+        guard let driver = currentCrew as? Driver else { return false }
+        return driver.status == .busy
+    }
+    
     var body: some View {
         NavigationLink(destination: CrewProfileView(crewMember: currentCrew)) {
             VStack(spacing: 0) {
@@ -272,35 +278,66 @@ struct CrewCardView: View {
                 Label("Delete Crew Member", systemImage: "trash")
             }
             
-            if currentCrew.status == .available {
-                Button {
-                    Task {
-                        if currentCrew is Driver {
-                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
+            if let driver = currentCrew as? Driver {
+                if !isInTrip {  // Only show status change options if not in a trip
+                    if currentCrew.status == .available {
+                        Button {
+                            Task {
+                                do {
+                                    try await updateCrewStatus(.offDuty)
+                                    CrewDataController.shared.update()
+                                } catch {
+                                    print("Error updating crew status: \(error)")
+                                }
+                            }
+                        } label: {
+                            Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
                         }
-                        else {
-                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.offDuty, userID: nil, id: currentCrew.id)
-                        }
-                        CrewDataController.shared.update()
                     }
-                } label: {
-                    Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
+                    else if currentCrew.status == .offDuty {
+                        Button {
+                            Task {
+                                do {
+                                    try await updateCrewStatus(.available)
+                                    CrewDataController.shared.update()
+                                } catch {
+                                    print("Error updating crew status: \(error)")
+                                }
+                            }
+                        } label: {
+                            Label("Mark as Available", systemImage: "checkmark.circle.fill")
+                        }
+                    }
                 }
-            }
-            
-            else if currentCrew.status == .offDuty {
-                Button {
-                    Task {
-                        if currentCrew is Driver {
-                            await SupabaseDataController.shared.updateDriverStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
+            } else {
+                // For maintenance personnel, show status options as before
+                if currentCrew.status == .available {
+                    Button {
+                        Task {
+                            do {
+                                try await updateCrewStatus(.offDuty)
+                                CrewDataController.shared.update()
+                            } catch {
+                                print("Error updating crew status: \(error)")
+                            }
                         }
-                        else {
-                            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: Status.available, userID: nil, id: currentCrew.id)
-                        }
-                        CrewDataController.shared.update()
+                    } label: {
+                        Label("Mark as Off Duty", systemImage: "checkmark.circle.fill")
                     }
-                } label: {
-                    Label("Mark as Available", systemImage: "checkmark.circle.fill")
+                }
+                else if currentCrew.status == .offDuty {
+                    Button {
+                        Task {
+                            do {
+                                try await updateCrewStatus(.available)
+                                CrewDataController.shared.update()
+                            } catch {
+                                print("Error updating crew status: \(error)")
+                            }
+                        }
+                    } label: {
+                        Label("Mark as Available", systemImage: "checkmark.circle.fill")
+                    }
                 }
             }
             
@@ -328,8 +365,8 @@ struct CrewCardView: View {
             }
         }
         .onAppear {
+            // Only check for unread messages
             if let id = recipientId {
-                // Load unread message count
                 Task {
                     do {
                         let response = try await SupabaseDataController.shared.supabase
@@ -357,9 +394,9 @@ struct CrewCardView: View {
         else { return "Maintenance" }
     }
     
-    private func updateCrewStatus(_ newStatus: Status) {
+    private func updateCrewStatus(_ newStatus: Status) async throws {
         if currentCrew is Driver {
-            dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
+            try await dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
         } else {
             dataManager.updateMaintenancePersonnelStatus(currentCrew.id, status: newStatus)
         }

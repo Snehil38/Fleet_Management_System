@@ -187,7 +187,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             )
             // Notify fleet manager through Supabase
             Task {
-                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.name ?? "Unknown")")
+                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.id.uuidString ?? "Unknown")")
             }
         }
         
@@ -207,7 +207,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             )
             // Notify fleet manager through Supabase
             Task {
-                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.name ?? "Unknown")")
+                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.id.uuidString ?? "Unknown")")
             }
         }
     }
@@ -280,8 +280,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "sourceRegion":
             isInSourceRegion = true
             print("DEBUG: Entered source region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) entered source region"
-            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) entered source region"
+            let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
             supabaseController.insertIntoGeofenceEvents(event: event)
             checkTripStartEligibility()
             
@@ -295,8 +295,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "destinationRegion":
             isInDestinationRegion = true
             print("DEBUG: Entered destination region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) entered destination region"
-            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) entered destination region"
+            let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
+            supabaseController.insertIntoGeofenceEvents(event: event)
             tripTimer?.invalidate()
             tripTimer = nil
             
@@ -305,7 +306,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let durationString = formatTimeRemaining(duration)
                 
                 Task {
-                    await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip.name). Trip duration: \(durationString)")
+                    await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip.id.uuidString). Trip duration: \(durationString)")
                 }
             }
             
@@ -334,16 +335,16 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         case "sourceRegion":
             isInSourceRegion = false
             print("DEBUG: Exited source region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) exited source region"
-            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) exited source region"
+            let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
             supabaseController.insertIntoGeofenceEvents(event: event)
             checkTripStartEligibility()
             
         case "destinationRegion":
             isInDestinationRegion = false
             print("DEBUG: Exited destination region")
-            let message = "DEBUG: Vehicle: \(currentTrip.vehicleDetails.name) exited destination region"
-            let event = GeofenceEvents(tripId: currentTrip.id, message: message)
+            let message = "Vehicle: \(currentTrip.vehicleDetails.name) exited destination region"
+            let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
             supabaseController.insertIntoGeofenceEvents(event: event)
             
         default:
@@ -488,6 +489,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_post_trip,
                     vehicle_id,
                     driver_id,
+                    secondary_driver_id,
                     start_time,
                     end_time,
                     notes,
@@ -499,6 +501,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     end_latitude,
                     end_longitude,
                     pickup,
+                    estimated_distance,
+                    estimated_time,
                     vehicles (
                         id,
                         name,
@@ -534,6 +538,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let has_completed_post_trip: Bool
                 let vehicle_id: UUID
                 let driver_id: UUID?
+                let secondary_driver_id: UUID?
                 let start_time: Date?
                 let end_time: Date?
                 let notes: String?
@@ -545,10 +550,15 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let end_latitude: Double?
                 let end_longitude: Double?
                 let pickup: String?
+                let estimated_distance: Double?
+                let estimated_time: Double?
                 let vehicles: Vehicle
                 
                 // Add computed properties to parse distance and fuel cost
                 var parsedDistance: String {
+                    if let estimatedDistance = estimated_distance {
+                        return String(format: "%.1f", estimatedDistance)
+                    }
                     guard let notes = notes,
                           let distanceRange = notes.range(of: "Distance: "),
                           let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
@@ -563,7 +573,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                           let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
                         return "N/A"
                     }
-                    return String(notes[fuelRange.upperBound..<endRange.lowerBound])
+                    let dist = (Double(parsedDistance) ?? 0)*0.5
+                    return "\(dist) $"
                 }
             }
             
@@ -579,6 +590,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_post_trip: data.has_completed_post_trip,
                     vehicle_id: data.vehicle_id,
                     driver_id: data.driver_id,
+                    secondary_driver_id: data.secondary_driver_id,
                     start_time: data.start_time,
                     end_time: data.end_time,
                     notes: data.notes,
@@ -589,7 +601,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     start_longitude: data.start_longitude,
                     end_latitude: data.end_latitude,
                     end_longitude: data.end_longitude,
-                    pickup: data.pickup
+                    pickup: data.pickup,
+                    estimated_distance: data.estimated_distance,
+                    estimated_time: data.estimated_time
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
@@ -649,9 +663,34 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 print("Failed to decode date string: \(dateString)")
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
             }
-            
-            // Start building the query
-            var query = supabaseController.supabase
+
+            // Define JoinedTripData struct
+            struct JoinedTripData: Codable {
+                let id: UUID
+                let destination: String
+                let trip_status: String
+                let has_completed_pre_trip: Bool
+                let has_completed_post_trip: Bool
+                let vehicle_id: UUID
+                let driver_id: UUID?
+                let secondary_driver_id: UUID?
+                let start_time: Date?
+                let end_time: Date?
+                let notes: String?
+                let created_at: Date
+                let updated_at: Date?
+                let is_deleted: Bool
+                let start_latitude: Double?
+                let start_longitude: Double?
+                let end_latitude: Double?
+                let end_longitude: Double?
+                let pickup: String?
+                let estimated_distance: Double?
+                let estimated_time: Double?
+                let vehicles: Vehicle
+            }
+
+            let query = supabaseController.supabase
                 .from("trips")
                 .select("""
                     id,
@@ -661,6 +700,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_post_trip,
                     vehicle_id,
                     driver_id,
+                    secondary_driver_id,
                     start_time,
                     end_time,
                     notes,
@@ -672,6 +712,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     end_latitude,
                     end_longitude,
                     pickup,
+                    estimated_distance,
+                    estimated_time,
                     vehicles (
                         id,
                         name,
@@ -691,60 +733,14 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     )
                 """)
                 .eq("is_deleted", value: false)
-            
+
             // Add driver filter if driverId is set
             if let driverId = driverId {
-                query = query.eq("driver_id", value: driverId)
+                query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
             }
-            
+
             // Execute the query
             let response = try await query.execute()
-            
-            // Print raw response for debugging
-//            print("Raw response: \(String(data: response.data, encoding: .utf8) ?? "nil")")
-            
-            // Define a nested struct to match the joined data structure
-            struct JoinedTripData: Codable {
-                let id: UUID
-                let destination: String
-                let trip_status: String
-                let has_completed_pre_trip: Bool
-                let has_completed_post_trip: Bool
-                let vehicle_id: UUID
-                let driver_id: UUID?
-                let start_time: Date?
-                let end_time: Date?
-                let notes: String?
-                let created_at: Date
-                let updated_at: Date?
-                let is_deleted: Bool
-                let start_latitude: Double?
-                let start_longitude: Double?
-                let end_latitude: Double?
-                let end_longitude: Double?
-                let pickup: String?
-                let vehicles: Vehicle
-                
-                // Add computed properties to parse distance and fuel cost
-                var parsedDistance: String {
-                    guard let notes = notes,
-                          let distanceRange = notes.range(of: "Distance: "),
-                          let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    return String(notes[distanceRange.upperBound..<endRange.lowerBound])
-                }
-                
-                var parsedFuelCost: String {
-                    guard let notes = notes,
-                          let fuelRange = notes.range(of: "Estimated Fuel Cost: "),
-                          let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    let dist = (Double(parsedDistance) ?? 0)*0.5
-                    return "\(dist) $"
-                }
-            }
             
             let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
             
@@ -758,6 +754,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     has_completed_post_trip: data.has_completed_post_trip,
                     vehicle_id: data.vehicle_id,
                     driver_id: data.driver_id,
+                    secondary_driver_id: data.secondary_driver_id,
                     start_time: data.start_time,
                     end_time: data.end_time,
                     notes: data.notes,
@@ -768,97 +765,77 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     start_longitude: data.start_longitude,
                     end_latitude: data.end_latitude,
                     end_longitude: data.end_longitude,
-                    pickup: data.pickup
+                    pickup: data.pickup,
+                    estimated_distance: data.estimated_distance,
+                    estimated_time: data.estimated_time
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
-            
+
             print("Successfully processed \(tripsWithVehicles.count) trips")
-            
+
             // Update published properties
             await MainActor.run {
                 // Find current trip (in progress)
-                if let currentTrip = tripsWithVehicles.first(where: { $0.status == TripStatus.inProgress }) {
+                if let currentTrip = tripsWithVehicles.first(where: { $0.status.rawValue == "current" }) {
                     self.currentTrip = currentTrip
                 } else {
                     self.currentTrip = nil
                 }
-                
+
                 // Filter upcoming trips (only pending or assigned)
                 self.upcomingTrips = tripsWithVehicles.filter { trip in
-                    trip.status == .pending || trip.status == .assigned
+                    trip.status.rawValue == "pending" || trip.status.rawValue == "assigned"
                 }
-                
+
                 // Convert completed/delivered trips to delivery details
                 let completedTrips = tripsWithVehicles.filter { trip in 
-                    trip.status == .delivered && trip.hasCompletedPostTrip
+                    trip.status.rawValue == "delivered"
                 }
-                
-                self.recentDeliveries = completedTrips.compactMap { trip in
-                    guard let joinedData = joinedData.first(where: { $0.id == trip.id }) else { return nil }
-                    
-                    // Extract additional details from notes if available
-                    var cargoType = "General Cargo"
-                    if let notes = trip.notes,
-                       let cargoRange = notes.range(of: "Cargo Type: ") {
-                        let noteText = notes[cargoRange.upperBound...]
-                        if let endOfCargo = noteText.firstIndex(of: "\n") {
-                            cargoType = String(noteText[..<endOfCargo])
-                        } else {
-                            cargoType = String(noteText)
-                        }
-                    }
-                    
-                    // Include distance and fuel cost in the notes
-                    let distance = joinedData.parsedDistance
-                    let fuelCost = joinedData.parsedFuelCost
-                    
-                    return DeliveryDetails(
+
+                self.recentDeliveries = completedTrips.map { trip in
+                    DeliveryDetails(
                         id: trip.id,
                         location: trip.destination,
-                        date: formatDate(trip.endTime ?? joinedData.created_at),
+                        date: formatDate(trip.endTime ?? trip.startTime ?? Date()),
                         status: "Delivered",
                         driver: "Current Driver",
                         vehicle: trip.vehicleDetails.licensePlate,
-                        notes: """
-                               Trip: \(trip.name)
-                               Cargo: \(cargoType)
-                               Distance: \(distance)
-                               Estimated Fuel Cost: \(fuelCost)
-                               From: \(trip.startingPoint)
-                               \(trip.notes ?? "")
-                               """
+                        notes: trip.notes ?? "No notes available"
                     )
                 }
-                
+
                 // Sort recent deliveries by date (newest first)
                 self.recentDeliveries.sort { lhs, rhs in
-                    // Extract dates from formatted strings (basic parsing)
-                    let lhsIsToday = lhs.date.contains("Today")
-                    let rhsIsToday = rhs.date.contains("Today")
-                    let lhsIsYesterday = lhs.date.contains("Yesterday")
-                    let rhsIsYesterday = rhs.date.contains("Yesterday")
-                    
-                    if lhsIsToday && !rhsIsToday {
-                        return true
-                    } else if !lhsIsToday && rhsIsToday {
-                        return false
-                    } else if lhsIsYesterday && !rhsIsToday && !rhsIsYesterday {
-                        return true
-                    } else if !lhsIsYesterday && !lhsIsToday && (rhsIsToday || rhsIsYesterday) {
-                        return false
-                    }
-                    
-                    // If both are from the same period, compare the actual times
-                    return lhs.date > rhs.date
+                    let lhsDate = parseDate(lhs.date) ?? Date.distantPast
+                    let rhsDate = parseDate(rhs.date) ?? Date.distantPast
+                    return lhsDate > rhsDate
                 }
-                
-                self.error = nil
             }
         } catch {
             print("Error fetching trips: \(error)")
             throw TripError.fetchError("Failed to fetch trips: \(error.localizedDescription)")
         }
+    }
+    
+    private func parseDate(_ dateString: String) -> Date? {
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        // Try different date formats
+        let formats = [
+            "Today, h:mm a",
+            "Yesterday, h:mm a",
+            "MMM d, h:mm a"
+        ]
+        
+        for format in formats {
+            dateFormatter.dateFormat = format
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+        }
+        return nil
     }
     
     private func formatDate(_ date: Date) -> String {
@@ -878,6 +855,12 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             formatter.dateFormat = "MMM d, h:mm a"
             return formatter.string(from: date)
         }
+    }
+    
+    private func formatFullDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy h:mm a"
+        return formatter.string(from: date)
     }
     
     // Update getCurrentTripData to handle optional currentTrip
@@ -951,10 +934,21 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 driver: "Current Driver",
                 vehicle: trip.vehicleDetails.licensePlate,
                 notes: """
-                       Trip: \(trip.name)
-                       Cargo: General Cargo
-                       Distance: \(trip.distance)
+                       Trip Details
+                       ---------------
+                       Trip: \(trip.id.uuidString)
                        From: \(trip.startingPoint)
+                       To: \(trip.destination)
+                       Distance: \(trip.distance) km
+                       
+                       Timing
+                       ---------------
+                       Start: \(formatFullDate(trip.startTime ?? Date()))
+                       End: \(formatFullDate(trip.endTime ?? Date()))
+                       
+                       Additional Info
+                       ---------------
+                       Cargo Type: General Cargo
                        \(trip.notes ?? "")
                        """
             )
@@ -1106,12 +1100,179 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     /// - Parameter id: The ID of the trip to delete
     /// - Returns: Void
     /// - Throws: Error if the deletion fails
+    @MainActor
     func deleteTrip(id: UUID) async throws {
         // Soft delete the trip in the database
         supabaseController.deleteTrip(tripID: id)
         
-        // Update local data
-        await refreshAllTrips()
+        // Update local state
+        allTrips.removeAll { $0.id == id }
+        upcomingTrips.removeAll { $0.id == id }
+        if let currentTrip = currentTrip, currentTrip.id == id {
+            self.currentTrip = nil
+        }
+        recentDeliveries.removeAll { $0.id == id }
+    }
+    
+    func generateDeliveryReceipt(for trip: Trip, signature: Data? = nil) throws -> Data {
+        guard trip.status == .delivered else {
+            throw TripError.updateError("Cannot generate receipt for non-delivered trip")
+        }
+        
+        let driverName = trip.driverId.flatMap { driverId in
+            CrewDataController.shared.drivers.first { $0.userID == driverId }?.name
+        } ?? "Unassigned"
+        
+        // Create a PDF document
+        let format = UIGraphicsPDFRendererFormat()
+        let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        let data = renderer.pdfData { context in
+            context.beginPage()
+            
+            // Set up the content area with margins
+            let contentRect = pageRect.insetBy(dx: 50, dy: 50)
+            var currentY = contentRect.minY
+            
+            // Title attributes
+            let titleStyle = NSMutableParagraphStyle()
+            titleStyle.alignment = .center
+            let titleAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 24),
+                .paragraphStyle: titleStyle,
+                .foregroundColor: UIColor.black
+            ]
+            
+            // Header attributes
+            let headerStyle = NSMutableParagraphStyle()
+            headerStyle.alignment = .left
+            let headerAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 12),
+                .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
+            ]
+            
+            // Content attributes
+            let contentStyle = NSMutableParagraphStyle()
+            contentStyle.alignment = .left
+            let contentAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .foregroundColor: UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
+            ]
+            
+            // Draw title
+            let title = "DELIVERY RECEIPT"
+            let titleSize = title.size(withAttributes: titleAttributes)
+            title.draw(at: CGPoint(x: (pageRect.width - titleSize.width) / 2, y: currentY),
+                      withAttributes: titleAttributes)
+            currentY += titleSize.height + 20
+            
+            // Function to draw a field with label
+            func drawField(label: String, value: String, at yPos: inout CGFloat) {
+                let fieldHeight: CGFloat = 25
+                let labelWidth: CGFloat = 150
+                
+                // Draw border
+                let fieldRect = CGRect(x: contentRect.minX, y: yPos, width: contentRect.width, height: fieldHeight)
+                let borderPath = UIBezierPath(rect: fieldRect)
+                UIColor.black.setStroke()
+                borderPath.lineWidth = 0.5
+                borderPath.stroke()
+                
+                // Draw label
+                label.draw(at: CGPoint(x: contentRect.minX + 5, y: yPos + 5),
+                         withAttributes: headerAttributes)
+                
+                // Draw value
+                value.draw(at: CGPoint(x: contentRect.minX + labelWidth + 5, y: yPos + 5),
+                         withAttributes: contentAttributes)
+                
+                yPos += fieldHeight
+            }
+            
+            // Draw fields
+            drawField(label: "Trip ID:", value: trip.id.uuidString, at: &currentY)
+            drawField(label: "Status:", value: trip.status.rawValue, at: &currentY)
+            drawField(label: "Vehicle:", value: "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model)", at: &currentY)
+            drawField(label: "License Plate:", value: trip.vehicleDetails.licensePlate, at: &currentY)
+            drawField(label: "Driver:", value: driverName, at: &currentY)
+            
+            currentY += 20 // Add spacing
+            
+            drawField(label: "Destination:", value: trip.destination, at: &currentY)
+            drawField(label: "Address:", value: trip.address, at: &currentY)
+            drawField(label: "Distance:", value: trip.distance, at: &currentY)
+            
+            currentY += 20 // Add spacing
+            
+            drawField(label: "Start Time:", value: trip.startTime?.formatted() ?? "N/A", at: &currentY)
+            drawField(label: "End Time:", value: trip.endTime?.formatted() ?? "N/A", at: &currentY)
+            
+            currentY += 20 // Add spacing
+            
+            let estimatedFuelCost = Double(trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0 * 0.5
+            let totalRevenue = estimatedFuelCost + 50.0
+            
+            drawField(label: "Estimated Fuel Cost:", value: "$\(String(format: "%.2f", estimatedFuelCost))", at: &currentY)
+            drawField(label: "Total Revenue:", value: "$\(String(format: "%.2f", totalRevenue))", at: &currentY)
+            
+            if let notes = trip.notes, !notes.isEmpty {
+                currentY += 20
+                "Notes:".draw(at: CGPoint(x: contentRect.minX, y: currentY),
+                            withAttributes: headerAttributes)
+                currentY += 20
+                
+                let notesRect = CGRect(x: contentRect.minX, y: currentY,
+                                     width: contentRect.width, height: 60)
+                let notesBorder = UIBezierPath(rect: notesRect)
+                UIColor.black.setStroke()
+                notesBorder.lineWidth = 0.5
+                notesBorder.stroke()
+                
+                notes.draw(in: notesRect.insetBy(dx: 5, dy: 5),
+                          withAttributes: contentAttributes)
+                currentY += 80
+            }
+            
+            // Draw signature section at the bottom
+            let signatureY = contentRect.maxY - 100
+            
+            // Draw signature header
+            "Fleet Manager's Signature:".draw(
+                at: CGPoint(x: contentRect.minX, y: signatureY),
+                withAttributes: headerAttributes
+            )
+            
+            // Draw signature box
+            let signatureRect = CGRect(
+                x: contentRect.minX,
+                y: signatureY + 20,
+                width: 200,
+                height: 60
+            )
+            
+            let signatureBox = UIBezierPath(rect: signatureRect)
+            UIColor.black.setStroke()
+            signatureBox.lineWidth = 0.5
+            signatureBox.stroke()
+            
+            // Draw signature if available
+            if let signatureData = signature,
+               let signatureImage = UIImage(data: signatureData) {
+                signatureImage.draw(in: signatureRect.insetBy(dx: 5, dy: 5))
+            }
+            
+            // Draw date
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .long
+            let dateString = "Date: \(dateFormatter.string(from: Date()))"
+            dateString.draw(
+                at: CGPoint(x: contentRect.maxX - 200, y: signatureY + 40),
+                withAttributes: contentAttributes
+            )
+        }
+        
+        return data
     }
 } 
 

@@ -30,21 +30,32 @@ struct DriverStatusCard: View {
     }
 }
 
-#Preview {
-    HStack(spacing: 12) {
-        DriverStatusCard(
-            icon: "clock.fill",
-            title: "ETA",
-            value: "25 mins",
-            color: .blue
-        )
-        
-        DriverStatusCard(
-            icon: "arrow.left.and.right",
-            title: "Distance",
-            value: "8.5 km",
-            color: .green
-        )
+struct TripStatusView: View {
+    @StateObject private var tripController = TripDataController.shared
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            DriverStatusCard(
+                icon: "clock.fill",
+                title: "ETA",
+                value: tripController.currentTrip?.eta ?? "N/A",
+                color: .blue
+            )
+            
+            DriverStatusCard(
+                icon: "arrow.left.and.right",
+                title: "Distance",
+                value: tripController.currentTrip?.distance ?? "N/A",
+                color: .green
+            )
+        }
+        .padding()
+        .task {
+            await tripController.refreshTrips()
+        }
     }
-    .padding()
+}
+
+#Preview {
+    TripStatusView()
 } 

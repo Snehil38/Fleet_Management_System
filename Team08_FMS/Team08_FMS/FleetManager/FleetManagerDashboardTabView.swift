@@ -144,10 +144,10 @@ struct FleetManagerDashboardTabView: View {
 
                     // Financial Summary
                     VStack(spacing: 16) {
-                        // Total Expenses
+                        // Monthly Fuel Expenses
                         FinancialCard(
-                            title: "Total Expenses",
-                            amount: "$\(String(format: "%.2f", totalExpenses))",
+                            title: "Monthly Fuel Expenses",
+                            amount: "$\(String(format: "%.2f", totalFuelCost))",
                             trend: .negative
                         )
 
@@ -156,6 +156,20 @@ struct FleetManagerDashboardTabView: View {
                             title: "Monthly Salary Expenses",
                             amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
                             trend: .negative
+                        )
+                        
+                        // Total Expenses
+                        FinancialCard(
+                            title: "Total Expenses",
+                            amount: "$\(String(format: "%.2f", totalExpenses))",
+                            trend: .negative
+                        )
+                        
+                        // Trip Revenue
+                        FinancialCard(
+                            title: "Trip Revenue",
+                            amount: "$\(String(format: "%.2f", totalTripRevenue))",
+                            trend: .positive
                         )
 
                         // Total Revenue
@@ -405,6 +419,7 @@ struct AddTripView: View {
     let dismiss: () -> Void
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
+    @EnvironmentObject private var crewDataController: CrewDataController
     
     // Location Manager for current location
     @StateObject private var locationManager = LocationManager()
@@ -433,8 +448,8 @@ struct AddTripView: View {
     // Trip details state
     @State private var selectedVehicle: Vehicle?
     @State private var cargoType = "General Goods"
-    @State private var startDate = Date()
-    @State private var deliveryDate = Date().addingTimeInterval(86400)
+    @State private var startDate = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date()
+    @State private var deliveryDate = Calendar.current.date(byAdding: .hour, value: 28, to: Date()) ?? Date()
     @State private var distance: Double = 0.0
     @State private var fuelCost: Double = 0.0
     @State private var tripCost: Double = 0.0
@@ -443,6 +458,7 @@ struct AddTripView: View {
     @State private var notes: String = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var showingSuccessAlert = false
     
     // Fetched available vehicles after route calculation.
     @State private var fetchedAvailableVehicles: [Vehicle] = []
@@ -579,43 +595,77 @@ struct AddTripView: View {
                         // Schedule Card
                         CardView(title: "SCHEDULE", systemImage: "calendar") {
                             VStack(spacing: 16) {
-                                DatePicker("Start Date",
-                                           selection: $startDate,
-                                           in: Date()...,
-                                           displayedComponents: [.date, .hourAndMinute]
-                                )
-                                .onChange(of: startDate) { newDate, _ in
-                                    if distance > 0 {
-                                        let estimatedHours = distance / 40.0
-                                        deliveryDate = newDate.addingTimeInterval(estimatedHours * 3600)
+                                // Start Date Picker with minimum 4 hours from now
+                                let minStartDate = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date()
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    DatePicker("Start Date",
+                                             selection: $startDate,
+                                             in: minStartDate...,
+                                             displayedComponents: [.date, .hourAndMinute]
+                                    )
+                                    .onChange(of: startDate) { newDate, _ in
+                                        if distance > 0 {
+                                            let estimatedHours = distance / 40.0
+                                            deliveryDate = newDate.addingTimeInterval(estimatedHours * 3600)
+                                        }
                                     }
+                                    .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
+                                    
+                                    Text("Trip must start at least 4 hours from now")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
                                 }
-                                .tint(Color(red: 0.2, green: 0.5, blue: 1.0))
                                 
                                 if distance > 0 {
-                                    Divider()
-                                    
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Estimated Delivery")
-                                            .font(.subheadline)
-                                            .foregroundColor(.gray)
-                                        
-                                        HStack {
-                                            Image(systemName: "calendar")
-                                                .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
-                                            Text(deliveryDate, style: .date)
-                                                .font(.headline)
+                                    CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
+                                        VStack(spacing: 16) {
+                                            // First row: Distance and Travel Time
+                                            HStack(spacing: 20) {
+                                                EstimateItem(
+                                                    icon: "arrow.left.and.right",
+                                                    title: "Distance",
+                                                    value: String(format: "%.1f km", distance),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                                
+                                                Divider()
+                                                
+                                                EstimateItem(
+                                                    icon: "clock.fill",
+                                                    title: "Travel Time",
+                                                    value: String(format: "%.1f hours", distance / 40.0),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                            }
+                                            
+                                            Divider()
+                                            
+                                            // Second row: Fuel Cost and Trip Cost
+                                            HStack(spacing: 20) {
+                                                EstimateItem(
+                                                    icon: "fuelpump.fill",
+                                                    title: "Fuel Cost",
+                                                    value: String(format: "$%.2f", fuelCost),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                                
+                                                Divider()
+                                                
+                                                EstimateItem(
+                                                    icon: "dollarsign.circle.fill",
+                                                    title: "Trip Cost",
+                                                    value: String(format: "$%.2f", tripCost),
+                                                    valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+                                                )
+                                            }
                                         }
-                                        
-                                        HStack {
-                                            Image(systemName: "clock")
-                                                .foregroundColor(Color(red: 0.2, green: 0.5, blue: 1.0))
-                                            Text(deliveryDate, style: .time)
-                                                .font(.headline)
-                                        }
+                                        .padding()
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(10)
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
+
                             }
                             .padding()
                             .background(Color(.systemGray6))
@@ -623,41 +673,41 @@ struct AddTripView: View {
                         }
                         
                         // Trip Estimates Card
-                        if distance > 0 {
-                            CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
-                                VStack(spacing: 16) {
-                                    HStack(spacing: 20) {
-                                        EstimateItem(
-                                            icon: "arrow.left.and.right",
-                                            title: "Total Distance",
-                                            value: String(format: "%.1f km", distance),
-                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                        )
-                                        
-                                        Divider()
-                                        
-                                        EstimateItem(
-                                            icon: "clock.fill",
-                                            title: "Est. Travel Time",
-                                            value: String(format: "%.1f hours", distance / 40.0),
-                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                        )
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    EstimateItem(
-                                        icon: "fuelpump.fill",
-                                        title: "Est. Fuel Cost",
-                                        value: String(format: "$%.2f", fuelCost),
-                                        valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
-                                    )
-                                }
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .cornerRadius(10)
-                            }
-                        }
+//                        if distance > 0 {
+//                            CardView(title: "TRIP ESTIMATES", systemImage: "chart.bar.fill") {
+//                                VStack(spacing: 16) {
+//                                    HStack(spacing: 20) {
+//                                        EstimateItem(
+//                                            icon: "arrow.left.and.right",
+//                                            title: "Total Distance",
+//                                            value: String(format: "%.1f km", distance),
+//                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+//                                        )
+//                                        
+//                                        Divider()
+//                                        
+//                                        EstimateItem(
+//                                            icon: "clock.fill",
+//                                            title: "Est. Travel Time",
+//                                            value: String(format: "%.1f hours", distance / 40.0),
+//                                            valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+//                                        )
+//                                    }
+//                                    
+//                                    Divider()
+//                                    
+//                                    EstimateItem(
+//                                        icon: "fuelpump.fill",
+//                                        title: "Est. Fuel Cost",
+//                                        value: String(format: "$%.2f", fuelCost),
+//                                        valueColor: Color(red: 0.2, green: 0.5, blue: 1.0)
+//                                    )
+//                                }
+//                                .padding()
+//                                .background(Color(.systemGray6))
+//                                .cornerRadius(10)
+//                            }
+//                        }
                         
                         // Vehicle Selection is displayed only after route calculation.
                         if distance > 0 {
@@ -696,11 +746,11 @@ struct AddTripView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(isFormValid ? Color.blue : Color.gray)
+                    .background((distance > 0 ? (isVehicleSelected) : isFormValid) ? Color.blue : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(distance > 0 ? (!isVehicleSelected && displayedVehicles.isEmpty) : (!isFormValid || isCalculating))
+                .disabled(distance > 0 ? (!isVehicleSelected) : (!isFormValid || isCalculating))
                 .padding(16)
                 .background(
                     Rectangle()
@@ -718,13 +768,21 @@ struct AddTripView: View {
                 Button("Cancel") { dismiss() }
             }
         }
-        .alert(isPresented: $showingAlert) {
-            Alert(title: Text("Trip Creation"),
-                  message: Text(alertMessage),
-                  dismissButton: .default(Text("OK")))
+        .alert("Error", isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
+        .alert("Success", isPresented: $showingSuccessAlert) {
+            Button("OK", role: .cancel) {
+                dismiss()
+            }
+        } message: {
+            Text("Trip has been successfully created!")
         }
         .onAppear {
             setupSearchCompleter()
+            crewDataController.update() // Update drivers list when view appears
             
             // Observe location updates
             locationManager.objectWillChange.sink { [weak locationManager] _ in
@@ -854,12 +912,20 @@ struct AddTripView: View {
             // Get distance in kilometers
             self.distance = route.distance / 1000
             
-            // Calculate costs with $5 per km
-            let fuelRatio = 0.2 // 20% of cost is fuel
-            let costPerKm = 5.0 // $5 per km as requested
-            
-            self.tripCost = self.distance * costPerKm
-            self.fuelCost = (self.distance * 0.8) + 50.0
+            // Cost parameters
+            let costPerKm = 5.0         // Additional cost per kilometer (e.g., maintenance, driver, etc.)
+            let baseCost = 50.0         // Base cost for starting the trip
+
+            // Fuel efficiency parameters
+            let fuelConsumptionRate = 8.5   // Liters per 100 km (adjust as needed)
+            let fuelPricePerLiter = 1.50    // Price per liter in dollars (adjust as needed)
+
+            // Calculate fuel cost using realistic fuel consumption formula
+            // Fuel cost = (distance / 100) * fuelConsumptionRate * fuelPricePerLiter
+            fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
+
+            // Calculate total trip cost including the base cost, per km cost, and fuel cost
+            tripCost = baseCost + (distance * costPerKm) + fuelCost
             
             // Calculate estimated travel time and update delivery date
             let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
@@ -877,12 +943,20 @@ struct AddTripView: View {
         // Get distance in kilometers
         distance = locationA.distance(from: locationB) / 1000
         
-        // Calculate costs with $5 per km
-        let fuelRatio = 0.2 // 20% of cost is fuel
-        let costPerKm = 5.0 // $5 per km as requested
-        
-        tripCost = (distance * 0.8) + 50.0
-        fuelCost = (distance * 0.8) + 50.0
+        // Cost parameters
+        let costPerKm = 5.0         // Additional cost per kilometer (e.g., maintenance, driver, etc.)
+        let baseCost = 50.0         // Base cost for starting the trip
+
+        // Fuel efficiency parameters
+        let fuelConsumptionRate = 8.5   // Liters per 100 km (adjust as needed)
+        let fuelPricePerLiter = 1.50    // Price per liter in dollars (adjust as needed)
+
+        // Calculate fuel cost using realistic fuel consumption formula
+        // Fuel cost = (distance / 100) * fuelConsumptionRate * fuelPricePerLiter
+        fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
+
+        // Calculate total trip cost including the base cost, per km cost, and fuel cost
+        tripCost = baseCost + (distance * costPerKm) + fuelCost
         
         // Calculate estimated travel time and update delivery date
         let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
@@ -919,14 +993,14 @@ struct AddTripView: View {
                 
                 if success {
                     try await TripDataController.shared.fetchAllTrips()
-                    dismiss()
+                    showingSuccessAlert = true
                 } else {
-                    alertMessage = "Failed to create trip. Please try again."
                     showingAlert = true
+                    alertMessage = "Failed to create trip. Please try again."
                 }
             } catch {
-                alertMessage = "Error: \(error.localizedDescription)"
                 showingAlert = true
+                alertMessage = "Error: \(error.localizedDescription)"
             }
         }
     }
