@@ -723,58 +723,58 @@ struct TripDetailView: View {
                 }
                 
                 // Proof of Delivery Section (for completed trips)
-                if trip.status == .delivered {
-                    Section(header: Text("PROOF OF DELIVERY")) {
-                        Button(action: {
-                            do {
-                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip, signature: fleetManagerSignature)
-                                showingDeliveryReceipt = true
-                            } catch {
-                                pdfError = error.localizedDescription
-                                showingPDFError = true
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "doc.text.fill")
-                                    .foregroundColor(.blue)
-                                Text("Delivery Receipt")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        Button(action: {
-                            showingSignatureSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "signature")
-                                    .foregroundColor(.blue)
-                                Text("Fleet Manager Signature")
-                                Spacer()
-                                if fleetManagerSignature != nil {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                }
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        if let pdfData = pdfData {
-                            ShareLink(item: pdfData, preview: SharePreview("Delivery Receipt", image: Image(systemName: "doc.fill"))) {
-                                HStack {
-                                    Image(systemName: "square.and.arrow.up")
-                                        .foregroundColor(.blue)
-                                    Text("Download Receipt")
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                            }
-                        }
-                    }
-                }
+//                if trip.status == .delivered {
+//                    Section(header: Text("PROOF OF DELIVERY")) {
+//                        Button(action: {
+//                            do {
+//                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip, signature: fleetManagerSignature)
+//                                showingDeliveryReceipt = true
+//                            } catch {
+//                                pdfError = error.localizedDescription
+//                                showingPDFError = true
+//                            }
+//                        }) {
+//                            HStack {
+//                                Image(systemName: "doc.text.fill")
+//                                    .foregroundColor(.blue)
+//                                Text("Delivery Receipt")
+//                                Spacer()
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                        
+//                        Button(action: {
+//                            showingSignatureSheet = true
+//                        }) {
+//                            HStack {
+//                                Image(systemName: "signature")
+//                                    .foregroundColor(.blue)
+//                                Text("Fleet Manager Signature")
+//                                Spacer()
+//                                if fleetManagerSignature != nil {
+//                                    Image(systemName: "checkmark.circle.fill")
+//                                        .foregroundColor(.green)
+//                                }
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                        
+//                        if let pdfData = pdfData {
+//                            ShareLink(item: pdfData, preview: SharePreview("Delivery Receipt", image: Image(systemName: "doc.fill"))) {
+//                                HStack {
+//                                    Image(systemName: "square.and.arrow.up")
+//                                        .foregroundColor(.blue)
+//                                    Text("Download Receipt")
+//                                    Spacer()
+//                                    Image(systemName: "chevron.right")
+//                                        .foregroundColor(.gray)
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
                 
                 // Notes Section
                 Section(header: Text("NOTES")) {
