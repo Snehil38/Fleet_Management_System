@@ -35,6 +35,10 @@ struct DriverTabView: View {
     ]
     @State private var selectedRouteId: String = "1"
     
+    @State private var currentTrip: Trip?
+    @State private var upcomingTrips: [Trip] = []
+    @State private var recentDeliveries: [DeliveryDetails] = []
+    
     var body: some View {
         TabView(selection: $selectedTab) {
             mainContentView
@@ -51,13 +55,26 @@ struct DriverTabView: View {
             }
             .tag(1)
         }
-        .environmentObject(tripController)
         .animation(.easeInOut(duration: 0.3), value: selectedTab)
-        .task {
-            // Set the driver ID and load trips
-            tripController.setDriverId(driverId)
-            await tripController.refreshTrips()
-            TripDataController.shared.startMonitoringRegions()
+        .onChange(of: tripController.currentTrip) { newTrip in
+            currentTrip = newTrip
+        }
+        .onChange(of: tripController.upcomingTrips) { newTrips in
+            upcomingTrips = newTrips
+        }
+        .onChange(of: tripController.recentDeliveries) { newDeliveries in
+            recentDeliveries = newDeliveries
+        }
+        .onAppear {
+            currentTrip = tripController.currentTrip
+            upcomingTrips = tripController.upcomingTrips
+            recentDeliveries = tripController.recentDeliveries
+            Task {
+                await tripController.refreshTrips()
+            }
+        }
+        .alert(alertMessage, isPresented: $showingAlert) {
+            Button("OK", role: .cancel) { }
         }
     }
     
@@ -85,9 +102,29 @@ struct DriverTabView: View {
                         ScrollView(.vertical, showsIndicators: false) {
                             VStack(spacing: 24) {
                                 // Current Delivery Card
-                                if let currentTrip = tripController.currentTrip,
+                                if let currentTrip = self.currentTrip,
                                    currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                                    currentDeliveryCard(currentTrip)
+                                    VStack(alignment: .leading, spacing: 20) {
+                                        HStack {
+                                            Text("Current Delivery")
+                                                .font(.system(size: 24, weight: .bold))
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal)
+                                        
+                                        VStack(alignment: .leading, spacing: 16) {
+                                            currentDeliveryContent(currentTrip)
+                                        }
+                                        .padding(16)
+                                        .background(Color.blue.opacity(0.05))
+                                        .cornerRadius(16)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Color(.systemGray4), lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+                                        .padding(.horizontal)
+                                    }
                                 }
                                 
                                 // Only show upcoming trips and trip queue if available
@@ -103,8 +140,8 @@ struct DriverTabView: View {
                                             Text("Upcoming Trips")
                                                 .font(.system(size: 24, weight: .bold))
                                             
-                                            if !tripController.upcomingTrips.isEmpty {
-                                                Text("\(tripController.upcomingTrips.count)")
+                                            if !upcomingTrips.isEmpty {
+                                                Text("\(upcomingTrips.count)")
                                                     .font(.system(size: 16, weight: .semibold))
                                                     .foregroundColor(.white)
                                                     .padding(.horizontal, 10)
@@ -117,22 +154,26 @@ struct DriverTabView: View {
                                         }
                                         .padding(.horizontal)
 
-                                        if tripController.upcomingTrips.isEmpty {
+                                        if upcomingTrips.isEmpty {
                                             emptyUpcomingTripsView
                                         } else {
                                             VStack(spacing: 0) {
-                                                ForEach(tripController.upcomingTrips) { trip in
+                                                ForEach(upcomingTrips) { trip in
                                                     UpcomingTripRow(trip: trip)
                                                         .environmentObject(tripController)
-                                                    if trip.id != tripController.upcomingTrips.last?.id {
+                                                    if trip.id != upcomingTrips.last?.id {
                                                         Divider()
                                                             .padding(.horizontal)
                                                     }
                                                 }
                                             }
-                                            .background(Color(.systemBackground))
+                                            .background(Color.orange.opacity(0.05))
                                             .cornerRadius(20)
-                                            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 20)
+                                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                                            )
+                                            .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
                                             .padding(.horizontal)
                                         }
                                     }
@@ -147,8 +188,8 @@ struct DriverTabView: View {
                                         Text("Recent Deliveries")
                                             .font(.system(size: 24, weight: .bold))
                                         
-                                        if !tripController.recentDeliveries.isEmpty {
-                                            Text("\(tripController.recentDeliveries.count)")
+                                        if !recentDeliveries.isEmpty {
+                                            Text("\(recentDeliveries.count)")
                                                 .font(.system(size: 16, weight: .semibold))
                                                 .foregroundColor(.white)
                                                 .padding(.horizontal, 10)
@@ -161,11 +202,11 @@ struct DriverTabView: View {
                                     }
                                     .padding(.horizontal)
                                     
-                                    if tripController.recentDeliveries.isEmpty {
+                                    if recentDeliveries.isEmpty {
                                         emptyRecentDeliveriesView
                                     } else {
                                         VStack(spacing: 0) {
-                                            ForEach(tripController.recentDeliveries) { delivery in
+                                            ForEach(recentDeliveries) { delivery in
                                                 Button {
                                                     selectedDelivery = delivery
                                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -176,7 +217,7 @@ struct DriverTabView: View {
                                                 }
                                                 .buttonStyle(PlainButtonStyle())
 
-                                                if delivery.id != tripController.recentDeliveries.last?.id {
+                                                if delivery.id != recentDeliveries.last?.id {
                                                     Divider()
                                                         .padding(.horizontal)
                                                 }
@@ -187,9 +228,13 @@ struct DriverTabView: View {
                                                 showingDeliveryDetails = true
                                             }
                                         }
-                                        .background(Color(.systemBackground))
+                                        .background(Color.green.opacity(0.05))
                                         .cornerRadius(20)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(Color(.systemGray4), lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
                                         .padding(.horizontal)
                                     }
                                 }
@@ -242,14 +287,19 @@ struct DriverTabView: View {
             VehicleInspectionView(isPreTrip: true) { success in
                 if success {
                     // Only mark as completed if successful
-                    if let currentTrip = tripController.currentTrip {
+                    if let updatedTrip = self.currentTrip {
                         Task {
                             do {
                                 try await tripController.updateTripInspectionStatus(
-                                    tripId: currentTrip.id,
+                                    tripId: updatedTrip.id,
                                     isPreTrip: true,
                                     completed: true
                                 )
+                                // Update local state after Supabase is updated
+                                if var trip = self.currentTrip {
+                                    trip.hasCompletedPreTrip = true
+                                    currentTrip = trip
+                                }
                             } catch {
                                 alertMessage = "Failed to update pre-trip inspection status: \(error.localizedDescription)"
                                 showingAlert = true
@@ -257,6 +307,7 @@ struct DriverTabView: View {
                         }
                     }
                 } else {
+                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before starting the trip"
                     showingAlert = true
                 }
@@ -265,17 +316,25 @@ struct DriverTabView: View {
         .sheet(isPresented: $showingPostTripInspection) {
             VehicleInspectionView(isPreTrip: false) { success in
                 if success {
-                    // Only mark as completed if successful
-                    if let currentTrip = tripController.currentTrip {
+                    // Only mark as completed and mark delivered if successful
+                    if var updatedTrip = self.currentTrip {
                         Task {
                             do {
                                 try await tripController.updateTripInspectionStatus(
-                                    tripId: currentTrip.id,
+                                    tripId: updatedTrip.id,
                                     isPreTrip: false,
                                     completed: true
                                 )
-                                await MainActor.run {
-                                    markCurrentTripDelivered()
+                                // Update local state after Supabase is updated
+                                if var trip = self.currentTrip {
+                                    trip.hasCompletedPostTrip = true
+                                    currentTrip = trip
+                                    // Use Task to call the async method
+                                    Task {
+                                        await MainActor.run {
+                                            markCurrentTripDelivered()
+                                        }
+                                    }
                                 }
                             } catch {
                                 alertMessage = "Failed to update post-trip inspection status: \(error.localizedDescription)"
@@ -284,25 +343,19 @@ struct DriverTabView: View {
                         }
                     }
                 } else {
+                    // If not successful, display alert but don't mark as completed
                     alertMessage = "Please resolve all issues before completing delivery"
                     showingAlert = true
                 }
             }
         }
         .sheet(isPresented: $showingVehicleDetails) {
-            if let currentTrip = tripController.currentTrip {
+            if let currentTrip = self.currentTrip {
                 VehicleDetailsView(vehicleDetails: currentTrip.vehicleDetails)
             }
         }
         .sheet(isPresented: $showingSosModal) {
-            SOSModalView(isPresented: $showingSosModal)
-        }
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Action Required"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
+            SOSEmergencyView(isPresented: $showingSosModal, currentTrip: $currentTrip)
         }
         .sheet(isPresented: $showingDeliveryDetails) {
             if let delivery = selectedDelivery {
@@ -313,10 +366,10 @@ struct DriverTabView: View {
     
     private var navigationOverlay: some View {
         RealTimeNavigationView(
-            destination: tripController.currentTrip?.destinationCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            destinationName: tripController.currentTrip?.destination ?? "",
-            address: tripController.currentTrip?.address ?? "",
-            sourceCoordinate: tripController.currentTrip?.sourceCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            destination: self.currentTrip?.destinationCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            destinationName: self.currentTrip?.destination ?? "",
+            address: self.currentTrip?.address ?? "",
+            sourceCoordinate: self.currentTrip?.sourceCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
             onDismiss: { 
                 withAnimation(.easeInOut(duration: 0.3)) {
                     showingNavigation = false 
@@ -329,17 +382,27 @@ struct DriverTabView: View {
     }
     
     private func currentDeliveryCard(_ trip: Trip) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Current Delivery")
-                .font(.system(size: 22, weight: .bold))
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Current Delivery")
+                    .font(.system(size: 24, weight: .bold))
+                Spacer()
+            }
+            .padding(.horizontal)
             
-            currentDeliveryContent(trip)
+            VStack(alignment: .leading, spacing: 16) {
+                currentDeliveryContent(trip)
+            }
+            .padding(16)
+            .background(Color.blue.opacity(0.05))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(.systemGray4), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+            .padding(.horizontal)
         }
-        .padding(16)
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-        .padding(.horizontal)
     }
     
     private func currentDeliveryContent(_ trip: Trip) -> some View {
@@ -504,72 +567,87 @@ struct DriverTabView: View {
     
     private func tripLocationsView(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Simplified container with integrated progress line
-            VStack(alignment: .leading, spacing: 20) {
-                // Starting Point section
-                HStack(alignment: .center, spacing: 18) {
-                    // Container for the circle and progress line
-                    ZStack(alignment: .top) {
-                        // Blue circle
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 20, height: 20)
-                        
-                        // Progress line from starting point to destination
-                        Rectangle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [Color.blue, Color.gray.opacity(0.4)]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ))
-                            .frame(width: 2, height: 75)
-                            .offset(y: 20)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Starting Point")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        Text(trip.startingPoint)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.primary)
-                        Text("Mumbai, Maharashtra")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
+            // Route Info Card
+            VStack(spacing: 12) {
+                // Title
+                HStack {
+                    Image(systemName: "map.fill")
+                        .foregroundColor(.blue)
+                    Text("Route Information")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.primary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
                 
-                // Destination section - no spacing adjustment needed with the improved layout
-                HStack(alignment: .top, spacing: 18) {
-                    // Red location pin
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.red)
-                        .offset(x: -2) // Align with the line
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Destination")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                        Text(trip.destination)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.primary)
-                        Text(trip.address)
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                // Pickup and Drop-off with vertical line
+                HStack(spacing: 0) {
+                    // Vertical line with dots
+                    VStack(spacing: 0) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                        Rectangle()
+                            .fill(Color(.systemGray2))
+                            .frame(width: 2, height: 32)
+                        Rectangle()
+                            .fill(Color.red)
+                            .frame(width: 6, height: 6)
                     }
+                    .padding(.vertical, 6)
+                    
+                    VStack(spacing: 16) {
+                        // Pickup Location
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Pickup")
+                                .font(.system(size: 12))
+                                .foregroundColor(.green)
+                            Text(trip.startingPoint)
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.green.opacity(0.08))
+                        .cornerRadius(8)
+                        
+                        // Drop-off Location
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Destination")
+                                .font(.system(size: 12))
+                                .foregroundColor(.red)
+                            Text(trip.destination)
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.red.opacity(0.08))
+                        .cornerRadius(8)
+                    }
+                    .padding(.leading, 12)
                 }
+                .padding(.horizontal, 4)
             }
+            .padding(16)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
     }
     
     private func tripActionButtons(_ trip: Trip) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             if isCurrentTripDeclined {
                 // Show Accept/Decline buttons for declined trip
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ActionButton(
                         title: "Accept Trip",
                         icon: "checkmark",
@@ -584,7 +662,6 @@ struct DriverTabView: View {
                         color: .red
                     ) {
                         Task {
-                            // Remove from current and add to upcoming
                             if let index = tripQueue.firstIndex(where: { $0.id == trip.id }) {
                                 tripQueue.remove(at: index)
                             }
@@ -592,65 +669,97 @@ struct DriverTabView: View {
                     }
                 }
             } else {
-                // Show regular action buttons in a more compact layout
-                HStack(spacing: 10) {
-                    ActionButton(
-                        title: "Start\nNavigation",
-                        icon: "location.fill",
-                        color: trip.hasCompletedPreTrip ? .blue : .gray
-                    ) {
-                        if !trip.hasCompletedPreTrip {
-                            alertMessage = "Please complete pre-trip inspection before starting navigation"
-                            showingAlert = true
-                        } else {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingNavigation = true
-                            }
-                        }
-                    }
-                    
-                    ActionButton(
-                        title: "Pre-Trip Inspection",
-                        icon: "checklist",
-                        color: trip.hasCompletedPreTrip ? .gray : .orange
-                    ) {
-                        if !trip.hasCompletedPreTrip {
-                            showingPreTripInspection = true
-                        }
-                    }
-                }
-                
-                HStack(spacing: 10) {
-                    ActionButton(
-                        title: "Mark Delivered",
-                        icon: "checkmark.circle.fill",
-                        color: .green
-                    ) {
-                        if !trip.hasCompletedPreTrip {
-                            alertMessage = "Please complete pre-trip inspection before marking as delivered"
-                            showingAlert = true
-                        } else if trip.hasCompletedPostTrip {
-                            // Already completed post-trip
-                            // Use Task to handle the async call
-                            Task {
-                                await MainActor.run {
-                                    markCurrentTripDelivered()
+                // Show regular action buttons in a grid layout
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        // Start Navigation Button
+                        Button(action: {
+                            if !trip.hasCompletedPreTrip {
+                                alertMessage = "Please complete pre-trip inspection before starting navigation"
+                                showingAlert = true
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingNavigation = true
                                 }
                             }
-                        } else {
-                            showingPostTripInspection = true
+                        }) {
+                            HStack {
+                                Image(systemName: "location.fill")
+                                Text("Start Navigation")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(trip.hasCompletedPreTrip ? Color.blue : Color.gray)
+                            .cornerRadius(12)
+                        }
+                        
+                        // Pre-Trip Inspection Button
+                        Button(action: {
+                            if !trip.hasCompletedPreTrip {
+                                showingPreTripInspection = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "checklist")
+                                Text("Pre-Trip Inspection")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(trip.hasCompletedPreTrip ? Color.gray : Color.orange)
+                            .cornerRadius(12)
                         }
                     }
                     
-                    ActionButton(
-                        title: "SOS",
-                        icon: "exclamationmark.triangle.fill",
-                        color: .red
-                    ) {
-                        // Show the SOS modal instead of an alert
-                        showingSosModal = true
+                    HStack(spacing: 12) {
+                        // Mark Delivered Button
+                        Button(action: {
+                            if !trip.hasCompletedPreTrip {
+                                alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                                showingAlert = true
+                            } else if trip.hasCompletedPostTrip {
+                                Task {
+                                    await MainActor.run {
+                                        markCurrentTripDelivered()
+                                    }
+                                }
+                            } else {
+                                showingPostTripInspection = true
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Mark Delivered")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.green)
+                            .cornerRadius(12)
+                        }
+                        
+                        // SOS Button
+                        Button(action: {
+                            showingSosModal = true
+                        }) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text("SOS")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.red)
+                            .cornerRadius(12)
+                        }
                     }
                 }
+                .padding(.horizontal, 4)
             }
         }
     }
@@ -693,7 +802,11 @@ struct DriverTabView: View {
             }
             .background(Color(.systemBackground))
             .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color(.systemGray4), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
             .padding(.horizontal)
         }
     }
@@ -713,7 +826,11 @@ struct DriverTabView: View {
         .padding(40)
         .background(Color(.systemBackground))
         .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
     }
     
@@ -732,7 +849,11 @@ struct DriverTabView: View {
         .padding(40)
         .background(Color(.systemBackground))
         .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
     }
     
@@ -757,12 +878,16 @@ struct DriverTabView: View {
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
         .padding(.horizontal)
     }
     
     private func markCurrentTripDelivered() {
-        if let trip = tripController.currentTrip, trip.hasCompletedPostTrip {
+        if let trip = self.currentTrip, trip.hasCompletedPostTrip {
             // Create a Task to handle the async operation
             Task {
                 do {
@@ -810,12 +935,12 @@ struct DriverTabView: View {
             }
         } else {
             // If pre-trip not completed, show alert
-            if let trip = tripController.currentTrip, !trip.hasCompletedPreTrip {
+            if let trip = self.currentTrip, !trip.hasCompletedPreTrip {
                 alertMessage = "Please complete pre-trip inspection before marking as delivered"
                 showingAlert = true
             }
             // If post-trip not completed, show post-trip inspection
-            else if let trip = tripController.currentTrip, !trip.hasCompletedPostTrip {
+            else if let trip = self.currentTrip, !trip.hasCompletedPostTrip {
                 showingPostTripInspection = true
             } else {
                 print("Cannot mark as delivered: trip is nil")
@@ -1335,13 +1460,13 @@ struct MapPolyline: View {
     }
 }
 
-struct SOSModalView: View {
+struct SOSEmergencyView: View {
     @Binding var isPresented: Bool
-    @StateObject private var profileManager = ProfileManager.shared
-    @State private var emergencySubject: String = ""
+    @Binding var currentTrip: Trip?
+    @State private var emergencySubject = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
-    @State private var showingChat = false
+    @StateObject private var profileManager = ProfileManager.shared
     @State private var selectedOption: SOSOption = .emergency
     
 
@@ -1419,7 +1544,7 @@ struct SOSModalView: View {
                     // Chat View
                     if let manager = profileManager.fleetManager {
                         if let userID = manager.userID {
-                            ChatView(recipientType: .maintenance, recipientId: userID, recipientName: manager.name)
+                            ChatView(recipientType: .maintenance, recipientId: userID, recipientName: manager.name, tripId: self.currentTrip?.id)
                                 .frame(maxHeight: .infinity)
                         } else {
                             Text("Unable to start chat: Fleet manager information is incomplete")
