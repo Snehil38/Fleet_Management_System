@@ -129,6 +129,11 @@ class ChatViewModel: ObservableObject {
             let currentUserId = try await supabaseDataController.getUserID()
             let userRole = await supabaseDataController.userRole
             
+            // Ensure we have a valid currentUserId
+            guard let currentUserIdString = currentUserId?.uuidString else {
+                throw NSError(domain: "ChatError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid current user ID"])
+            }
+            
             // Build the base query
             var query = supabaseDataController.supabase
                 .from("chat_messages")
@@ -138,18 +143,14 @@ class ChatViewModel: ObservableObject {
             if let tripId = tripId {
                 // For trip-specific chats, only show messages for this trip
                 query = query.eq("trip_id", value: tripId.uuidString)
-                
-                // For both fleet manager and driver, show all messages in this trip
-                // This ensures all trip messages are loaded regardless of sender/recipient
-                query = query.or("trip_id.eq.\(tripId.uuidString)")
             } else {
                 // For non-trip chats, filter messages based on the conversation participants
                 if userRole == "fleet_manager" {
                     // For fleet manager: show messages where they are either sender or recipient
-                    query = query.or("and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId)),and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId))")
+                    query = query.or("and(fleet_manager_id.eq.\(currentUserIdString),recipient_id.eq.\(recipientId.uuidString)),and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserIdString))")
                 } else {
                     // For driver: show messages where they are either sender or recipient
-                    query = query.or("and(fleet_manager_id.eq.\(recipientId),recipient_id.eq.\(currentUserId)),and(fleet_manager_id.eq.\(currentUserId),recipient_id.eq.\(recipientId))")
+                    query = query.or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserIdString)),and(fleet_manager_id.eq.\(currentUserIdString),recipient_id.eq.\(recipientId.uuidString))")
                 }
                 // Exclude trip-specific messages from general chat
                 query = query.is("trip_id", value: nil)
@@ -199,28 +200,29 @@ class ChatViewModel: ObservableObject {
                     for index in fetchedMessages.indices {
                         var message = fetchedMessages[index]
                         if userRole == "fleet_manager" {
-                            message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                            // For fleet manager: message is from current user if they are the fleet_manager_id
+                            message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserIdString
                         } else {
-                            message.isFromCurrentUser = message.recipient_id == recipientId
+                            // For driver: message is from current user if they are NOT the fleet_manager_id
+                            message.isFromCurrentUser = message.fleet_manager_id.uuidString != recipientId.uuidString
                         }
                         fetchedMessages[index] = message
                         
                         // Mark as read if needed
-                        if message.recipient_id == currentUserId && message.status == .sent {
+                        if message.recipient_id.uuidString == currentUserIdString && message.status == .sent {
                             Task {
                                 await self.markMessageAsRead(message.id)
                             }
                         }
                     }
-                    
-                    // Only update if we have new messages or different content
-                    if self.messages != fetchedMessages {
-                        self.messages = fetchedMessages
-                    }
                 }
+                
+                // Always update messages to ensure consistency
+                self.messages = fetchedMessages
                 
                 self.isLoading = false
                 print("📱 Loaded \(fetchedMessages.count) messages")
+                print("📱 Messages after update: \(self.messages.map { "id: \($0.id), text: \($0.message_text), isFromCurrentUser: \($0.isFromCurrentUser)" })")
             }
             
         } catch {
@@ -261,7 +263,9 @@ class ChatViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 // Get the current user's ID
-                let userId = try await supabaseDataController.getUserID() ?? UUID()
+                guard let userId = try await supabaseDataController.getUserID() else {
+                    throw NSError(domain: "ChatError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid current user ID"])
+                }
                 let userRole = await supabaseDataController.userRole
                 
                 // Get the fleet manager's ID
@@ -335,7 +339,7 @@ class ChatViewModel: ObservableObject {
                     attachment_url: nil,
                     attachment_type: nil,
                     trip_id: tripId,
-                    isFromCurrentUser: true
+                    isFromCurrentUser: userRole == "fleet_manager" ? messageFleetManagerId == userId : messageFleetManagerId != fleetManagerId
                 )
                 
                 // Add message to local state
