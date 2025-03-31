@@ -379,27 +379,27 @@ struct TripDetailsView: View {
                     }
                     
                     // Proof of delivery section for completed trips
-                    Section(header: Text("Proof of Delivery")) {
-                        Button(action: {}) {
-                            HStack {
-                                Image(systemName: "doc.text.fill")
-                                Text("Delivery Receipt")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        Button(action: {}) {
-                            HStack {
-                                Image(systemName: "signature")
-                                Text("Customer Signature")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                    }
+//                    Section(header: Text("Proof of Delivery")) {
+//                        Button(action: {}) {
+//                            HStack {
+//                                Image(systemName: "doc.text.fill")
+//                                Text("Delivery Receipt")
+//                                Spacer()
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                        
+//                        Button(action: {}) {
+//                            HStack {
+//                                Image(systemName: "signature")
+//                                Text("Customer Signature")
+//                                Spacer()
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                    }
                 } else {
                     // Status section for non-completed trips
                     Section(header: Text("Status")) {

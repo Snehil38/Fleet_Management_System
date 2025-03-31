@@ -705,31 +705,31 @@ struct TripDetailView: View {
                 }
                 
                 // Proof of Delivery Section (for completed trips)
-                if trip.status == .delivered {
-                    Section(header: Text("PROOF OF DELIVERY")) {
-                        Button(action: {}) {
-                            HStack {
-                                Image(systemName: "doc.text.fill")
-                                    .foregroundColor(.blue)
-                                Text("Delivery Receipt")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        Button(action: {}) {
-                            HStack {
-                                Image(systemName: "signature")
-                                    .foregroundColor(.blue)
-                                Text("Customer Signature")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                    }
-                }
+//                if trip.status == .delivered {
+//                    Section(header: Text("PROOF OF DELIVERY")) {
+//                        Button(action: {}) {
+//                            HStack {
+//                                Image(systemName: "doc.text.fill")
+//                                    .foregroundColor(.blue)
+//                                Text("Delivery Receipt")
+//                                Spacer()
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                        
+//                        Button(action: {}) {
+//                            HStack {
+//                                Image(systemName: "signature")
+//                                    .foregroundColor(.blue)
+//                                Text("Customer Signature")
+//                                Spacer()
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                    }
+//                }
                 
                 // Notes Section
                 Section(header: Text("NOTES")) {
