@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import UIKit
+import PDFKit
 
 struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
@@ -447,11 +448,11 @@ struct TripDetailsView: View {
     @State private var errorMessage = ""
     @State private var showingShareSheet = false
     @State private var pdfURL: URL?
+    @State private var showingDeliveryReceipt = false
+    @State private var receiptData: Data?
     
     init(trip: Trip) {
         self.trip = trip
-        // Initialize ChatViewModel with a temporary UUID
-        // We'll update it with the correct fleet manager ID in onAppear
         self._chatViewModel = StateObject(wrappedValue: ChatViewModel(recipientId: UUID(), recipientType: .driver))
     }
     
@@ -486,43 +487,34 @@ struct TripDetailsView: View {
                         TripDetailRow(icon: "checkmark.shield.fill", title: "Post-Trip Inspection", value: "Completed")
                     }
                     
-                    Section(header: Text("Proof of Delivery")) {
-                        Button(action: {}) {
+                    Section(header: Text("PROOF OF DELIVERY")) {
+                        Button(action: {
+                            generateDeliveryReceipt()
+                        }) {
                             HStack {
                                 Image(systemName: "doc.text.fill")
+                                    .foregroundColor(.blue)
                                 Text("Delivery Receipt")
+                                    .foregroundColor(.blue)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
                             }
                         }
                         
-                        Button(action: {}) {
+                        Button(action: {
+                            generateChatHistoryPDF()
+                        }) {
                             HStack {
-                                Image(systemName: "signature")
-                                Text("Customer Signature")
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    .foregroundColor(.blue)
+                                Text("Chat History")
+                                    .foregroundColor(.blue)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
                             }
                         }
-                        
-                        // Add Chat History Download Button
-                        Button(action: generateAndDownloadPDF) {
-                            HStack {
-                                Image(systemName: "arrow.down.doc.fill")
-                                Text("Download Chat History")
-                                Spacer()
-                                if isGeneratingPDF {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                            }
-                        }
-                        .disabled(isGeneratingPDF)
                     }
                 } else {
                     // Status section for non-completed trips
@@ -577,6 +569,11 @@ struct TripDetailsView: View {
                     ShareSheet(activityItems: [url])
                 }
             }
+            .sheet(isPresented: $showingDeliveryReceipt) {
+                if let data = receiptData {
+                    TripDeliveryReceiptViewer(data: data)
+                }
+            }
             .task {
                 // Get fleet manager ID and load chat messages
                 do {
@@ -605,75 +602,313 @@ struct TripDetailsView: View {
         }
     }
     
-    private func generateAndDownloadPDF() {
-        isGeneratingPDF = true
-        
-        Task {
-            do {
-                // Create PDF content
-                let pdfContent = generatePDFContent()
+    private func generateDeliveryReceipt() {
+        print("Generating delivery receipt...")
+        do {
+            let pdfMetaData = [
+                kCGPDFContextCreator: "FMS App",
+                kCGPDFContextAuthor: "Driver App",
+                kCGPDFContextTitle: "Delivery Receipt"
+            ]
+            
+            let format = UIGraphicsPDFRendererFormat()
+            format.documentInfo = pdfMetaData as [String: Any]
+            
+            let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
+            let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+            
+            let pdfData = try renderer.pdfData { context in
+                context.beginPage()
+                let ctx = UIGraphicsGetCurrentContext()!
                 
-                // Get the documents directory
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                let fileName = "chat_history_\(trip.id.uuidString)_\(Date().formatted(.iso8601)).pdf"
-                let fileURL = documentsPath.appendingPathComponent(fileName)
+                // Set up text attributes
+                let titleAttributes = [
+                    NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 24),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
+                let headerAttributes = [
+                    NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 14),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
+                let textAttributes = [
+                    NSAttributedString.Key.font: UIFont.systemFont(ofSize: 12),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
                 
-                // Write PDF data to file
-                try pdfContent.write(to: fileURL)
+                // Draw title
+                let title = "DELIVERY RECEIPT"
+                let titleSize = title.size(withAttributes: titleAttributes)
+                let titleX = (pageRect.width - titleSize.width) / 2
+                title.draw(at: CGPoint(x: titleX, y: 40), withAttributes: titleAttributes)
                 
-                // Show share sheet
-                await MainActor.run {
-                    isGeneratingPDF = false
-                    pdfURL = fileURL
-                    showingShareSheet = true
+                // Set up table drawing parameters
+                var yPosition: CGFloat = 100
+                let leftMargin: CGFloat = 50
+                let labelWidth: CGFloat = 150  // Width for labels
+                let valueWidth: CGFloat = 350  // Width for values
+                let rowHeight: CGFloat = 25
+                let padding: CGFloat = 5
+                
+                // Function to draw a table row with word wrap
+                func drawTableRow(label: String, value: String, atY y: CGFloat) -> CGFloat {
+                    let rect = CGRect(x: leftMargin, y: y, width: labelWidth + valueWidth, height: rowHeight)
+                    ctx.stroke(rect)
+                    
+                    // Draw vertical line between columns
+                    let midX = leftMargin + labelWidth
+                    ctx.move(to: CGPoint(x: midX, y: y))
+                    ctx.addLine(to: CGPoint(x: midX, y: y + rowHeight))
+                    ctx.strokePath()
+                    
+                    // Draw label
+                    let labelRect = CGRect(x: leftMargin + padding, y: y + padding, 
+                                         width: labelWidth - padding * 2, height: rowHeight - padding * 2)
+                    label.draw(in: labelRect, withAttributes: textAttributes)
+                    
+                    // Draw value with potential wrapping
+                    let valueRect = CGRect(x: midX + padding, y: y + padding,
+                                         width: valueWidth - padding * 2, height: rowHeight - padding * 2)
+                    value.draw(in: valueRect, withAttributes: textAttributes)
+                    
+                    return y + rowHeight
                 }
+                
+                // Draw Trip Information section
+                "Trip Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                yPosition = drawTableRow(label: "Trip ID:", value: trip.id.uuidString, atY: yPosition)
+                yPosition = drawTableRow(label: "Status:", value: trip.status.rawValue, atY: yPosition)
+                yPosition = drawTableRow(label: "Vehicle:", value: trip.vehicleDetails.bodyType.rawValue, atY: yPosition)
+                yPosition = drawTableRow(label: "License Plate:", value: trip.vehicleDetails.licensePlate, atY: yPosition)
+                yPosition = drawTableRow(label: "Driver:", value: "Ravi", atY: yPosition)
+                
+                yPosition += 20
+                
+                // Draw Delivery Information section
+                "Delivery Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                yPosition = drawTableRow(label: "Destination:", value: trip.destination, atY: yPosition)
+                yPosition = drawTableRow(label: "Address:", value: trip.address, atY: yPosition)
+                yPosition = drawTableRow(label: "Distance:", value: trip.distance, atY: yPosition)
+                
+                yPosition += 20
+                
+                // Draw Timing Information section
+                "Timing Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                // Format dates properly
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateStyle = .medium
+                dateFormatter.timeStyle = .short
+                
+                let startTimeStr = trip.startTime.map { dateFormatter.string(from: $0) } ?? "N/A"
+                let endTimeStr = trip.endTime.map { dateFormatter.string(from: $0) } ?? "N/A"
+                
+                yPosition = drawTableRow(label: "Start Time:", value: startTimeStr, atY: yPosition)
+                yPosition = drawTableRow(label: "End Time:", value: endTimeStr, atY: yPosition)
+                
+                yPosition += 20
+                
+                // Draw Cost Information section
+                "Cost Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                let fuelCost = calculateFuelCost()
+                let revenue = calculateRevenue()
+                
+                yPosition = drawTableRow(label: "Estimated Fuel Cost:", value: String(format: "$%.2f", fuelCost), atY: yPosition)
+                yPosition = drawTableRow(label: "Total Revenue:", value: String(format: "$%.2f", revenue), atY: yPosition)
+                
+                yPosition += 20
+                
+                // Draw Notes section
+                "Notes".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                let cargoType = trip.notes?.components(separatedBy: "Cargo Type:").last?.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespaces) ?? "General Goods"
+                yPosition = drawTableRow(label: "Cargo Type:", value: cargoType, atY: yPosition)
+                yPosition = drawTableRow(label: "Estimated Distance:", value: trip.distance, atY: yPosition)
+                
+                yPosition += 40
+                
+                // Draw Signature section
+                "Fleet Manager's Signature:".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                // Draw signature box
+                let signatureRect = CGRect(x: leftMargin, y: yPosition, width: 200, height: 60)
+                ctx.stroke(signatureRect)
+                
+                yPosition += 80
+                
+                // Draw date with proper formatting
+                let currentDate = Date()
+                dateFormatter.dateStyle = .long
+                dateFormatter.timeStyle = .none
+                let dateString = "Date: \(dateFormatter.string(from: currentDate))"
+                dateString.draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: textAttributes)
+            }
+            
+            print("Receipt PDF generated")
+            receiptData = pdfData
+            showingDeliveryReceipt = true
+            
             } catch {
-                await MainActor.run {
-                    isGeneratingPDF = false
-                    errorMessage = "Failed to generate PDF: \(error.localizedDescription)"
+            print("Error generating receipt: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
                     showingError = true
                 }
             }
+    
+    private func calculateFuelCost() -> Double {
+        let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .joined()
+        
+        if let distance = Double(numericDistance) {
+            return distance * 0.5 // $0.5 per km
         }
+        return 0.0
     }
     
-    private func generatePDFContent() -> Data {
-        // Create PDF content with better formatting
-        var content = """
-        TRIP CHAT HISTORY
-        =================
-        
-        Trip Details:
-        ------------
-        Trip ID: \(trip.id.uuidString)
-        From: \(trip.startingPoint)
-        To: \(trip.destination)
-        Status: Completed
-        Vehicle: \(trip.vehicleDetails.make) \(trip.vehicleDetails.model)
-        License Plate: \(trip.vehicleDetails.licensePlate)
-        Date: \(Date().formatted())
-        
-        Chat History:
-        ------------
-        
-        """
+    private func calculateRevenue() -> Double {
+        return calculateFuelCost() * 1.5 // 50% margin
+    }
+    
+    private func generateChatHistoryPDF() {
+        print("Generating chat history PDF...")
+        do {
+            let pdfMetaData = [
+                kCGPDFContextCreator: "FMS App",
+                kCGPDFContextAuthor: "Driver App",
+                kCGPDFContextTitle: "Chat History"
+            ]
+            
+            let format = UIGraphicsPDFRendererFormat()
+            format.documentInfo = pdfMetaData as [String: Any]
+            
+            let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
+            let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+            
+            let pdfData = try renderer.pdfData { context in
+                context.beginPage()
+                let ctx = UIGraphicsGetCurrentContext()!
+                
+                // Set up text attributes
+                let titleAttributes = [
+                    NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 24),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
+                let headerAttributes = [
+                    NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 14),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
+                let textAttributes = [
+                    NSAttributedString.Key.font: UIFont.systemFont(ofSize: 12),
+                    NSAttributedString.Key.foregroundColor: UIColor.black
+                ]
+                
+                // Draw title
+                let title = "CHAT HISTORY"
+                let titleSize = title.size(withAttributes: titleAttributes)
+                let titleX = (pageRect.width - titleSize.width) / 2
+                title.draw(at: CGPoint(x: titleX, y: 40), withAttributes: titleAttributes)
+                
+                // Set up table drawing parameters
+                var yPosition: CGFloat = 100
+                let leftMargin: CGFloat = 50
+                let contentWidth: CGFloat = 500
+                let padding: CGFloat = 10
+                
+                // Draw Trip Information section
+                "Trip Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
+                
+                // Function to draw a table row
+                func drawTableRow(label: String, value: String, atY y: CGFloat) -> CGFloat {
+                    let rect = CGRect(x: leftMargin, y: y, width: contentWidth, height: 25)
+                    ctx.stroke(rect)
+                    
+                    let labelRect = CGRect(x: leftMargin + padding, y: y + padding/2,
+                                         width: 100, height: 20)
+                    label.draw(in: labelRect, withAttributes: textAttributes)
+                    
+                    let valueRect = CGRect(x: leftMargin + 120, y: y + padding/2,
+                                         width: contentWidth - 140, height: 20)
+                    value.draw(in: valueRect, withAttributes: textAttributes)
+                    
+                    return y + 25
+                }
+                
+                // Draw trip details
+                yPosition = drawTableRow(label: "Trip ID:", value: trip.id.uuidString, atY: yPosition)
+                yPosition = drawTableRow(label: "From:", value: trip.startingPoint, atY: yPosition)
+                yPosition = drawTableRow(label: "To:", value: trip.destination, atY: yPosition)
+                yPosition = drawTableRow(label: "Status:", value: "Completed", atY: yPosition)
+                yPosition = drawTableRow(label: "Vehicle:", value: "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model)", atY: yPosition)
+                
+                yPosition += 30
+                
+                // Draw Chat Messages section
+                "Chat Messages".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+                yPosition += 25
         
         // Sort messages by date
         let sortedMessages = chatViewModel.messages.sorted { $0.created_at < $1.created_at }
         
-        // Add each message with proper formatting
+                if sortedMessages.isEmpty {
+                    let noMessagesRect = CGRect(x: leftMargin, y: yPosition, width: contentWidth, height: 30)
+                    ctx.stroke(noMessagesRect)
+                    "No messages found for this trip.".draw(in: CGRect(x: leftMargin + padding, y: yPosition + padding,
+                                                                     width: contentWidth - 2*padding, height: 20),
+                                                          withAttributes: textAttributes)
+                } else {
+                    // Draw each message
         for message in sortedMessages {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateStyle = .medium
+                        dateFormatter.timeStyle = .short
+                        let timestamp = dateFormatter.string(from: message.created_at)
             let sender = message.isFromFleetManager ? "Fleet Manager" : "Driver"
-            let timestamp = message.created_at.formatted(date: .complete, time: .standard)
-            content += "\n[\(timestamp)]\n\(sender): \(message.message_text)\n"
-            content += "----------------------------------------\n"
+                        
+                        // Draw message box
+                        let messageHeight: CGFloat = 60
+                        let messageRect = CGRect(x: leftMargin, y: yPosition, width: contentWidth, height: messageHeight)
+                        ctx.stroke(messageRect)
+                        
+                        // Draw timestamp and sender
+                        let headerText = "[\(timestamp)] \(sender):"
+                        headerText.draw(at: CGPoint(x: leftMargin + padding, y: yPosition + padding),
+                                     withAttributes: [.font: UIFont.boldSystemFont(ofSize: 11),
+                                                    .foregroundColor: UIColor.black])
+                        
+                        // Draw message text
+                        message.message_text.draw(in: CGRect(x: leftMargin + padding, y: yPosition + 25,
+                                                           width: contentWidth - 2*padding, height: messageHeight - 30),
+                                                withAttributes: textAttributes)
+                        
+                        yPosition += messageHeight + 5
+                        
+                        // Check if we need a new page
+                        if yPosition > pageRect.height - 100 {
+                            context.beginPage()
+                            yPosition = 50
+                        }
+                    }
+                }
+            }
+            
+            print("Chat history PDF generated")
+            receiptData = pdfData
+            showingDeliveryReceipt = true
+            
+        } catch {
+            print("Error generating chat history: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            showingError = true
         }
-        
-        if sortedMessages.isEmpty {
-            content += "\nNo messages found for this trip.\n"
-        }
-        
-        return Data(content.utf8)
     }
     
     private var statusText: String {
@@ -739,5 +974,80 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// Add TripDeliveryReceiptViewer after ShareSheet
+struct TripDeliveryReceiptViewer: View {
+    @Environment(\.presentationMode) var presentationMode
+    let data: Data
+    @State private var showShareSheet = false
+    
+    var body: some View {
+        NavigationView {
+            PDFKitView(data: data)
+                .navigationTitle("Delivery Receipt")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Done") {
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                    }
+                    
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            showShareSheet = true
+                        }) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                }
+                .sheet(isPresented: $showShareSheet) {
+                    ShareSheet(activityItems: [data])
+                }
+        }
+    }
+}
+
+struct PDFKitView: UIViewRepresentable {
+    let data: Data
+    
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.autoScales = true
+        
+        if let document = PDFDocument(data: data) {
+            pdfView.document = document
+            pdfView.autoScales = true
+            pdfView.displayMode = .singlePage
+            pdfView.displayDirection = .vertical
+            pdfView.usePageViewController(true)
+            pdfView.maxScaleFactor = 4.0
+            pdfView.minScaleFactor = pdfView.scaleFactorForSizeToFit
+        }
+        
+        return pdfView
+    }
+    
+    func updateUIView(_ pdfView: PDFView, context: Context) {
+        if let document = PDFDocument(data: data) {
+            pdfView.document = document
+        }
+    }
+}
+
+// Add this extension to create PDF from HTML
+extension String {
+    func htmlAttributedString() -> NSAttributedString? {
+        guard let data = self.data(using: .utf8) else { return nil }
+        return try? NSAttributedString(
+            data: data,
+            options: [
+                .documentType: NSAttributedString.DocumentType.html,
+                .characterEncoding: String.Encoding.utf8.rawValue
+            ],
+            documentAttributes: nil
+        )
+    }
 }
 
