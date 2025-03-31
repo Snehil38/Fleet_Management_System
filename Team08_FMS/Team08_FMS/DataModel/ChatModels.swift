@@ -21,7 +21,6 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var is_deleted: Bool
     let attachment_url: String?
     let attachment_type: String?
-    let trip_id: UUID?
     
     // Additional UI properties - not stored in database
     var isFromCurrentUser: Bool = false
@@ -43,7 +42,6 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         case is_deleted
         case attachment_url
         case attachment_type
-        case trip_id
     }
     
     init(from decoder: Decoder) throws {
@@ -59,12 +57,11 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         is_deleted = try container.decode(Bool.self, forKey: .is_deleted)
         attachment_url = try container.decodeIfPresent(String.self, forKey: .attachment_url)
         attachment_type = try container.decodeIfPresent(String.self, forKey: .attachment_type)
-        trip_id = try container.decodeIfPresent(UUID.self, forKey: .trip_id)
     }
     
     init(id: UUID, fleet_manager_id: UUID, recipient_id: UUID, recipient_type: String, 
          message_text: String, status: MessageStatus, created_at: Date, updated_at: Date, 
-         is_deleted: Bool, attachment_url: String?, attachment_type: String?, trip_id: UUID?, isFromCurrentUser: Bool) {
+         is_deleted: Bool, attachment_url: String?, attachment_type: String?, isFromCurrentUser: Bool) {
         self.id = id
         self.fleet_manager_id = fleet_manager_id
         self.recipient_id = recipient_id
@@ -76,7 +73,6 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         self.is_deleted = is_deleted
         self.attachment_url = attachment_url
         self.attachment_type = attachment_type
-        self.trip_id = trip_id
         self.isFromCurrentUser = isFromCurrentUser
     }
     
@@ -93,7 +89,6 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         try container.encode(is_deleted, forKey: .is_deleted)
         try container.encodeIfPresent(attachment_url, forKey: .attachment_url)
         try container.encodeIfPresent(attachment_type, forKey: .attachment_type)
-        try container.encodeIfPresent(trip_id, forKey: .trip_id)
     }
     
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {

@@ -18,25 +18,18 @@ struct ChatView: View {
     let recipientType: RecipientType
     let recipientId: UUID
     let recipientName: String
-    let tripId: UUID?
     @StateObject private var viewModel: ChatViewModel
     @State private var messageText = ""
     @State private var isShowingEmergencySheet = false
     @FocusState private var isFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
     @StateObject private var tripController = TripDataController.shared
-    @Environment(\.dismiss) private var dismiss
     
-    init(recipientType: RecipientType, recipientId: UUID, recipientName: String, tripId: UUID? = nil) {
+    init(recipientType: RecipientType, recipientId: UUID, recipientName: String) {
         self.recipientType = recipientType
         self.recipientId = recipientId
         self.recipientName = recipientName
-        self.tripId = tripId
-        self._viewModel = StateObject(wrappedValue: ChatViewModel(
-            recipientId: recipientId,
-            recipientType: recipientType,
-            tripId: tripId
-        ))
+        self._viewModel = StateObject(wrappedValue: ChatViewModel(recipientId: recipientId, recipientType: recipientType))
     }
     
     var body: some View {
@@ -57,10 +50,7 @@ struct ChatView: View {
                 }
                 .onAppear {
                     scrollProxy = proxy
-                    // Scroll to bottom after a short delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        scrollToBottom()
-                    }
+                    viewModel.clearMessages() // Clear messages when view appears
                 }
                 .onChange(of: viewModel.messages) { _ in
                     scrollToBottom()
@@ -70,27 +60,9 @@ struct ChatView: View {
                 await viewModel.loadMessages()
             }
             
-            // Message input
+            // Message input with trip details button for drivers
             messageInputView
         }
-        .overlay(
-            // Notification overlay
-            Group {
-                if viewModel.showNotification {
-                    VStack {
-                        Text(viewModel.notificationMessage)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(10)
-                            .padding()
-                        Spacer()
-                    }
-                    .transition(.move(edge: .top))
-                    .animation(.easeInOut, value: viewModel.showNotification)
-                }
-            }
-        )
         .sheet(isPresented: $isShowingEmergencySheet) {
             EmergencyAssistanceView()
         }
@@ -108,7 +80,7 @@ struct ChatView: View {
         HStack {
             // Back button
             Button(action: {
-                dismiss()
+                // Handle back action
             }) {
                 Image(systemName: "chevron.left")
                     .font(.title3)
@@ -123,11 +95,6 @@ struct ChatView: View {
                 Text(recipientType.displayName)
                     .font(.caption)
                     .foregroundColor(.gray)
-                if tripId != nil {
-                    Text("Trip Chat")
-                        .font(.caption2)
-                        .foregroundColor(ChatThemeColors.primary)
-                }
             }
             
             Spacer()
@@ -242,11 +209,6 @@ struct ChatView: View {
 // Preview provider
 struct ChatView_Previews: PreviewProvider {
     static var previews: some View {
-        ChatView(
-            recipientType: .driver,
-            recipientId: UUID(),
-            recipientName: "John Smith",
-            tripId: UUID()
-        )
+        ChatView(recipientType: .driver, recipientId: UUID(), recipientName: "John Smith")
     }
 } 

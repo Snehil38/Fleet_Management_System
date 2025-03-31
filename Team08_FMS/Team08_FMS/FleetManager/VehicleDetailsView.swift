@@ -356,7 +356,7 @@ struct VehicleDetailView: View {
                 vehicleDetailsSection
                 
                 // Documents Section
-                documentSection
+//                documentSection
             } else {
                 // View mode sections
                 readOnlyBasicInfoSection

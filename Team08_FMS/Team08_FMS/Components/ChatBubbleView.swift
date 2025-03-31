@@ -7,7 +7,7 @@ struct ChatBubbleView: View {
     @State private var currentUserId: UUID?
     
     private var backgroundColor: Color {
-        message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray5)
+        message.isFromCurrentUser ? .blue : Color(.systemGray5)
     }
     
     private var textColor: Color {
@@ -35,7 +35,9 @@ struct ChatBubbleView: View {
             
             // Get current user ID when view appears
             Task {
-                currentUserId = await supabaseController.getUserID()
+                do {
+                    currentUserId = await supabaseController.getUserID()
+                }
             }
         }
     }
@@ -48,20 +50,13 @@ struct ChatBubbleView: View {
                 .padding(.vertical, 8)
                 .background(backgroundColor)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .fixedSize(horizontal: false, vertical: true)
             
             HStack(spacing: 4) {
-                if !message.isFromCurrentUser {
-                    Text(formatDate(message.created_at))
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                }
+                Text(formatDate(message.created_at))
+                    .font(.caption2)
+                    .foregroundColor(.gray)
                 
                 if message.isFromCurrentUser {
-                    Text(formatDate(message.created_at))
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                    
                     Group {
                         switch message.status {
                         case .sent:
@@ -103,7 +98,6 @@ struct ChatBubbleView_Previews: PreviewProvider {
                 is_deleted: false,
                 attachment_url: nil,
                 attachment_type: nil,
-                trip_id: UUID(),
                 isFromCurrentUser: true
             ))
             
@@ -119,7 +113,6 @@ struct ChatBubbleView_Previews: PreviewProvider {
                 is_deleted: false,
                 attachment_url: nil,
                 attachment_type: nil,
-                trip_id: nil,
                 isFromCurrentUser: false
             ))
         }
