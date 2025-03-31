@@ -570,60 +570,73 @@ struct DriverTabView: View {
             // Route Info Card
             VStack(spacing: 16) {
                 // Title
-                Text("Route Information")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 4)
+                HStack {
+                    Image(systemName: "map.fill")
+                        .foregroundColor(.blue)
+                    Text("Route Information")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.primary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
                 
                 // Pickup and Drop-off with connecting line
-                HStack(spacing: 20) {
+                HStack(spacing: 16) {
                     // Pickup Location
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Circle()
                                 .fill(Color.green)
-                                .frame(width: 10, height: 10)
+                                .frame(width: 8, height: 8)
                             Text(trip.startingPoint)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.primary)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
                         Text("Pickup")
                             .font(.system(size: 12))
                             .foregroundColor(.green)
-                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(8)
                     
                     // Connecting Line
                     Rectangle()
-                        .fill(Color(uiColor: .systemGray3))
+                        .fill(Color(.systemGray2))
                         .frame(height: 2)
-                        .frame(maxWidth: 80)
-                        .padding(.vertical, 14)
+                        .frame(maxWidth: 30)
                     
                     // Drop-off Location
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Rectangle()
                                 .fill(Color.red)
-                                .frame(width: 10, height: 10)
+                                .frame(width: 8, height: 8)
                             Text(trip.destination)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.primary)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
                         Text("Destination")
                             .font(.system(size: 12))
                             .foregroundColor(.red)
-                            .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
                 }
                 .padding(.horizontal, 4)
             }
             .padding(16)
-            .background(Color(uiColor: .systemGray6))
-            .cornerRadius(12)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
         }
         .padding(.vertical, 4)
