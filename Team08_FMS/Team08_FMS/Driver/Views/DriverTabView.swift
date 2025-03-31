@@ -568,7 +568,7 @@ struct DriverTabView: View {
     private func tripLocationsView(_ trip: Trip) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Route Info Card
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 // Title
                 HStack {
                     Image(systemName: "map.fill")
@@ -580,57 +580,58 @@ struct DriverTabView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
                 
-                // Pickup and Drop-off with connecting line
-                HStack(spacing: 16) {
-                    // Pickup Location
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 8, height: 8)
+                // Pickup and Drop-off with vertical line
+                HStack(spacing: 0) {
+                    // Vertical line with dots
+                    VStack(spacing: 0) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                        Rectangle()
+                            .fill(Color(.systemGray2))
+                            .frame(width: 2, height: 32)
+                        Rectangle()
+                            .fill(Color.red)
+                            .frame(width: 6, height: 6)
+                    }
+                    .padding(.vertical, 6)
+                    
+                    VStack(spacing: 16) {
+                        // Pickup Location
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Pickup")
+                                .font(.system(size: 12))
+                                .foregroundColor(.green)
                             Text(trip.startingPoint)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 15, weight: .regular))
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
-                        Text("Pickup")
-                            .font(.system(size: 12))
-                            .foregroundColor(.green)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .background(Color.green.opacity(0.1))
-                    .cornerRadius(8)
-                    
-                    // Connecting Line
-                    Rectangle()
-                        .fill(Color(.systemGray2))
-                        .frame(height: 2)
-                        .frame(maxWidth: 30)
-                    
-                    // Drop-off Location
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Rectangle()
-                                .fill(Color.red)
-                                .frame(width: 8, height: 8)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.green.opacity(0.08))
+                        .cornerRadius(8)
+                        
+                        // Drop-off Location
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Destination")
+                                .font(.system(size: 12))
+                                .foregroundColor(.red)
                             Text(trip.destination)
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 15, weight: .regular))
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
-                        Text("Destination")
-                            .font(.system(size: 12))
-                            .foregroundColor(.red)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.red.opacity(0.08))
+                        .cornerRadius(8)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(8)
+                    .padding(.leading, 12)
                 }
                 .padding(.horizontal, 4)
             }
