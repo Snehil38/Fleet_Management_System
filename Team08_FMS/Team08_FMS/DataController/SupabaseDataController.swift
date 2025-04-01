@@ -3,14 +3,6 @@ import Supabase
 import Combine
 import SwiftSMTP
 
-// Define SupabaseError enum for error handling
-enum SupabaseError: Error {
-    case responseDataMissing
-    case decodingFailed
-    case resourceNotFound
-    case serverError(Int)
-}
-
 struct GeofenceEvents: Codable, Identifiable {
     
     let id: UUID
@@ -410,7 +402,7 @@ class SupabaseDataController: ObservableObject {
                 .eq("user_id", value: userID)
                 .execute()
             
-            // Ensure response data exists
+            // Ensure response.data is not nil
             let responseData = response.data
             // Debugging: Print raw JSON response
             if let jsonString = String(data: responseData, encoding: .utf8) {
@@ -498,8 +490,7 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             // Decode the returned data into an array of GeofenceEvents
-            let responseData = response.data
-            let events = try JSONDecoder().decode([GeofenceEvents].self, from: responseData)
+            let events = try JSONDecoder().decode([GeofenceEvents].self, from: response.data)
             
             // Update your local array
             await MainActor.run {
@@ -669,8 +660,7 @@ class SupabaseDataController: ObservableObject {
             let data = response.data
             
             // Print raw JSON response for debugging
-            let responseData = response.data
-            if let rawJSON = String(data: responseData, encoding: .utf8) {
+            if let rawJSON = String(data: data, encoding: .utf8) {
                 print("Raw JSON Response for Driver: \(rawJSON)")
             }
             
@@ -792,8 +782,7 @@ class SupabaseDataController: ObservableObject {
             let data = response.data
             
             // Print raw JSON response for debugging
-            let responseData = response.data
-            if let rawJSON = String(data: responseData, encoding: .utf8) {
+            if let rawJSON = String(data: data, encoding: .utf8) {
                 print("Raw JSON Response for Maintenance Personnel: \(rawJSON)")
             }
             
@@ -877,8 +866,7 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             // Print raw JSON response for debugging.
-            let responseData = response.data
-            if let rawJSON = String(data: responseData, encoding: .utf8) {
+            if let rawJSON = String(data: response.data, encoding: .utf8) {
                 print("Raw JSON Insert Response for Driver: \(rawJSON)")
             }
             
@@ -913,8 +901,7 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             // Print raw JSON response for debugging.
-            let responseData = response.data
-            if let rawJSON = String(data: responseData, encoding: .utf8) {
+            if let rawJSON = String(data: response.data, encoding: .utf8) {
                 print("Raw JSON Insert Response for Maintenance Personnel: \(rawJSON)")
             }
             
@@ -1361,18 +1348,17 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
-    func deleteTrip(tripID: UUID) async throws {
-        do {
-            let response = try await supabase
-                .from("trips")
-                .delete()
-                .eq("id", value: tripID)
-                .execute()
-            
-            print("Trip deleted successfully: \(response)")
-        } catch {
-            print("Error deleting trip: \(error)")
-            throw error
+    func deleteTrip(tripID: UUID) {
+        Task {
+            do {
+                let response = try await supabase
+                    .from("trips")
+                    .delete()
+                    .eq("id", value: tripID)
+                    .execute()
+                
+                print("Trip deleted successfully: \(response)")
+            }
         }
     }
 
@@ -1510,63 +1496,131 @@ class SupabaseDataController: ObservableObject {
         return availableDrivers
     }
     
-    // Get all trips from the database
-    public func getAllTrips() async throws -> [SupabaseTrip] {
-        do {
-            let response = try await supabase
-                .from("trips")
-                .select("*")
-                .eq("is_deleted", value: false)
-                .neq("trip_status", value: "deleted")
-                .execute()
-            
-            // Handle the response data properly
-            let data = response.data
-            if data.isEmpty {
-                return []
-            }
-            
-            // Decode the response data into SupabaseTrip objects
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            return try decoder.decode([SupabaseTrip].self, from: data)
-        } catch {
-            print("Error fetching all trips: \(error)")
-            throw error
-        }
-    }
-    
-    // Get a vehicle by ID
-    public func getVehicleById(id: UUID) async throws -> Vehicle {
-        do {
-            let response = try await supabase
-                .from("vehicles")
-                .select("*")
-                .eq("id", value: id)
-                .execute()
-            
-            let data = response.data
-            if data.isEmpty {
-                throw NSError(domain: "SupabaseError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Vehicle not found"])
-            }
-            
-            // Decode the response data into a Vehicle object
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            let vehicles = try decoder.decode([Vehicle].self, from: data)
-            
-            guard let vehicle = vehicles.first else {
-                throw NSError(domain: "SupabaseError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Vehicle not found"])
-            }
-            
-            return vehicle
-        } catch {
-            print("Error fetching vehicle by ID: \(error)")
-            throw error
-        }
-    }
+//    func fetchTripByID(tripID: UUID) async throws -> Trip {
+//        let decoder = JSONDecoder()
+//        let dateFormatter = DateFormatter()
+//        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+//        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+//        
+//        decoder.dateDecodingStrategy = .custom { decoder in
+//            let container = try decoder.singleValueContainer()
+//            let dateString = try container.decode(String.self)
+//            let formats = [
+//                "yyyy-MM-dd'T'HH:mm:ss",
+//                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
+//                "yyyy-MM-dd'T'HH:mm:ssZ",
+//                "yyyy-MM-dd"
+//            ]
+//            for format in formats {
+//                dateFormatter.dateFormat = format
+//                if let date = dateFormatter.date(from: dateString) {
+//                    return date
+//                }
+//            }
+//            if let dotIndex = dateString.firstIndex(of: ".") {
+//                let truncated = String(dateString[..<dotIndex])
+//                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+//                if let date = dateFormatter.date(from: truncated) {
+//                    return date
+//                }
+//            }
+//            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
+//        }
+//        
+//        let query = supabase
+//            .from("trips")
+//            .select("""
+//                id,
+//                destination,
+//                trip_status,
+//                has_completed_pre_trip,
+//                has_completed_post_trip,
+//                vehicle_id,
+//                driver_id,
+//                start_time,
+//                end_time,
+//                notes,
+//                created_at,
+//                updated_at,
+//                is_deleted,
+//                start_latitude,
+//                start_longitude,
+//                end_latitude,
+//                end_longitude,
+//                pickup,
+//                vehicles (
+//                    id,
+//                    name,
+//                    year,
+//                    make,
+//                    model,
+//                    vin,
+//                    license_plate,
+//                    vehicle_type,
+//                    color,
+//                    body_type,
+//                    body_subtype,
+//                    msrp,
+//                    pollution_expiry,
+//                    insurance_expiry,
+//                    status
+//                )
+//            """)
+//            .eq("is_deleted", value: false)
+//            .eq("id", value: tripID)
+//        
+//        let response = try await query.execute()
+//        
+//        struct JoinedTripData: Codable {
+//            let id: UUID
+//            let destination: String
+//            let trip_status: String
+//            let has_completed_pre_trip: Bool
+//            let has_completed_post_trip: Bool
+//            let vehicle_id: UUID
+//            let driver_id: UUID?
+//            let start_time: Date?
+//            let end_time: Date?
+//            let notes: String?
+//            let created_at: Date
+//            let updated_at: Date?
+//            let is_deleted: Bool
+//            let start_latitude: Double?
+//            let start_longitude: Double?
+//            let end_latitude: Double?
+//            let end_longitude: Double?
+//            let pickup: String?
+//            let vehicles: Vehicle
+//        }
+//        
+//        let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
+//        guard let data = joinedData.first else {
+//            throw TripError.fetchError("No trip found with the given ID.")
+//        }
+//        
+//        let supabaseTrip = SupabaseTrip(
+//            id: data.id,
+//            destination: data.destination,
+//            trip_status: data.trip_status,
+//            has_completed_pre_trip: data.has_completed_pre_trip,
+//            has_completed_post_trip: data.has_completed_post_trip,
+//            vehicle_id: data.vehicle_id,
+//            driver_id: data.driver_id,
+//            start_time: data.start_time,
+//            end_time: data.end_time,
+//            notes: data.notes,
+//            created_at: data.created_at,
+//            updated_at: data.updated_at ?? data.created_at,
+//            is_deleted: data.is_deleted,
+//            start_latitude: data.start_latitude,
+//            start_longitude: data.start_longitude,
+//            end_latitude: data.end_latitude,
+//            end_longitude: data.end_longitude,
+//            pickup: data.pickup
+//        )
+//        
+//        return Trip(from: supabaseTrip, vehicle: data.vehicles)
+//    }
 
     // MARK: - Service History
         
@@ -1581,11 +1635,7 @@ class SupabaseDataController: ObservableObject {
 
         // Ensure response data exists
         let jsonData = response.data
-        if jsonData.isEmpty {
-            // Return empty array if no data
-            return []
-        }
-            
+
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
@@ -1594,16 +1644,11 @@ class SupabaseDataController: ObservableObject {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
 
-        // Decode raw JSON response into a dictionary
-        if let jsonObjects = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] {
-            // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
-            let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: jsonData)
+        // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
+        let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: jsonData)
 
-            print("Decoded Maintenance Personnel Service History: \(history)")
-            return history
-        }
-        
-        return []
+//        print("Decoded Maintenance Personnel Service History: \(history)")
+        return history
     }
         
     func insertServiceHistory(history: MaintenancePersonnelServiceHistory) async throws {
@@ -1626,13 +1671,8 @@ class SupabaseDataController: ObservableObject {
             .execute()
 
         // Ensure response data exists
-        if response.data == nil {
-            // Return empty array if no data
-            return []
-        }
-        
         let jsonData = response.data
-            
+
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Ensure this matches Supabase timestamp format
@@ -1645,7 +1685,7 @@ class SupabaseDataController: ObservableObject {
         // Decode JSON into the struct
         let personnelRoutineSchedule = try decoder.decode([MaintenancePersonnelRoutineSchedule].self, from: jsonData)
 
-        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
+//        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
         return personnelRoutineSchedule
     }
     
@@ -1657,7 +1697,7 @@ class SupabaseDataController: ObservableObject {
             .execute()
         print("Insert complete for MaintenancePersonnelRoutineSchedule")
     }
-
+    
     func deleteRoutineSchedule(schedule: MaintenancePersonnelRoutineSchedule) async throws {
         print("Deleting MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
         try await supabase
@@ -1678,13 +1718,8 @@ class SupabaseDataController: ObservableObject {
             .select()
             .execute()
 
-        // Ensure response data exists
-        if requestResponse.data == nil {
-            return []
-        }
-        
-        let responseData = requestResponse.data
-            
+        let jsonData = requestResponse.data
+
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
@@ -1695,14 +1730,14 @@ class SupabaseDataController: ObservableObject {
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
 
         // Convert JSON dictionaries into `MaintenanceServiceRequest` objects
-        let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: responseData)
+        let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: jsonData)
 
-        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
+//        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
         return serviceRequests
     }
 
     func insertServiceRequest(request: MaintenanceServiceRequest) async throws {
-        print("Inserting MaintenanceServiceRequest: \(request)")
+//        print("Inserting MaintenanceServiceRequest: \(request)")
         try await supabase
             .from("maintenanceservicerequest")
             .insert(request)
@@ -1713,45 +1748,31 @@ class SupabaseDataController: ObservableObject {
     // MARK: - Safety Check
 
     func fetchSafetyChecks(requestId: UUID) async throws -> [SafetyCheck] {
-        print("Fetching SafetyChecks for requestId: \(requestId)")
+//        print("Fetching SafetyChecks for requestId: \(requestId)")
         let response = try await supabase
             .from("safetycheck")
             .select()
             .eq("requestID", value: requestId)
             .execute()
-        
-        if response.data == nil {
-            return []
-        }
-        
-        let responseData = response.data
-        
-        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: responseData)
-        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
+        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
+//        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
         return safetyChecks
     }
     
     func fetchSafetyChecks(historyId: UUID) async throws -> [SafetyCheck] {
-        print("Fetching SafetyChecks for requestId: \(historyId)")
+//        print("Fetching SafetyChecks for requestId: \(historyId)")
         let response = try await supabase
             .from("safetycheck")
             .select()
             .eq("historyID", value: historyId)
             .execute()
-        
-        if response.data == nil {
-            return []
-        }
-        
-        let responseData = response.data
-        
-        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: responseData)
-        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
+        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
+//        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
         return safetyChecks
     }
     
     func insertSafetyCheck(check: SafetyCheck) async throws {
-        print("Inserting SafetyCheck: \(check)")
+//        print("Inserting SafetyCheck: \(check)")
         try await supabase
             .from("safetycheck")
             .insert(check)
@@ -1761,30 +1782,26 @@ class SupabaseDataController: ObservableObject {
 
     // MARK: - Expense
 
-    func fetchExpenses() async throws -> [Expense] {
-        print("Fetching Expenses...")
-        
+    func fetchExpenses(for requestId: UUID) async throws -> [Expense] {
+//        print("Fetching Expenses for requestId: \(requestId.uuidString)")
         let response = try await supabase
-            .from("expenses")
-            .select("*")
+            .from("expense")
+            .select()
+            .eq("requestID", value: requestId.uuidString)
             .execute()
         
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
         
-        // Configure JSONDecoder with date decoding strategy
+        // Configure JSONDecoder
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
         
-        if response.data == nil {
-            return []
-        }
-        
-        let responseData = response.data
-        
-        let expenses = try decoder.decode([Expense].self, from: responseData)
-        print("Decoded Expenses: \(expenses)")
+        // Decode JSON into Expense objects
+        let expenses = try decoder.decode([Expense].self, from: response.data)
+//        print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
         return expenses
     }
     
@@ -1814,242 +1831,26 @@ class SupabaseDataController: ObservableObject {
             throw NSError(domain: "SupabaseError", code: response.status, userInfo: [NSLocalizedDescriptionKey: "Failed to update service request status."])
         }
     }
-
-    // Add a new function to add additional pickup points to a trip with a dedicated table
-    public func addPickupPointToTrip(tripId: UUID, location: String, address: String, latitude: Double, longitude: Double) async throws {
-        do {
-            // Create a new pickup point object with all the required fields
-            struct PickupPointInsert: Encodable {
-                let id: String
-                let trip_id: String
-                let location: String
-                let address: String
-                let latitude: Double
-                let longitude: Double
-                let sequence: Int
-                let completed: Bool
-                let created_at: String
-            }
-            
-            let pickupPoint = PickupPointInsert(
-                id: UUID().uuidString,
-                trip_id: tripId.uuidString,
-                location: location,
-                address: address,
-                latitude: latitude,
-                longitude: longitude,
-                sequence: 1, // Default sequence
-                completed: false,
-                created_at: Date().ISO8601Format()
-            )
-            
-            // Insert the pickup point into the dedicated pickuppoints table
-            try await supabase
-                .from("pickuppoints")
-                .insert(pickupPoint)
-                .execute()
-            
-            print("Added pickup point to trip successfully")
-        } catch {
-            print("Error adding pickup point to trip: \(error)")
-            throw error
-        }
-    }
     
-    // Mark a pickup point as completed using the dedicated table
-    public func markPickupPointCompleted(pickupPointId: UUID) async throws {
-        do {
-            // Update the pickup point's completed status
-            try await supabase
-                .from("pickuppoints")
-                .update(["completed": true])
-                .eq("id", value: pickupPointId)
-                .execute()
-            
-            print("Marked pickup point as completed successfully")
-        } catch {
-            print("Error marking pickup point as completed: \(error)")
-            throw error
-        }
-    }
-    
-    // Get all pickup points for a specific trip
-    public func getPickupPointsForTrip(tripId: UUID) async throws -> [Trip] {
-        do {
-            let response = try await supabase.database
-                .from("pickup_points")
-                .select()
-                .eq("trip_id", value: tripId.uuidString)
-                .order("sequence", ascending: true)
-                .execute()
-            
-            if response.data.isEmpty {
-                return []
-            }
-            
-            // Configure date formatter for ISO8601 dates
-            let dateFormatter = ISO8601DateFormatter()
-            
-            // Parse the pickup points from the response
-            let responseData = response.data
-            if responseData.isEmpty {
-                return []
-            }
-            
-            // Manually parse JSON for better control
-            guard let jsonObjects = try? JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] else {
-                return []
-            }
-            
-            var pickupPoints: [Trip] = []
-            
-            for data in jsonObjects {
-                if let id = UUID(uuidString: data["id"] as? String ?? ""),
-                   let parentTripId = UUID(uuidString: data["trip_id"] as? String ?? ""),
-                   let location = data["location"] as? String,
-                   let address = data["address"] as? String,
-                   let latitude = data["latitude"] as? Double,
-                   let longitude = data["longitude"] as? Double,
-                   let sequence = data["sequence"] as? Int,
-                   let completed = data["completed"] as? Bool {
-                    
-                    var estimatedArrivalTime: Date? = nil
-                    if let arrivalTimeString = data["estimated_arrival_time"] as? String {
-                        estimatedArrivalTime = dateFormatter.date(from: arrivalTimeString)
-                    }
-                    
-                    let pickupPoint = Trip.createPickupPoint(
-                        id: id,
-                        parentTripId: parentTripId,
-                        location: location,
-                        address: address,
-                        latitude: latitude,
-                        longitude: longitude,
-                        sequence: sequence,
-                        completed: completed,
-                        estimatedArrivalTime: estimatedArrivalTime
-                    )
-                    
-                    pickupPoints.append(pickupPoint)
-                }
-            }
-            
-            return pickupPoints
-        } catch {
-            print("Error getting pickup points for trip: \(error)")
-            throw error
-        }
-    }
-    
-    // Delete a pickup point
-    public func deletePickupPoint(pickupPointId: UUID) async throws {
-        do {
-            try await supabase
-                .from("pickuppoints")
-                .delete()
-                .eq("id", value: pickupPointId)
-                .execute()
-            
-            print("Deleted pickup point successfully")
-        } catch {
-            print("Error deleting pickup point: \(error)")
-            throw error
-        }
-    }
-
-    public func markPickupPointCompleted(tripId: UUID, additionalPickupPoint: String) async throws {
-        do {
-            let response = try await supabase
-                .from("trips")
-                .select("notes")
-                .eq("id", value: tripId)
-                .execute()
-            
-            // Handle the response data properly - it's of type Data already
-            let responseData = response.data
-            if responseData.isEmpty {
-                throw NSError(domain: "SupabaseError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Trip not found"])
-            }
-            
-            // Define a struct to decode the response
-            struct TripNotesResponse: Decodable {
-                let notes: String?
-            }
-            
-            // Decode the trip response
-            let decoder = JSONDecoder()
-            let tripResponse = try decoder.decode([TripNotesResponse].self, from: responseData)
-            
-            guard let existingNotes = tripResponse.first?.notes else {
-                throw NSError(domain: "SupabaseError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Trip notes not found"])
-            }
-            
-            // Define a regex pattern to find the pickup point
-            let pattern = "Pickup Point: \(additionalPickupPoint) \\(Not Completed\\)"
-            let regex = try NSRegularExpression(pattern: pattern, options: [])
-            
-            // Replace "Not Completed" with "Completed" in the notes
-            let replacement = "Pickup Point: \(additionalPickupPoint) (Completed)"
-            let updatedNotes = regex.stringByReplacingMatches(in: existingNotes, options: [], range: NSRange(location: 0, length: existingNotes.utf16.count), withTemplate: replacement)
-            
-            // Update the trip with the updated notes
-            try await supabase
-                .from("trips")
-                .update(["notes": updatedNotes])
-                .eq("id", value: tripId)
-                .execute()
-            
-            print("Marked additional pickup point as completed successfully")
-        } catch {
-            print("Error marking additional pickup point as completed: \(error)")
-            throw error
-        }
-    }
-
-    // Add a new method to handle updating trip details with driver ID
-    public func updateTrip(tripId: UUID, destination: String, address: String, notes: String, driverId: UUID?) async throws -> Trip? {
-        do {
-            // Create an Encodable struct for the update data
-            struct TripUpdateData: Encodable {
-                let destination: String
-                let notes: String
-                let pickup: String
-                let driver_id: String?
-            }
-            
-            // Create an instance of the encodable struct
-            let updateData = TripUpdateData(
-                destination: destination,
-                notes: notes,
-                pickup: address,
-                driver_id: driverId?.uuidString
-            )
-            
-            let response = try await supabase.database
-                .from("trips")
-                .update(updateData)
-                .eq("id", value: tripId.uuidString)
-                .execute()
-            
-            if response.data.isEmpty {
-                throw SupabaseError.responseDataMissing
-            }
-            
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            let supabaseTrips = try decoder.decode([SupabaseTrip].self, from: response.data)
-            if let supabaseTrip = supabaseTrips.first {
-                // Fetch the vehicle for the trip
-                let vehicles = try await fetchVehicles()
-                if let vehicle = vehicles.first(where: { $0.id == supabaseTrip.vehicle_id }) {
-                    return Trip(from: supabaseTrip, vehicle: vehicle)
-                }
-            }
-            return nil
-        } catch {
-            print("Error updating trip: \(error)")
-            throw error
-        }
+    func fetchAllExpense() async throws -> [Expense] {
+        // Fetch expenses from Supabase filtered by requestID
+        let response = try await supabase
+            .from("expense")
+            .select()
+            .execute()
+        
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        // Configure JSONDecoder with the custom date decoding strategy
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+        
+        // Decode JSON into an array of Expense objects
+        let expenses = try decoder.decode([Expense].self, from: response.data)
+        
+        return expenses
     }
 }
