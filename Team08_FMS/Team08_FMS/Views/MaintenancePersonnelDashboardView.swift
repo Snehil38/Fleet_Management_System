@@ -144,10 +144,10 @@ struct ServiceRequestCard: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(request.vehicleName)
-                        .font(.headline)
+                        .font(.system(.headline, design: .default))
                     
                     Text(request.serviceType.rawValue)
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .default))
                         .foregroundColor(.secondary)
                 }
                 
@@ -161,13 +161,13 @@ struct ServiceRequestCard: View {
             // Details
             VStack(alignment: .leading, spacing: 8) {
                 Text(request.description)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
                 
                 if request.status == .inProgress {
                     Label("\(request.expenses.count) Expenses", systemImage: "dollarsign.circle.fill")
-                        .font(.caption)
+                        .font(.system(.caption, design: .default))
                         .foregroundColor(.green)
                 }
             }

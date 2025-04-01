@@ -129,27 +129,27 @@ struct ServiceHistoryRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(history.vehicleName)
-                    .font(.headline)
+                    .font(.system(.headline, design: .default))
                 Spacer()
                 ServiceTypeBadge(type: history.serviceType)
             }
             
             Text(history.description)
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.secondary)
                 .lineLimit(2)
             
             HStack {
                 Label(history.date.formatted(date: .abbreviated, time: .shortened),
                       systemImage: "calendar")
-                    .font(.caption)
+                    .font(.system(.caption, design: .default))
                     .foregroundColor(.secondary)
                 
                 Spacer()
                 
                 Label("\(history.safetyChecks.filter { $0.isChecked }.count) Checks",
                       systemImage: "checkmark.circle.fill")
-                    .font(.caption)
+                    .font(.system(.caption, design: .default))
                     .foregroundColor(.secondary)
             }
         }

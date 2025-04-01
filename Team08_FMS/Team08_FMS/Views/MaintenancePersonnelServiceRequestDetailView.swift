@@ -311,33 +311,33 @@ struct MaintenanceServiceDetailsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Service Details")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             
             Divider()
             
             Text(request.description)
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.secondary)
             
             if let issueType = request.issueType {
                 Text("Issue Type")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .fontWeight(.medium)
                     .padding(.top, 4)
                 
                 Text(issueType)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.secondary)
             }
             
             if !request.notes.isEmpty {
                 Text("Notes")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .fontWeight(.medium)
                     .padding(.top, 4)
                 
                 Text(request.notes)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.secondary)
             }
         }

@@ -9,7 +9,7 @@ struct RoleSelectionView: View {
         NavigationStack {
             VStack(spacing: 20) {
                 Text("TrackNGo")
-                    .font(.title)
+                    .font(.system(.title, design: .default))
                     .fontWeight(.bold)
                     .foregroundColor(Color.pink.opacity(0.5))
                     .padding(.top, 20)
@@ -21,7 +21,7 @@ struct RoleSelectionView: View {
                     .padding(.bottom, 20)
                 
                 Text("Select Your Role")
-                    .font(.headline)
+                    .font(.system(.headline, design: .default))
                 
                 VStack(spacing: 10) {
                     ForEach(roles, id: \.self) { role in
@@ -31,7 +31,7 @@ struct RoleSelectionView: View {
                             navigateToLogin = true
                         }) {
                             Text(role)
-                                .font(.headline)
+                                .font(.system(.headline, design: .default))
                                 .foregroundColor(.white)
                                 .padding()
                                 .frame(maxWidth: .infinity)

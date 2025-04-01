@@ -45,23 +45,23 @@ struct RoutineScheduleRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(schedule.vehicleName)
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             
             HStack {
                 Label(schedule.serviceType.rawValue, systemImage: "gear")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                 Spacer()
                 Text("Every \(schedule.interval) days")
-                    .font(.caption)
+                    .font(.system(.caption, design: .default))
                     .foregroundColor(.secondary)
             }
             
             HStack {
                 Text("Next Service:")
-                    .font(.caption)
+                    .font(.system(.caption, design: .default))
                     .foregroundColor(.secondary)
                 Text(schedule.nextServiceDate.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption)
+                    .font(.system(.caption, design: .default))
             }
         }
         .padding(.vertical, 4)

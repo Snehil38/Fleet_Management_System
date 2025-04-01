@@ -206,13 +206,14 @@ struct SafetyCheckItem: View {
                 }
                 
                 Text(check.item)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .fontWeight(.medium)
             }
             
             if check.isChecked {
                 TextField("Add notes...", text: $check.notes, axis: .vertical)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(.subheadline, design: .default))
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -236,11 +237,11 @@ struct ServicesEmptyStateView: View {
                 .foregroundColor(.gray)
             
             Text(title)
-                .font(.headline)
+                .font(.system(.headline, design: .default))
                 .foregroundColor(.gray)
             
             Text(message)
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)

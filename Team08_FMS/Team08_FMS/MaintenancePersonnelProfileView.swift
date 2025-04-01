@@ -111,10 +111,10 @@ struct MaintenancePersonnelProfileView: View {
         VStack(spacing: 8) {
             HStack {
                 Text("Status")
-                    .font(.headline)
+                    .font(.system(.headline, design: .default))
                 Spacer()
                 Text(AppDataController.shared.getStatusString(status: personnel.status))
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .fontWeight(.medium)
                     .foregroundColor(personnel.status.color)
                 
@@ -126,13 +126,13 @@ struct MaintenancePersonnelProfileView: View {
             
             if personnel.status == .offDuty {
                 Text("Your status will automatically change back to Available tomorrow.")
-                    .font(.caption)
+                    .font(.system(.caption, design: .default))
                     .foregroundColor(.gray)
                     .italic()
             }
             else if personnel.status == .busy {
                 Text("You cannot change status while you have a In-Progress Maintenance.")
-                    .font(.caption)
+                    .font(.system(.caption, design: .default))
                     .foregroundColor(.gray)
                     .italic()
             }
@@ -147,7 +147,7 @@ struct MaintenancePersonnelProfileView: View {
     private func contactInformation(for personnel: MaintenancePersonnel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("CONTACT INFORMATION")
-                .font(.caption)
+                .font(.system(.caption, design: .default))
                 .foregroundColor(.gray)
                 .padding(.horizontal)
             
@@ -165,7 +165,7 @@ struct MaintenancePersonnelProfileView: View {
     private func experienceDetails(for personnel: MaintenancePersonnel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("EXPERIENCE & DETAILS")
-                .font(.caption)
+                .font(.system(.caption, design: .default))
                 .foregroundColor(.gray)
                 .padding(.horizontal)
             
