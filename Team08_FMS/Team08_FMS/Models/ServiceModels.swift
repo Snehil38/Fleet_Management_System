@@ -106,12 +106,16 @@ struct SafetyCheck: Identifiable, Codable, Equatable {
     let item: String
     var isChecked: Bool
     var notes: String
+    var requestID: UUID?
+    var historyID: UUID?
     
-    init(id: UUID = UUID(), item: String, isChecked: Bool = false, notes: String = "") {
+    init(id: UUID = UUID(), item: String, isChecked: Bool = false, notes: String = "", requestID: UUID?, historyID: UUID?) {
         self.id = id
         self.item = item
         self.isChecked = isChecked
         self.notes = notes
+        self.requestID = requestID
+        self.historyID = historyID
     }
 }
 
@@ -127,8 +131,8 @@ struct MaintenanceServiceRequest: Identifiable, Codable, Equatable {
     var status: ServiceRequestStatus
     var notes: String
     let issueType: String?
-    var safetyChecks: [SafetyCheck]
-    var expenses: [Expense]
+//    var safetyChecks: [UUID]
+//    var expenses: [UUID]
     var totalCost: Double
     var startDate: Date?
     var completionDate: Date?
@@ -145,8 +149,6 @@ struct MaintenanceServiceRequest: Identifiable, Codable, Equatable {
         self.status = status
         self.notes = notes
         self.issueType = issueType
-        self.safetyChecks = []
-        self.expenses = []
         self.totalCost = 0.0
     }
     
@@ -162,8 +164,6 @@ struct MaintenanceServiceRequest: Identifiable, Codable, Equatable {
         lhs.status == rhs.status &&
         lhs.notes == rhs.notes &&
         lhs.issueType == rhs.issueType &&
-        lhs.safetyChecks == rhs.safetyChecks &&
-        lhs.expenses == rhs.expenses &&
         lhs.totalCost == rhs.totalCost &&
         lhs.startDate == rhs.startDate &&
         lhs.completionDate == rhs.completionDate
@@ -176,13 +176,15 @@ struct Expense: Identifiable, Codable, Equatable {
     let amount: Double
     let date: Date
     let category: ExpenseCategory
+    var requestID: UUID?
     
-    init(description: String, amount: Double, date: Date, category: ExpenseCategory) {
+    init(description: String, amount: Double, date: Date, category: ExpenseCategory, requestID: UUID) {
         self.id = UUID()
         self.description = description
         self.amount = amount
         self.date = date
         self.category = category
+        self.requestID = requestID
     }
 }
 

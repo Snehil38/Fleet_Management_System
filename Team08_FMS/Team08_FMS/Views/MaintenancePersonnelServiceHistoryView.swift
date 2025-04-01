@@ -66,7 +66,7 @@ struct MaintenancePersonnelServiceHistoryView: View {
             } else {
                 List {
                     ForEach(filteredHistory) { history in
-                        ServiceHistoryRow(history: history)
+                        ServiceHistoryRow(history: history, dataStore: dataStore)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selectedHistory = history
@@ -80,7 +80,7 @@ struct MaintenancePersonnelServiceHistoryView: View {
         .sheet(isPresented: $showingDetail) {
             if let history = selectedHistory {
                 NavigationView {
-                    ServiceHistoryDetailView(history: history)
+                    ServiceHistoryDetailView(history: history, dataStore: dataStore)
                         .navigationTitle("Service History Details")
                         .navigationBarItems(trailing: Button("Done") {
                             showingDetail = false
@@ -124,6 +124,8 @@ struct ServiceTypeFilterButton: View {
 
 struct ServiceHistoryRow: View {
     let history: MaintenancePersonnelServiceHistory
+    @ObservedObject var dataStore: MaintenancePersonnelDataStore
+    @State private var safetyChecks: [SafetyCheck] = []
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -147,15 +149,31 @@ struct ServiceHistoryRow: View {
                 
                 Spacer()
                 
-                Label("\(history.safetyChecks.filter { $0.isChecked }.count) Checks",
+                Label("\(safetyChecks.filter { $0.isChecked }.count) Checks",
                       systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 8)
+        .onAppear(perform: loadSafetyChecks)
+    }
+    
+    private func loadSafetyChecks() {
+        Task {
+            do {
+                // Fetch safety checks based on the history's ID, which now represents the history record.
+                let fetchedChecks = try await dataStore.fetchSafetyChecks(historyID: history.id)
+                await MainActor.run {
+                    self.safetyChecks = fetchedChecks
+                }
+            } catch {
+                print("Error fetching safety checks for history \(history.id): \(error)")
+            }
+        }
     }
 }
+
 
 struct ServiceTypeBadge: View {
     let type: ServiceType
@@ -195,6 +213,8 @@ struct ServiceTypeBadge: View {
 
 struct ServiceHistoryDetailView: View {
     let history: MaintenancePersonnelServiceHistory
+    @ObservedObject var dataStore: MaintenancePersonnelDataStore
+    @State private var safetyChecks: [SafetyCheck] = []
     
     var body: some View {
         ScrollView {
@@ -206,14 +226,32 @@ struct ServiceHistoryDetailView: View {
                 ServiceDetailsCard(history: history)
                 
                 // Safety Checks Card
-                if !history.safetyChecks.isEmpty {
-                    SafetyChecksCard(checks: history.safetyChecks)
+                if !safetyChecks.isEmpty {
+                    SafetyChecksCard(checks: safetyChecks)
                 }
             }
             .padding(.vertical)
         }
+        .onAppear {
+            loadSafetyChecks()
+        }
+    }
+    
+    private func loadSafetyChecks() {
+        Task {
+            do {
+                // Adjust the parameter if safety checks are tied to a different identifier
+                let fetchedChecks = try await dataStore.fetchSafetyChecks(historyID: history.id)
+                await MainActor.run {
+                    self.safetyChecks = fetchedChecks
+                }
+            } catch {
+                print("Error fetching safety checks for history \(history.id): \(error)")
+            }
+        }
     }
 }
+
 
 struct MaintenanceVehicleHistoryInfoCard: View {
     let history: MaintenancePersonnelServiceHistory

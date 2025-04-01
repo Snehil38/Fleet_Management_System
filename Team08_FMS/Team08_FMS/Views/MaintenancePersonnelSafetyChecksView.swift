@@ -18,7 +18,7 @@ struct MaintenancePersonnelSafetyChecksView: View {
             } else {
                 List {
                     ForEach(dataStore.serviceRequests) { request in
-                        SafetyCheckRow(request: request)
+                        SafetyCheckRow(request: request, dataStore: dataStore)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 selectedRequest = request
@@ -50,6 +50,8 @@ struct MaintenancePersonnelSafetyChecksView: View {
 
 struct SafetyCheckRow: View {
     let request: MaintenanceServiceRequest
+    @ObservedObject var dataStore: MaintenancePersonnelDataStore
+    @State private var safetyChecks: [SafetyCheck] = []
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -66,38 +68,49 @@ struct SafetyCheckRow: View {
                 .lineLimit(2)
             
             HStack {
-                Label("\(request.safetyChecks.filter { $0.isChecked }.count)/\(request.safetyChecks.count) Checks", 
+                Label("\(safetyChecks.filter { $0.isChecked }.count)/\(safetyChecks.count) Checks",
                       systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
                 Spacer()
                 
-                if !request.safetyChecks.isEmpty {
-                    ProgressView(value: Double(request.safetyChecks.filter { $0.isChecked }.count),
-                               total: Double(request.safetyChecks.count))
+                if !safetyChecks.isEmpty {
+                    ProgressView(value: Double(safetyChecks.filter { $0.isChecked }.count),
+                                 total: Double(safetyChecks.count))
                         .progressViewStyle(LinearProgressViewStyle(tint: .green))
                         .frame(width: 100)
                 }
             }
         }
         .padding(.vertical, 8)
+        .onAppear {
+            loadSafetyChecks()
+        }
+    }
+    
+    private func loadSafetyChecks() {
+        Task {
+            do {
+                let fetchedChecks = try await dataStore.fetchSafetyChecks(requestID: request.id)
+                await MainActor.run {
+                    self.safetyChecks = fetchedChecks
+                }
+            } catch {
+                print("Error fetching safety checks for request \(request.id): \(error)")
+            }
+        }
     }
 }
+
 
 struct SafetyCheckDetailView: View {
     let request: MaintenanceServiceRequest
     @ObservedObject var dataStore: MaintenancePersonnelDataStore
-    @State private var safetyChecks: [SafetyCheck]
+    @State private var safetyChecks: [SafetyCheck] = []
     @State private var showingSaveAlert = false
     @State private var showingErrorAlert = false
     @State private var errorMessage = ""
-    
-    init(request: MaintenanceServiceRequest, dataStore: MaintenancePersonnelDataStore) {
-        self.request = request
-        self.dataStore = dataStore
-        _safetyChecks = State(initialValue: request.safetyChecks)
-    }
     
     var body: some View {
         ScrollView {
@@ -136,8 +149,30 @@ struct SafetyCheckDetailView: View {
         } message: {
             Text(errorMessage)
         }
+        .onAppear {
+            loadSafetyChecks()
+        }
     }
     
+    // Loads safety checks for the given service request
+    private func loadSafetyChecks() {
+        Task {
+            do {
+                // Assuming your data store now has a method to fetch safety checks for a request.
+                let checks = try await dataStore.fetchSafetyChecks(requestID: request.id)
+                await MainActor.run {
+                    self.safetyChecks = checks
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to load safety checks: \(error.localizedDescription)"
+                    showingErrorAlert = true
+                }
+            }
+        }
+    }
+    
+    // Saves the updated safety checks
     private func saveSafetyChecks() {
         Task {
             await dataStore.updateSafetyChecks(for: request, checks: safetyChecks)
@@ -145,6 +180,7 @@ struct SafetyCheckDetailView: View {
         showingSaveAlert = true
     }
 }
+
 
 struct MaintenanceVehicleInfoCard: View {
     let request: MaintenanceServiceRequest

@@ -10,7 +10,7 @@ struct MaintenancePersonnelServiceHistory: Identifiable, Codable {
     let date: Date
     let completionDate: Date
     let notes: String
-    let safetyChecks: [SafetyCheck]
+    let safetyChecks: [UUID]
 }
 
 struct MaintenancePersonnelRoutineSchedule: Identifiable, Codable {
@@ -51,7 +51,6 @@ class MaintenancePersonnelDataStore: ObservableObject {
             let fetchedRoutineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
             let fetchedServiceRequests = try await SupabaseDataController.shared.fetchServiceRequests()
 
-            // Capture self weakly to avoid strong reference cycles
             await MainActor.run {
                 self.serviceHistory = fetchedServiceHistory
                 self.routineSchedules = fetchedRoutineSchedules
@@ -63,23 +62,39 @@ class MaintenancePersonnelDataStore: ObservableObject {
     }
     
     // MARK: - Service History Methods
+    
     func addToServiceHistory(from request: MaintenanceServiceRequest) async {
-        // Create a new service history record based on the service request
-        let newHistory = MaintenancePersonnelServiceHistory(
-            id: UUID(),
-            vehicleId: request.vehicleId,
-            vehicleName: request.vehicleName,
-            serviceType: request.serviceType,
-            description: request.description,
-            date: request.date,
-            completionDate: Date(),  // Assuming completionDate is set to now
-            notes: request.notes,
-            safetyChecks: request.safetyChecks
-        )
-        
         do {
+            // Generate a new ID for the history record.
+            let newHistoryID = UUID()
+            
+            // Fetch any safety checks that were added for this service request.
+            let safetyChecksFromRequest = try await fetchSafetyChecks(requestID: request.id)
+            var safetyCheckIDs: [UUID] = []
+            
+            // Update each safety check with the new historyID and update them in Supabase.
+            for var check in safetyChecksFromRequest {
+                check.historyID = newHistoryID
+                try await SupabaseDataController.shared.insertSafetyCheck(check: check)
+                safetyCheckIDs.append(check.id)
+            }
+            
+            // Create the new history record including the safety check IDs.
+            let newHistory = MaintenancePersonnelServiceHistory(
+                id: newHistoryID,
+                vehicleId: request.vehicleId,
+                vehicleName: request.vehicleName,
+                serviceType: request.serviceType,
+                description: request.description,
+                date: request.date,
+                completionDate: Date(),  // set to now
+                notes: request.notes,
+                safetyChecks: safetyCheckIDs
+            )
+            
+            // Insert the new service history record.
             try await SupabaseDataController.shared.insertServiceHistory(history: newHistory)
-            // Refresh the local service history data after insertion
+            // Refresh the local service history data after insertion.
             serviceHistory = try await SupabaseDataController.shared.fetchServiceHistory()
         } catch {
             print("Error adding service history: \(error)")
@@ -107,9 +122,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
     }
     
     func updateRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) async {
-        // This assumes you have an update function in your SupabaseDataController
         do {
-            // Update on the backend and then refresh the local copy
             try await SupabaseDataController.shared.insertRoutineSchedule(schedule: schedule)
             routineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
         } catch {
@@ -118,7 +131,6 @@ class MaintenancePersonnelDataStore: ObservableObject {
     }
     
     func deleteRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) async {
-        // You would need to add a delete function in your SupabaseDataController
         do {
             try await SupabaseDataController.shared.deleteRoutineSchedule(schedule: schedule)
             routineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
@@ -153,14 +165,18 @@ class MaintenancePersonnelDataStore: ObservableObject {
                 break
             }
             
-            // Call SupabaseDataController to update the service request in the database
             do {
-                let updateSuccess = try await SupabaseDataController.shared.updateServiceRequestStatus(serviceRequestId: updatedRequest.id, newStatus: newStatus)
+                let updateSuccess = try await SupabaseDataController.shared.updateServiceRequestStatus(
+                    serviceRequestId: updatedRequest.id,
+                    newStatus: newStatus
+                )
                 
                 if updateSuccess {
-                    // After successful update, update the local serviceRequests array
-                    serviceRequests[index] = updatedRequest
-                    print("Service request status updated successfully.")
+                    // Capture a copy of updatedRequest using a capture list.
+                    await MainActor.run { [safeUpdatedRequest = updatedRequest] in
+                        serviceRequests[index] = safeUpdatedRequest
+                        print("Service request status updated successfully.")
+                    }
                 } else {
                     print("Failed to update service request status in Supabase.")
                 }
@@ -170,18 +186,26 @@ class MaintenancePersonnelDataStore: ObservableObject {
         }
     }
 
+    // MARK: - Expense Methods
+    
     func addExpense(to request: MaintenanceServiceRequest, expense: Expense) async {
         do {
             try await SupabaseDataController.shared.insertExpense(expense: expense)
-            serviceRequests = try await SupabaseDataController.shared.fetchServiceRequests()
+            let updatedRequests = try await SupabaseDataController.shared.fetchServiceRequests()
+            await MainActor.run {
+                serviceRequests = updatedRequests
+            }
         } catch {
             print("Error inserting expense: \(error)")
         }
     }
     
+    // MARK: - Safety Check Methods
+    
     func updateSafetyChecks(for request: MaintenanceServiceRequest, checks: [SafetyCheck]) async {
         do {
-            // For simplicity, insert all provided safety checks. In a real app you might want to update or delete as needed.
+            // Insert (or update) all provided safety checks.
+            // In a complete implementation you might also handle deletions.
             for check in checks {
                 try await SupabaseDataController.shared.insertSafetyCheck(check: check)
             }
@@ -189,5 +213,25 @@ class MaintenancePersonnelDataStore: ObservableObject {
         } catch {
             print("Error updating safety checks: \(error)")
         }
+    }
+    
+    // MARK: - Fetch Safety Checks
+        
+    func fetchSafetyChecks(requestID: UUID) async throws -> [SafetyCheck] {
+        // This method should call your SupabaseDataController method to fetch safety checks by requestID.
+        let checks = try await SupabaseDataController.shared.fetchSafetyChecks(requestId: requestID)
+        return checks
+    }
+    
+    func fetchSafetyChecks(historyID: UUID) async throws -> [SafetyCheck] {
+        // This method should call your SupabaseDataController method to fetch safety checks by requestID.
+        let checks = try await SupabaseDataController.shared.fetchSafetyChecks(historyId: historyID)
+        return checks
+    }
+    
+    func fetchExpenses(for requestID: UUID) async throws -> [Expense] {
+        // Call the Supabase data controller to fetch expenses for the given service request ID.
+        let expenses = try await SupabaseDataController.shared.fetchExpenses(for: requestID)
+        return expenses
     }
 }

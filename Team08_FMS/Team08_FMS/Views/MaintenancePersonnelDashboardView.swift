@@ -68,14 +68,14 @@ struct MaintenancePersonnelDashboardView: View {
             LazyVStack(spacing: 16) {
                 ForEach(filteredRequests) { request in
                     NavigationLink(destination: MaintenancePersonnelServiceRequestDetailView(request: request, dataStore: dataStore)) {
-                        ServiceRequestCard(request: request)
+                        ServiceRequestCard(request: request, dataStore: dataStore)
                     }
                 }
             }
             .padding()
         }
     }
-    
+
     private var toolbarButtons: some View {
         Button(action: { showingProfile = true }) {
             Image(systemName: "person.circle.fill")
@@ -133,6 +133,8 @@ struct MaintenancePersonnelDashboardView: View {
 
 struct ServiceRequestCard: View {
     let request: MaintenanceServiceRequest
+    @ObservedObject var dataStore: MaintenancePersonnelDataStore
+    @State private var expenses: [Expense] = []
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -162,22 +164,22 @@ struct ServiceRequestCard: View {
                     .lineLimit(2)
                 
                 if request.status == .inProgress {
-                    Label("\(request.expenses.count) Expenses", systemImage: "dollarsign.circle.fill")
+                    Label("\(expenses.count) Expenses", systemImage: "dollarsign.circle.fill")
                         .font(.caption)
                         .foregroundColor(.green)
                 }
             }
             
-            if request.status == .inProgress && !request.expenses.isEmpty {
+            // Recent Expenses Preview
+            if request.status == .inProgress && !expenses.isEmpty {
                 Divider()
                 
-                // Recent Expenses Preview
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Recent Expenses")
                         .font(.caption)
                         .fontWeight(.medium)
                     
-                    ForEach(request.expenses.prefix(2)) { expense in
+                    ForEach(expenses.prefix(2)) { expense in
                         HStack {
                             Text(expense.description)
                                 .font(.caption)
@@ -188,8 +190,8 @@ struct ServiceRequestCard: View {
                         }
                     }
                     
-                    if request.expenses.count > 2 {
-                        Text("+ \(request.expenses.count - 2) more")
+                    if expenses.count > 2 {
+                        Text("+ \(expenses.count - 2) more")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -200,8 +202,26 @@ struct ServiceRequestCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .onAppear {
+            fetchExpensesForRequest()
+        }
+    }
+    
+    private func fetchExpensesForRequest() {
+        Task {
+            do {
+                // This method should be implemented in your data store.
+                let fetchedExpenses = try await dataStore.fetchExpenses(for: request.id)
+                await MainActor.run {
+                    self.expenses = fetchedExpenses
+                }
+            } catch {
+                print("Error fetching expenses for request \(request.id): \(error)")
+            }
+        }
     }
 }
+
 
 struct StatusFilterButton: View {
     let status: ServiceRequestStatus

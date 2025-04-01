@@ -1650,21 +1650,7 @@ class SupabaseDataController: ObservableObject {
         }
 
         // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
-        let history: [MaintenancePersonnelServiceHistory] = try jsonObjects.map { obj in
-            var modifiedObj = obj
-            
-            // Extract `safetyChecks`, decode if it exists, or default to an empty array
-            if let safetyChecksString = obj["safetyChecks"] as? String,
-               let safetyChecksData = safetyChecksString.data(using: .utf8) {
-                let safetyChecks = try? decoder.decode([SafetyCheck].self, from: safetyChecksData)
-                modifiedObj["safetyChecks"] = safetyChecks ?? []
-            } else {
-                modifiedObj["safetyChecks"] = []
-            }
-
-            let modifiedData = try JSONSerialization.data(withJSONObject: modifiedObj)
-            return try decoder.decode(MaintenancePersonnelServiceHistory.self, from: modifiedData)
-        }
+        let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: response.data)
 
         print("Decoded Maintenance Personnel Service History: \(history)")
         return history
@@ -1752,31 +1738,7 @@ class SupabaseDataController: ObservableObject {
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
 
         // Convert JSON dictionaries into `MaintenanceServiceRequest` objects
-        let serviceRequests: [MaintenanceServiceRequest] = try jsonObjects.map { obj in
-            var modifiedObj = obj
-
-            // Decode `safetyChecks` JSON if present, otherwise set empty array
-            if let safetyChecksString = obj["safetyChecks"] as? String,
-               let safetyChecksData = safetyChecksString.data(using: .utf8) {
-                let safetyChecks = try? JSONDecoder().decode([SafetyCheck].self, from: safetyChecksData)
-                modifiedObj["safetyChecks"] = safetyChecks ?? []
-            } else {
-                modifiedObj["safetyChecks"] = []
-            }
-
-            // Decode `expenses` JSON if present, otherwise set empty array
-            if let expensesString = obj["expenses"] as? String,
-               let expensesData = expensesString.data(using: .utf8) {
-                let expenses = try? JSONDecoder().decode([Expense].self, from: expensesData)
-                modifiedObj["expenses"] = expenses ?? []
-            } else {
-                modifiedObj["expenses"] = []
-            }
-
-            // Convert modified dictionary back to JSON and decode into struct
-            let modifiedData = try JSONSerialization.data(withJSONObject: modifiedObj)
-            return try decoder.decode(MaintenanceServiceRequest.self, from: modifiedData)
-        }
+        let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: requestResponse.data)
 
         print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
         return serviceRequests
@@ -1793,15 +1755,27 @@ class SupabaseDataController: ObservableObject {
 
     // MARK: - Safety Check
 
-    func fetchSafetyChecks(for requestId: UUID) async throws -> [SafetyCheck] {
-        print("Fetching SafetyChecks for requestId: \(requestId.uuidString)")
+    func fetchSafetyChecks(requestId: UUID) async throws -> [SafetyCheck] {
+        print("Fetching SafetyChecks for requestId: \(requestId)")
         let response = try await supabase
             .from("safetycheck")
             .select()
-            .eq("serviceRequestId", value: requestId.uuidString)
+            .eq("requestID", value: requestId)
             .execute()
         let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
-        print("Decoded SafetyChecks for requestId \(requestId.uuidString): \(safetyChecks)")
+        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
+        return safetyChecks
+    }
+    
+    func fetchSafetyChecks(historyId: UUID) async throws -> [SafetyCheck] {
+        print("Fetching SafetyChecks for requestId: \(historyId)")
+        let response = try await supabase
+            .from("safetycheck")
+            .select()
+            .eq("historyID", value: historyId)
+            .execute()
+        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
+        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
         return safetyChecks
     }
     
@@ -1821,7 +1795,7 @@ class SupabaseDataController: ObservableObject {
         let response = try await supabase
             .from("expense")
             .select()
-            .eq("serviceRequestId", value: requestId.uuidString)
+            .eq("requestID", value: requestId.uuidString)
             .execute()
         let expenses = try JSONDecoder().decode([Expense].self, from: response.data)
         print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")

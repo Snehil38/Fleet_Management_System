@@ -11,7 +11,8 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
     @State private var expenseDescription = ""
     @State private var expenseAmount = ""
     @State private var selectedExpenseCategory: ExpenseCategory = .parts
-    @State private var showingSafetyChecks = false
+    @State private var safetyChecks: [SafetyCheck] = []
+    @State private var expenses: [Expense] = []
     
     var body: some View {
         ScrollView {
@@ -25,14 +26,14 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
                     .padding(.horizontal)
                 
                 // Safety Checks Card
-                if !request.safetyChecks.isEmpty {
-                    MaintenanceSafetyChecksCard(checks: request.safetyChecks)
+                if !safetyChecks.isEmpty {
+                    MaintenanceSafetyChecksCard(checks: safetyChecks)
                         .padding(.horizontal)
                 }
                 
                 // Expenses Card
                 if request.status != .pending {
-                    ExpensesCard(request: request)
+                    ExpensesCard(expenses: expenses)
                         .padding(.horizontal)
                 }
                 
@@ -68,7 +69,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
                         }
                         
                         Button(action: {
-                            if request.expenses.isEmpty {
+                            if expenses.isEmpty {
                                 alertMessage = "You must add at least one expense before completing the maintenance"
                                 showingAlert = true
                             } else {
@@ -81,11 +82,11 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(request.expenses.isEmpty ? Color.gray : Color.blue)
+                            .background(expenses.isEmpty ? Color.gray : Color.blue)
                             .foregroundColor(.white)
                             .cornerRadius(10)
                         }
-                        .disabled(request.expenses.isEmpty)
+                        .disabled(expenses.isEmpty)
                     }
                 }
                 .padding(.horizontal)
@@ -119,7 +120,41 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         } message: {
             Text("Are you sure you want to mark this service request as completed?")
         }
+        .onAppear {
+            loadSafetyChecks()
+            loadExpenses()
+        }
     }
+    
+    // MARK: - Data Loading Methods
+    
+    private func loadSafetyChecks() {
+        Task {
+            do {
+                let fetchedChecks = try await dataStore.fetchSafetyChecks(requestID: request.id)
+                await MainActor.run {
+                    self.safetyChecks = fetchedChecks
+                }
+            } catch {
+                print("Error fetching safety checks for request \(request.id): \(error)")
+            }
+        }
+    }
+    
+    private func loadExpenses() {
+        Task {
+            do {
+                let fetchedExpenses = try await dataStore.fetchExpenses(for: request.id)
+                await MainActor.run {
+                    self.expenses = fetchedExpenses
+                }
+            } catch {
+                print("Error fetching expenses for request \(request.id): \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Action Methods
     
     private func startMaintenance() {
         Task {
@@ -127,7 +162,6 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         }
         alertMessage = "Maintenance started successfully"
         showingAlert = true
-        // Dismiss the view after a short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             dismiss()
         }
@@ -140,15 +174,19 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         }
         alertMessage = "Service request marked as completed"
         showingAlert = true
-        // Dismiss the view after a short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             dismiss()
         }
     }
 }
 
+
 struct ExpensesCard: View {
-    let request: MaintenanceServiceRequest
+    let expenses: [Expense]
+    
+    private var totalCost: Double {
+        expenses.reduce(0) { $0 + $1.amount }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -156,19 +194,19 @@ struct ExpensesCard: View {
                 Text("Expenses")
                     .font(.headline)
                 Spacer()
-                Text("Total: $\(request.totalCost, specifier: "%.2f")")
+                Text("Total: $\(totalCost, specifier: "%.2f")")
                     .font(.subheadline)
                     .foregroundColor(.green)
             }
             
             Divider()
             
-            if request.expenses.isEmpty {
+            if expenses.isEmpty {
                 Text("No expenses added yet")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             } else {
-                ForEach(request.expenses) { expense in
+                ForEach(expenses) { expense in
                     ExpenseRow(expense: expense)
                 }
             }
@@ -179,6 +217,7 @@ struct ExpensesCard: View {
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
+
 
 struct ExpenseRow: View {
     let expense: Expense
@@ -215,33 +254,45 @@ struct AddExpenseView: View {
     @Binding var amount: String
     @Binding var category: ExpenseCategory
     @Binding var isPresented: Bool
+    @FocusState private var focusedField: Bool
+    
+    var isValidAmount: Bool {
+        guard let value = Double(amount), value > 0 else { return false }
+        return true
+    }
     
     var body: some View {
-        Form {
-            Section("Expense Details") {
-                TextField("Description", text: $description)
-                TextField("Amount", text: $amount)
-                    .keyboardType(.decimalPad)
-                Picker("Category", selection: $category) {
-                    ForEach(ExpenseCategory.allCases, id: \.self) { category in
-                        Text(category.rawValue).tag(category)
+        NavigationView {
+            Form {
+                Section("Expense Details") {
+                    TextField("Description", text: $description)
+                        .focused($focusedField)
+                    
+                    TextField("Amount", text: $amount)
+                        .keyboardType(.decimalPad)
+                        .focused($focusedField)
+                    
+                    Picker("Category", selection: $category) {
+                        ForEach(ExpenseCategory.allCases, id: \.self) { category in
+                            Text(category.rawValue).tag(category)
+                        }
                     }
                 }
             }
-        }
-        .navigationTitle("Add Expense")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") {
-                    isPresented = false
+            .navigationTitle("Add Expense")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
                 }
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Add") {
-                    addExpense()
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add") {
+                        addExpense()
+                    }
+                    .disabled(description.isEmpty || amount.isEmpty || !isValidAmount)
                 }
-                .disabled(description.isEmpty || amount.isEmpty)
             }
         }
     }
@@ -253,16 +304,20 @@ struct AddExpenseView: View {
             description: description,
             amount: amountValue,
             date: Date(),
-            category: category
+            category: category,
+            requestID: request.id
         )
         
         Task {
             await dataStore.addExpense(to: request, expense: expense)
         }
+        
+        // Reset fields after adding expense
         description = ""
         amount = ""
         category = .parts
         isPresented = false
+        focusedField = false  // Dismiss keyboard
     }
 }
 
