@@ -5,12 +5,29 @@ struct MaintenancePersonnelChatView: View {
     @StateObject private var supabaseController = SupabaseDataController.shared
     @State private var fleetManager: FleetManager?
     @State private var isLoading = true
+    let serviceRequest: MaintenanceServiceRequest?
+    
+    init(serviceRequest: MaintenanceServiceRequest? = nil) {
+        self.serviceRequest = serviceRequest
+    }
     
     var body: some View {
         Group {
             if let manager = fleetManager {
                 if let userID = manager.userID {
-                    ChatView(recipientType: .maintenance, recipientId: userID, recipientName: manager.name)
+                    ChatView(
+                        recipientType: .maintenance,
+                        recipientId: userID,
+                        recipientName: manager.name,
+                        contextData: serviceRequest.map { request in
+                            [
+                                "requestId": request.id.uuidString,
+                                "vehicleName": request.vehicleName,
+                                "serviceType": request.serviceType.rawValue,
+                                "status": request.status.rawValue
+                            ]
+                        }
+                    )
                 } else {
                     ContentUnavailableView("Unable to start chat", 
                         systemImage: "exclamationmark.triangle",

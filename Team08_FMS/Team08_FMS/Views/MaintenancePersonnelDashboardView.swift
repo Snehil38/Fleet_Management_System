@@ -234,7 +234,7 @@ struct ServiceRequestCard: View {
             fetchExpensesForRequest()
         }
         .sheet(isPresented: $showingChat) {
-            MaintenancePersonnelChatView()
+            MaintenancePersonnelChatView(serviceRequest: request)
         }
     }
     

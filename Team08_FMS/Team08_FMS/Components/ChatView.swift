@@ -18,6 +18,7 @@ struct ChatView: View {
     let recipientType: RecipientType
     let recipientId: UUID
     let recipientName: String
+    let contextData: [String: String]?
     @StateObject private var viewModel: ChatViewModel
     @State private var messageText = ""
     @State private var isShowingEmergencySheet = false
@@ -25,10 +26,11 @@ struct ChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @StateObject private var tripController = TripDataController.shared
     
-    init(recipientType: RecipientType, recipientId: UUID, recipientName: String) {
+    init(recipientType: RecipientType, recipientId: UUID, recipientName: String, contextData: [String: String]? = nil) {
         self.recipientType = recipientType
         self.recipientId = recipientId
         self.recipientName = recipientName
+        self.contextData = contextData
         self._viewModel = StateObject(wrappedValue: ChatViewModel(recipientId: recipientId, recipientType: recipientType))
     }
     
@@ -36,6 +38,11 @@ struct ChatView: View {
         VStack(spacing: 0) {
             // Chat header
             chatHeader
+            
+            // Context info if available
+            if let contextData = contextData {
+                contextInfoView(data: contextData)
+            }
             
             // Messages list
             ScrollViewReader { proxy in
@@ -67,12 +74,54 @@ struct ChatView: View {
         }
     }
     
-    private func scrollToBottom() {
-        withAnimation(.easeOut(duration: 0.3)) {
-            if let lastMessage = viewModel.messages.last {
-                scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+    private func contextInfoView(data: [String: String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            switch recipientType {
+            case .maintenance:
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Service Request")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(data["vehicleName"] ?? "")
+                            .font(.headline)
+                    }
+                    Spacer()
+                    Text(data["status"] ?? "")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .cornerRadius(8)
+                }
+                Text(data["serviceType"] ?? "")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            case .driver:
+                if let tripId = data["tripId"] {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Active Trip")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text(data["destination"] ?? "")
+                                .font(.headline)
+                        }
+                        Spacer()
+                        Text(data["status"] ?? "")
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.green.opacity(0.2))
+                            .foregroundColor(.green)
+                            .cornerRadius(8)
+                    }
+                }
             }
         }
+        .padding()
+        .background(Color(.systemGray6))
     }
     
     private var chatHeader: some View {
@@ -98,15 +147,17 @@ struct ChatView: View {
             
             Spacer()
             
-            // Emergency button
-            Button(action: {
-                isShowingEmergencySheet = true
-            }) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title3)
-                    .foregroundColor(ChatThemeColors.emergency)
+            // Emergency button - only show for drivers
+            if recipientType == .driver {
+                Button(action: {
+                    isShowingEmergencySheet = true
+                }) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title3)
+                        .foregroundColor(ChatThemeColors.emergency)
+                }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
         .padding(.vertical, 12)
         .background(Color(.systemBackground))
@@ -116,8 +167,8 @@ struct ChatView: View {
     private var messageInputView: some View {
         VStack(spacing: 8) {
             // Trip details button (only for drivers)
-            if let currentTrip = tripController.currentTrip,
-               recipientType == .maintenance {
+            if recipientType == .driver,
+               let currentTrip = tripController.currentTrip {
                 Button(action: sendTripDetails) {
                     HStack {
                         Image(systemName: "car.fill")
@@ -162,6 +213,21 @@ struct ChatView: View {
         .shadow(color: Color.black.opacity(0.05), radius: 5, y: -2)
     }
     
+    private func scrollToBottom() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            if let lastMessage = viewModel.messages.last {
+                scrollProxy?.scrollTo(lastMessage.id, anchor: .bottom)
+            }
+        }
+    }
+    
+    private func sendMessage() {
+        guard !messageText.isEmpty else { return }
+        viewModel.sendMessage(messageText)
+        messageText = ""
+        scrollToBottom()
+    }
+    
     private func sendTripDetails() {
         guard let trip = tripController.currentTrip else { return }
         
@@ -191,23 +257,16 @@ struct ChatView: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
-    
-    private func sendMessage() {
-        guard !messageText.isEmpty else { return }
-        
-        // Create and send message
-        viewModel.sendMessage(messageText)
-        messageText = ""
-        isFocused = false
-        
-        // Scroll to bottom after sending
-        scrollToBottom()
-    }
 }
 
 // Preview provider
 struct ChatView_Previews: PreviewProvider {
     static var previews: some View {
-        ChatView(recipientType: .driver, recipientId: UUID(), recipientName: "John Smith")
+        ChatView(
+            recipientType: .driver,
+            recipientId: UUID(),
+            recipientName: "John Smith",
+            contextData: ["tripId": UUID().uuidString, "destination": "New York", "status": "In Progress"]
+        )
     }
 } 

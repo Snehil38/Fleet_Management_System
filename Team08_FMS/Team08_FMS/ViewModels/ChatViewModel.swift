@@ -115,11 +115,26 @@ class ChatViewModel: ObservableObject {
         
         do {
             let currentUserId = await supabaseDataController.getUserID()
+            let userRole = supabaseDataController.userRole
             
-            let response = try await supabaseDataController.supabase
+            // Build the query based on user role and recipient type
+            let query = supabaseDataController.supabase
                 .from("chat_messages")
                 .select()
-                .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
+                .eq("recipient_type", value: recipientType.rawValue)
+            
+            // Add the appropriate ID filters based on user role
+            if userRole == "fleet_manager" {
+                // Fleet manager viewing messages: show messages where they are sender or recipient
+                query.eq("recipient_id", value: recipientId)
+            } else {
+                // Driver/Maintenance viewing messages: show messages between them and fleet manager
+                query.eq("recipient_id", value: currentUserId)
+                    .eq("fleet_manager_id", value: recipientId)
+            }
+            
+            // Add ordering and execute
+            let response = try await query
                 .order("created_at", ascending: true)
                 .execute()
             
@@ -245,21 +260,14 @@ class ChatViewModel: ObservableObject {
                 } else {
                     // Driver/maintenance sending to fleet manager
                     messageFleetManagerId = fleetManagerId
-                    messageRecipientId = userId
-                    messageRecipientType = "driver"
+                    messageRecipientId = userId  // Set the sender's ID as recipient_id
+                    messageRecipientType = recipientType.rawValue
                 }
                 
                 print("Sending message with:")
                 print("Fleet Manager ID: \(messageFleetManagerId)")
                 print("Recipient ID: \(messageRecipientId)")
                 print("Recipient Type: \(messageRecipientType)")
-                
-                // Format dates with fractional seconds for consistency
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-                dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-                dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-                let currentDate = dateFormatter.string(from: Date())
                 
                 // Create message payload
                 let message = ChatMessage(
