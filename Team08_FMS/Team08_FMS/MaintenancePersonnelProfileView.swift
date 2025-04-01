@@ -7,6 +7,8 @@ struct MaintenancePersonnelProfileView: View {
     @State private var pendingStatus: Status?
     @State private var showAlert = false
     @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingLogoutAlert = false
 
     var body: some View {
         NavigationView {
@@ -30,9 +32,12 @@ struct MaintenancePersonnelProfileView: View {
                 }
             }
             .background(Color(.systemGroupedBackground))
+//            .navigationBarHidden(true)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { backButton }
+            .navigationBarItems(leading: Button("Back") {
+                presentationMode.wrappedValue.dismiss()
+            })
             .alert(isPresented: $showingStatusChangeAlert) {
                 if pendingStatus == .available {
                     return Alert(
@@ -63,18 +68,14 @@ struct MaintenancePersonnelProfileView: View {
                     )
                 }
             }
-//            .alert(isPresented: $showAlert) {
-//                Alert(
-//                    title: Text("Alert"),
-//                    message: Text("Are you sure you want to log out?"),
-//                    primaryButton: .destructive(Text("Yes")) {
-//                        Task {
-//                            SupabaseDataController.shared.signOut()
-//                        }
-//                    },
-//                    secondaryButton: .cancel()
-//                )
-//            }
+            .alert("Logout", isPresented: $showingLogoutAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Logout", role: .destructive) {
+                    dismiss()
+                }
+            } message: {
+                Text("Are you sure you want to logout?")
+            }
             .task { await loadPersonnelData() }
         }
     }
@@ -95,10 +96,6 @@ struct MaintenancePersonnelProfileView: View {
             Text(personnel.name)
                 .font(.title2)
                 .fontWeight(.semibold)
-            
-            Text(personnel.email)
-                .font(.subheadline)
-                .foregroundColor(.gray)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -200,9 +197,7 @@ struct MaintenancePersonnelProfileView: View {
     
     private var logoutButton: some View {
         Button {
-            Task {
-                supabaseDataController.signOut()
-            }
+            showingLogoutAlert = true
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
