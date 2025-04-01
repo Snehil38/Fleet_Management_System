@@ -87,13 +87,13 @@ enum ExpenseCategory: String, Codable, CaseIterable {
         let container = try decoder.singleValueContainer()
         let rawValue = try container.decode(String.self)
         switch rawValue.lowercased() {
-        case "Parts":
+        case "parts":
             self = .parts
-        case "Labor":
+        case "labor":
             self = .labor
-        case "Supplies":
+        case "supplies":
             self = .supplies
-        case "Other":
+        case "other":
             self = .other
         default:
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ExpenseCategory value: \(rawValue)")

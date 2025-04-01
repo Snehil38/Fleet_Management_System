@@ -1725,9 +1725,6 @@ class SupabaseDataController: ObservableObject {
 
         let jsonData = requestResponse.data
 
-        // Decode JSON into an array of dictionaries
-        let jsonObjects = try JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] ?? []
-
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
@@ -1797,7 +1794,18 @@ class SupabaseDataController: ObservableObject {
             .select()
             .eq("requestID", value: requestId.uuidString)
             .execute()
-        let expenses = try JSONDecoder().decode([Expense].self, from: response.data)
+        
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        // Configure JSONDecoder
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+        
+        // Decode JSON into Expense objects
+        let expenses = try decoder.decode([Expense].self, from: response.data)
         print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
         return expenses
     }
