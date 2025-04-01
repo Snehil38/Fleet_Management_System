@@ -9,6 +9,15 @@ struct TripDetailView: View {
     @StateObject private var supabaseDataController = SupabaseDataController.shared
     var trip: Trip
     
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
+    @State private var loading = false
+    
     // Editing state variables
     @State private var isEditing = false
     @State private var editedDestination: String = ""
@@ -254,9 +263,74 @@ struct TripDetailView: View {
                     FleetTripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
                 }
                 
-                // Additional Pickup Points Section (only show for non-delivered trips)
-                if trip.status != .delivered {
-                    tripPickupPoints
+                // Additional Pickup Points
+                if !trip.additionalPickups.isEmpty {
+                    Section(header: Text("ADDITIONAL PICKUP POINTS")) {
+                        ForEach(trip.additionalPickups, id: \.self) { pickupId in
+                            if let pickup = tripController.allTrips.first(where: { $0.id == pickupId }) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(pickup.destination)
+                                        .font(.headline)
+                                    
+                                    Text(pickup.address)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    
+                                    if let eta = pickup.estimatedArrivalTime {
+                                        Text("Estimated arrival: \(eta, formatter: dateFormatter)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                                .swipeActions(edge: .trailing) {
+                                    if !pickup.completed {
+                                        Button {
+                                            markPickupCompleted(pickup)
+                                        } label: {
+                                            Label("Complete", systemImage: "checkmark.circle")
+                                        }
+                                        .tint(.green)
+                                    }
+                                    
+                                    Button(role: .destructive) {
+                                        deletePickup(pickup)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Button {
+                            showingAddPickupSheet = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.blue)
+                                Text("Add Pickup Point")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        Button {
+                            showingAddPickupSheet = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.blue)
+                                Text("Add Pickup Point")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    } header: {
+                        Text("ADDITIONAL PICKUP POINTS")
+                    } footer: {
+                        Text("You can add intermediate stops for this trip")
+                            .font(.caption)
+                    }
                 }
                 
                 // Delivery Status Section
@@ -405,100 +479,92 @@ struct TripDetailView: View {
         }
     }
     
-    // Pickup points section
-    private var tripPickupPoints: some View {
-        Section(header: Text("ADDITIONAL PICKUP POINTS")) {
-            if trip.additionalPickups.isEmpty {
-                Text("No additional pickup points")
-                    .foregroundColor(.secondary)
-                    .padding(.vertical, 8)
-            } else {
-                ForEach(trip.additionalPickups) { pickup in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(pickup.location)
-                            .font(.headline)
-                        Text(pickup.address)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        if pickup.completed {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                Text("Completed")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                            }
-                            .padding(.top, 4)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .swipeActions {
-                        if !pickup.completed {
-                            Button {
-                                markPickupCompleted(pickup)
-                            } label: {
-                                Label("Complete", systemImage: "checkmark.circle")
-                            }
-                            .tint(.green)
-                        }
-                        
-                        Button(role: .destructive) {
-                            deletePickup(pickup)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                }
-            }
-            
-            Button(action: {
-                showingAddPickupSheet = true
-            }) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundColor(.blue)
-                    Text("Add Pickup Point")
-                        .foregroundColor(.blue)
-                }
-            }
-        }
-    }
-    
     private func markPickupCompleted(_ pickup: Trip) {
+        loading = true
+        
         Task {
             do {
                 try await supabaseDataController.markPickupPointCompleted(pickupPointId: pickup.id)
-                
-                // Refresh the pickup points for this trip
-                let updatedPickups = try await supabaseDataController.getPickupPointsForTrip(tripId: trip.id)
-                await MainActor.run {
-                    trip.additionalPickups = updatedPickups
+                // Refresh pickup points
+                if let updatedPickups = try? await supabaseDataController.getPickupPointsForTrip(tripId: trip.id) {
+                    DispatchQueue.main.async {
+                        // Update the trip's additionalPickups with the new data
+                        withAnimation {
+                            trip.additionalPickups = updatedPickups.map { $0.id }
+                        }
+                        loading = false
+                    }
+                } else {
+                    // If we couldn't get updated pickups, just mark it locally
+                    DispatchQueue.main.async {
+                        if let index = trip.additionalPickups.firstIndex(of: pickup.id) {
+                            withAnimation {
+                                // Update the pickup in allTrips
+                                if let pickupIndex = tripController.allTrips.firstIndex(where: { $0.id == pickup.id }) {
+                                    tripController.allTrips[pickupIndex].completed = true
+                                }
+                            }
+                        }
+                        loading = false
+                    }
                 }
             } catch {
-                print("Error marking pickup point as completed: \(error)")
+                print("Error marking pickup as completed: \(error)")
+                DispatchQueue.main.async {
+                    loading = false
+                }
             }
         }
     }
     
     private func deletePickup(_ pickup: Trip) {
+        loading = true
+        
         Task {
             do {
                 try await supabaseDataController.deletePickupPoint(pickupPointId: pickup.id)
-                
-                // Refresh the pickup points for this trip
-                let updatedPickups = try await supabaseDataController.getPickupPointsForTrip(tripId: trip.id)
-                await MainActor.run {
-                    trip.additionalPickups = updatedPickups
+                // Remove it from our local array
+                DispatchQueue.main.async {
+                    withAnimation {
+                        trip.additionalPickups.removeAll { $0 == pickup.id }
+                    }
+                    loading = false
                 }
             } catch {
-                print("Error deleting pickup point: \(error)")
+                print("Error deleting pickup: \(error)")
+                DispatchQueue.main.async {
+                    loading = false
+                }
             }
         }
     }
     
     private func addPickupPoint(newPickup: Trip) {
-        trip.additionalPickups.append(newPickup)
+        loading = true
+        
+        Task {
+            do {
+                try await supabaseDataController.addPickupPointToTrip(
+                    tripId: trip.id,
+                    location: newPickup.destination,
+                    address: newPickup.address,
+                    latitude: newPickup.latitude,
+                    longitude: newPickup.longitude
+                )
+                
+                let updatedPickups = try await supabaseDataController.getPickupPointsForTrip(tripId: trip.id)
+                await MainActor.run {
+                    trip.additionalPickups = updatedPickups.map { $0.id }
+                    loading = false
+                }
+            } catch {
+                print("Error adding pickup point to database: \(error)")
+                await MainActor.run {
+                    trip.additionalPickups.append(newPickup.id)
+                    loading = false
+                }
+            }
+        }
     }
     
     // Setup search completer

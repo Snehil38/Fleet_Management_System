@@ -842,7 +842,22 @@ struct AddPickupPointView: View {
                         dismiss()
                     }
                 } else {
-                    throw NSError(domain: "PickupPointError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Could not find the created pickup point"])
+                    // If we couldn't find the pickup point in the database, create it locally
+                    let newPickup = Trip.createPickupPoint(
+                        id: UUID(),
+                        parentTripId: tripId,
+                        location: location,
+                        address: address,
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude,
+                        sequence: 1,
+                        completed: false
+                    )
+                    await MainActor.run {
+                        onAdd(newPickup)
+                        isLoading = false
+                        dismiss()
+                    }
                 }
             } catch {
                 print("Error adding pickup point: \(error)")

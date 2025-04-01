@@ -186,7 +186,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 body: "Trip has exceeded the maximum allowed duration of 1 hour. Please check vehicle status."
             )
             // Notify fleet manager through Supabase
-            Task {
+        Task {
                 await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.id.uuidString ?? "Unknown")")
             }
         }
@@ -452,9 +452,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 // Convert to Trip model
                 var trip = Trip(from: supabaseTrip, vehicle: vehicle)
                 
-                // Fetch additional pickup points from dedicated table
+                // Fetch additional pickup points from dedicated table and map to IDs
                 let pickupPoints = try await supabaseController.getPickupPointsForTrip(tripId: trip.id)
-                trip.additionalPickups = pickupPoints
+                trip.additionalPickups = pickupPoints.map { $0.id }
                 
                 tripObjects.append(trip)
             }
@@ -524,7 +524,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 print("Failed to decode date string: \(dateString)")
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
             }
-
+            
             // Define JoinedTripData struct
             struct JoinedTripData: Codable {
                 let id: UUID
@@ -594,12 +594,12 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     )
                 """)
                 .eq("is_deleted", value: false)
-
+            
             // Add driver filter if driverId is set
             if let driverId = driverId {
                 query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
             }
-
+            
             // Execute the query
             let response = try await query.execute()
             
@@ -632,9 +632,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
-
+            
             print("Successfully processed \(tripsWithVehicles.count) trips")
-
+            
             // Update published properties
             await MainActor.run {
                 // Find current trip (in progress)
@@ -643,12 +643,12 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 } else {
                     self.currentTrip = nil
                 }
-
+                
                 // Filter upcoming trips (only pending or assigned)
                 self.upcomingTrips = tripsWithVehicles.filter { trip in
                     trip.status.rawValue == "pending" || trip.status.rawValue == "assigned"
                 }
-
+                
                 // Convert completed/delivered trips to delivery details
                 let completedTrips = tripsWithVehicles.filter { trip in 
                     trip.status.rawValue == "delivered"
@@ -665,7 +665,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                         notes: trip.notes ?? "No notes available"
                     )
                 }
-
+                
                 // Sort recent deliveries by date (newest first)
                 self.recentDeliveries.sort { lhs, rhs in
                     let lhsDate = parseDate(lhs.date) ?? Date.distantPast
@@ -1158,4 +1158,4 @@ extension TripDataController {
     }
     
     // You can also implement other delegate methods as needed.
-}
+} 

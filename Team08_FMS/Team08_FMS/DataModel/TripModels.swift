@@ -9,26 +9,9 @@ enum TripStatus: String, Codable {
     case assigned = "assigned"
 }
 
-// Additional Pickup Model
-struct Trip: Identifiable, Codable, Equatable {
-    let id: UUID
-    let tripId: UUID
-    var location: String
-    var address: String
-    var latitude: Double
-    var longitude: Double
-    var sequence: Int
-    var completed: Bool
-    var estimatedArrivalTime: Date?
-    
-    static func == (lhs: Trip, rhs: Trip) -> Bool {
-        lhs.id == rhs.id
-    }
-}
-
-// Trip Model
+// Trip Model - Unified to handle both main trips and pickup points
 class Trip: Identifiable, Equatable {
-    let id: UUID
+    var id: UUID
     var destination: String
     var address: String
     var eta: String
@@ -45,11 +28,23 @@ class Trip: Identifiable, Equatable {
     let startingPoint: String
     let pickup: String?
     var driverId: UUID?
-    var additionalPickups: [Trip]
+    var additionalPickups: [UUID]
+    
+    // Pickup point specific properties
+    var isPickupPoint: Bool = false
+    var parentTripId: UUID?
+    var sequence: Int = 0
+    var completed: Bool = false
+    var estimatedArrivalTime: Date?
+    var latitude: Double = 0
+    var longitude: Double = 0
     
     // Computed property for display purposes
     var displayName: String {
-        pickup ?? "Trip-\(id.uuidString.prefix(8))"
+        if isPickupPoint {
+            return destination
+        }
+        return pickup ?? "Trip-\(id.uuidString.prefix(8))"
     }
     
     // Static function to create empty trip
@@ -79,6 +74,24 @@ class Trip: Identifiable, Equatable {
             estimated_time: 0
         )
         return Trip(from: emptySupabaseTrip, vehicle: emptyVehicle)
+    }
+    
+    // Create a pickup point
+    static func createPickupPoint(id: UUID, parentTripId: UUID, location: String, address: String, 
+                                 latitude: Double, longitude: Double, sequence: Int, 
+                                 completed: Bool, estimatedArrivalTime: Date? = nil) -> Trip {
+        let trip = Trip.empty
+        trip.isPickupPoint = true
+        trip.id = id
+        trip.parentTripId = parentTripId
+        trip.destination = location
+        trip.address = address
+        trip.latitude = latitude
+        trip.longitude = longitude
+        trip.sequence = sequence
+        trip.completed = completed
+        trip.estimatedArrivalTime = estimatedArrivalTime
+        return trip
     }
     
     static func == (lhs: Trip, rhs: Trip) -> Bool {
@@ -158,18 +171,17 @@ class Trip: Identifiable, Equatable {
                             let lngStr = components[3].trimmingCharacters(in: .whitespaces)
                             
                             if let lat = Double(latStr), let lng = Double(lngStr) {
-                                let pickup = Trip(
+                                let pickup = Trip.createPickupPoint(
                                     id: UUID(),
-                                    tripId: self.id,
+                                    parentTripId: self.id,
                                     location: location,
                                     address: address,
                                     latitude: lat,
                                     longitude: lng,
                                     sequence: sequence,
-                                    completed: false,
-                                    estimatedArrivalTime: nil
+                                    completed: false
                                 )
-                                self.additionalPickups.append(pickup)
+                                self.additionalPickups.append(pickup.id)
                                 sequence += 1
                             }
                         }

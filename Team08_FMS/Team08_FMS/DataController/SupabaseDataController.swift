@@ -1896,54 +1896,45 @@ class SupabaseDataController: ObservableObject {
                 return []
             }
             
-            // Directly decode the data 
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            do {
-                // Try direct decoding
-                return try decoder.decode([Trip].self, from: responseData)
-            } catch {
-                // If direct decoding fails, manually parse JSON
-                guard let jsonObjects = try? JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] else {
-                    return []
-                }
-                
-                var pickupPoints: [Trip] = []
-                
-                for data in jsonObjects {
-                    if let id = UUID(uuidString: data["id"] as? String ?? ""),
-                       let tripId = UUID(uuidString: data["trip_id"] as? String ?? ""),
-                       let location = data["location"] as? String,
-                       let address = data["address"] as? String,
-                       let latitude = data["latitude"] as? Double,
-                       let longitude = data["longitude"] as? Double,
-                       let sequence = data["sequence"] as? Int,
-                       let completed = data["completed"] as? Bool {
-                        
-                        var estimatedArrivalTime: Date? = nil
-                        if let arrivalTimeString = data["estimated_arrival_time"] as? String {
-                            estimatedArrivalTime = dateFormatter.date(from: arrivalTimeString)
-                        }
-                        
-                        let pickupPoint = Trip(
-                            id: id,
-                            tripId: tripId,
-                            location: location,
-                            address: address,
-                            latitude: latitude,
-                            longitude: longitude,
-                            sequence: sequence,
-                            completed: completed,
-                            estimatedArrivalTime: estimatedArrivalTime
-                        )
-                        
-                        pickupPoints.append(pickupPoint)
-                    }
-                }
-                
-                return pickupPoints
+            // Manually parse JSON for better control
+            guard let jsonObjects = try? JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] else {
+                return []
             }
+            
+            var pickupPoints: [Trip] = []
+            
+            for data in jsonObjects {
+                if let id = UUID(uuidString: data["id"] as? String ?? ""),
+                   let parentTripId = UUID(uuidString: data["trip_id"] as? String ?? ""),
+                   let location = data["location"] as? String,
+                   let address = data["address"] as? String,
+                   let latitude = data["latitude"] as? Double,
+                   let longitude = data["longitude"] as? Double,
+                   let sequence = data["sequence"] as? Int,
+                   let completed = data["completed"] as? Bool {
+                    
+                    var estimatedArrivalTime: Date? = nil
+                    if let arrivalTimeString = data["estimated_arrival_time"] as? String {
+                        estimatedArrivalTime = dateFormatter.date(from: arrivalTimeString)
+                    }
+                    
+                    let pickupPoint = Trip.createPickupPoint(
+                        id: id,
+                        parentTripId: parentTripId,
+                        location: location,
+                        address: address,
+                        latitude: latitude,
+                        longitude: longitude,
+                        sequence: sequence,
+                        completed: completed,
+                        estimatedArrivalTime: estimatedArrivalTime
+                    )
+                    
+                    pickupPoints.append(pickupPoint)
+                }
+            }
+            
+            return pickupPoints
         } catch {
             print("Error getting pickup points for trip: \(error)")
             throw error
