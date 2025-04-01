@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-@preconcurrency import Supabase
+import Supabase
 
 private struct MessagePayload: Encodable {
     let id: String
@@ -67,7 +67,7 @@ class ChatViewModel: ObservableObject {
     private func setupMessageListener() async {
         // First, cleanup any existing channel
         if let channel = realtimeChannel {
-            channel.unsubscribe()
+            try? await channel.unsubscribe()
             realtimeChannel = nil
         }
         
@@ -94,7 +94,7 @@ class ChatViewModel: ObservableObject {
             }
             
             // Subscribe to the channel
-            channel.subscribe()
+            try await channel.subscribe()
             print("Successfully subscribed to realtime updates")
             
             // Store the channel reference
@@ -102,6 +102,11 @@ class ChatViewModel: ObservableObject {
                 self.realtimeChannel = channel
             }
             
+        } catch {
+            print("Error setting up realtime listener: \(error)")
+            await MainActor.run {
+                self.error = error
+            }
         }
     }
     
@@ -114,27 +119,12 @@ class ChatViewModel: ObservableObject {
         }
         
         do {
-            let currentUserId = await supabaseDataController.getUserID()
-            let userRole = supabaseDataController.userRole
+            let currentUserId = try await supabaseDataController.getUserID()
             
-            // Build the query based on user role and recipient type
-            let query = supabaseDataController.supabase
+            let response = try await supabaseDataController.supabase
                 .from("chat_messages")
                 .select()
-                .eq("recipient_type", value: recipientType.rawValue)
-            
-            // Add the appropriate ID filters based on user role
-            if userRole == "fleet_manager" {
-                // Fleet manager viewing messages: show messages where they are sender or recipient
-                query.eq("recipient_id", value: recipientId)
-            } else {
-                // Driver/Maintenance viewing messages: show messages between them and fleet manager
-                query.eq("recipient_id", value: currentUserId)
-                    .eq("fleet_manager_id", value: recipientId)
-            }
-            
-            // Add ordering and execute
-            let response = try await query
+                .or("recipient_id.eq.\(recipientId),fleet_manager_id.eq.\(recipientId)")
                 .order("created_at", ascending: true)
                 .execute()
             
@@ -206,7 +196,7 @@ class ChatViewModel: ObservableObject {
     private func updateUnreadCount() {
         Task {
             do {
-                let currentUserId = await supabaseDataController.getUserID()
+                let currentUserId = try await supabaseDataController.getUserID()
                 
                 let response = try await supabaseDataController.supabase
                     .from("chat_messages")
@@ -233,7 +223,7 @@ class ChatViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 // Get the current user's ID
-                guard let userId = await supabaseDataController.getUserID() else {
+                guard let userId = try? await supabaseDataController.getUserID() else {
                     print("No user ID found")
                     return
                 }
@@ -247,8 +237,8 @@ class ChatViewModel: ObservableObject {
                 }
                 
                 // Get the current user's role
-                let userRole = supabaseDataController.userRole
-                print("Current user role: \(userRole ?? "Invalid")")
+                let userRole = await supabaseDataController.userRole
+                print("Current user role: \(userRole)")
                 
                 // Determine message direction based on user role
                 let (messageFleetManagerId, messageRecipientId, messageRecipientType): (UUID, UUID, String)
@@ -261,14 +251,21 @@ class ChatViewModel: ObservableObject {
                 } else {
                     // Driver/maintenance sending to fleet manager
                     messageFleetManagerId = fleetManagerId
-                    messageRecipientId = userId  // Set the sender's ID as recipient_id
-                    messageRecipientType = recipientType.rawValue
+                    messageRecipientId = userId
+                    messageRecipientType = "driver"
                 }
                 
                 print("Sending message with:")
                 print("Fleet Manager ID: \(messageFleetManagerId)")
                 print("Recipient ID: \(messageRecipientId)")
                 print("Recipient Type: \(messageRecipientType)")
+                
+                // Format dates with fractional seconds for consistency
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+                dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+                let currentDate = dateFormatter.string(from: Date())
                 
                 // Create message payload
                 let message = ChatMessage(
@@ -371,7 +368,7 @@ class ChatViewModel: ObservableObject {
         refreshTimer?.invalidate()
         if let channel = realtimeChannel {
             Task {
-                channel.unsubscribe()
+                try? await channel.unsubscribe()
             }
         }
     }

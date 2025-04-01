@@ -548,8 +548,6 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if speed > 0.5 {
             // Convert speed to km/h for easier calculation
             let speedKmh = speed * 3.6
-            print(route)
-            print(speedKmh)
             
             // Update remaining time based on current speed and remaining distance
             if remainingDistance > 0 {
@@ -614,7 +612,6 @@ struct RealTimeNavigationView: View {
                     
                     // Check if we've reached the destination
                     if let route = navigationManager.route {
-                        print(route)
                         // Calculate distance to the actual destination coordinates
                         let destinationLocation = CLLocation(
                             latitude: navigationManager.destination.latitude,

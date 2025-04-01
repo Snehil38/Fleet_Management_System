@@ -105,7 +105,6 @@ struct MaintenancePersonnelTabView: View {
 
 struct RServiceRequestCard: View {
     let request: ServiceRequest
-    @State private var showingContact = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -135,28 +134,11 @@ struct RServiceRequestCard: View {
                     .foregroundColor(.white)
                     .cornerRadius(4)
             }
-            
-            if request.status == "In Progress" {
-                Button(action: {
-                    showingContact = true
-                }) {
-                    HStack {
-                        Image(systemName: "message.fill")
-                        Text("Contact")
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.blue)
-                    .padding(.top, 4)
-                }
-            }
         }
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(10)
         .padding(.horizontal)
-        .sheet(isPresented: $showingContact) {
-            ContactView()
-        }
     }
     
     private func priorityColor(_ priority: String) -> Color {

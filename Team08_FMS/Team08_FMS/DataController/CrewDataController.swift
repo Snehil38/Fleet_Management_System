@@ -227,6 +227,8 @@ class CrewDataController: ObservableObject {
                     }
                     self.objectWillChange.send()
                 }
+            } catch {
+                print("Error updating driver statuses: \(error)")
             }
         }
     }

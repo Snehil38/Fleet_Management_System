@@ -14,7 +14,6 @@ struct FleetManagerDashboardTabView: View {
     @EnvironmentObject private var vehicleManager: VehicleManager
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
     @StateObject private var tripController = TripDataController.shared
-    @StateObject private var dataStore = MaintenancePersonnelDataStore()
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
     @State private var showingAlertsView = false
@@ -39,11 +38,6 @@ struct FleetManagerDashboardTabView: View {
 
     private var totalMonthlySalaries: Double {
         dataManager.totalSalaryExpenses
-    }
-    
-    private var totalServiceExpenses: Double {
-        let expense = dataStore.totalExpenses
-        return expense
     }
 
     private var totalFuelCost: Double {
@@ -79,7 +73,7 @@ struct FleetManagerDashboardTabView: View {
     }
 
     private var totalExpenses: Double {
-        totalMonthlySalaries + totalFuelCost + totalServiceExpenses
+        totalMonthlySalaries + totalFuelCost
     }
 
     private var totalRevenue: Double {
@@ -161,12 +155,6 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Monthly Salary Expenses",
                             amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
-                            trend: .negative
-                        )
-                        
-                        FinancialCard(
-                            title: "Service Expenses",
-                            amount: "$\(String(format: "%.2f", totalServiceExpenses))",
                             trend: .negative
                         )
                         

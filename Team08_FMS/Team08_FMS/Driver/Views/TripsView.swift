@@ -187,7 +187,7 @@ struct TripsView: View {
         var cargoType = "General Cargo"
         var distance = "N/A"
         var startingPoint = ""
-        let deliveryNotes = delivery.notes
+        var deliveryNotes = delivery.notes
         var estimatedDistance: Double? = nil
         var estimatedTime: Double? = nil
         
@@ -584,7 +584,6 @@ struct TripDetailsView: View {
                         await MainActor.run {
                             // Create a new ChatViewModel with the correct fleet manager ID
                             let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
-                            print(newViewModel)
                         }
                     }
                 } catch {
@@ -612,7 +611,7 @@ struct TripDetailsView: View {
             let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
             let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
             
-            let pdfData = renderer.pdfData { context in
+            let pdfData = try renderer.pdfData { context in
                 context.beginPage()
                 let ctx = UIGraphicsGetCurrentContext()!
                 
@@ -751,6 +750,10 @@ struct TripDetailsView: View {
             receiptData = pdfData
             showingDeliveryReceipt = true
             
+        } catch {
+            print("Error generating receipt: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            showingError = true
         }
     }
     
@@ -783,7 +786,7 @@ struct TripDetailsView: View {
             let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
             let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
             
-            let pdfData = renderer.pdfData { context in
+            let pdfData = try renderer.pdfData { context in
                 context.beginPage()
                 let ctx = UIGraphicsGetCurrentContext()!
                 
@@ -895,6 +898,10 @@ struct TripDetailsView: View {
             receiptData = pdfData
             showingDeliveryReceipt = true
             
+        } catch {
+            print("Error generating chat history: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            showingError = true
         }
     }
     

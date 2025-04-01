@@ -29,44 +29,15 @@ class MaintenancePersonnelDataStore: ObservableObject {
     @Published var serviceHistory: [MaintenancePersonnelServiceHistory] = []
     @Published var routineSchedules: [MaintenancePersonnelRoutineSchedule] = []
     @Published var inspectionRequests: [InspectionRequest] = []  // Assuming these remain local or handled separately
-    @Published var totalExpenses: Double = 0
     
     init() {
         // Load data from Supabase when the data store is created
         Task {
             await loadData()
-            await calculateExpenses()
         }
     }
     
     // MARK: - Data Loading
-    
-    func calculateExpenses() async {
-        do {
-            let expenses = try await SupabaseDataController.shared.fetchAllExpense()
-            print("Fetched expenses: \(expenses)")
-            print("Expense count: \(expenses.count)")
-            
-            // Log each expense's amount
-            expenses.forEach { expense in
-                print("Expense amount: \(expense.amount)")
-            }
-            
-            let total = expenses.reduce(0.0) { partialResult, expense in
-                partialResult + expense.amount
-            }
-            
-            print("Calculated total: \(total)")
-            
-            await MainActor.run {
-                self.totalExpenses = total
-            }
-            
-        } catch {
-            print("Cannot fetch total expenses: \(error.localizedDescription)")
-        }
-    }
-
     
     func loadData() async {
         do {
