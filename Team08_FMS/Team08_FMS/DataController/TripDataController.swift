@@ -3,6 +3,7 @@ import CoreLocation
 import Supabase
 import Combine
 import UserNotifications
+import MapKit
 
 enum TripError: Error, Equatable {
     case fetchError(String)
@@ -38,6 +39,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published var estimatedArrivalTime: Date?
     
     @Published var allTrips: [Trip] = []
+    @Published var alternateRoutes: [MKRoute] = []
+    @Published var currentRoute: MKRoute?
+    @Published var hasFasterRouteAvailable = false
     
     private var locationManager = CLLocationManager()
     private let geofenceRadius: CLLocationDistance = 50.0 // 100 meters
@@ -1273,6 +1277,66 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
         
         return data
+    }
+    
+    // Add new method to check for alternate routes
+    func checkForAlternateRoutes(from currentLocation: CLLocation, to destination: CLLocationCoordinate2D) {
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: currentLocation.coordinate))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.transportType = .automobile
+        request.requestsAlternateRoutes = true // Request alternate routes
+        
+        let directions = MKDirections(request: request)
+        directions.calculate { [weak self] response, error in
+            guard let self = self,
+                  let response = response,
+                  error == nil else {
+                print("Error calculating alternate routes: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            
+            // Store current route if not set
+            if self.currentRoute == nil {
+                self.currentRoute = response.routes.first
+            }
+            
+            // Filter and sort alternate routes
+            let alternateRoutes = response.routes.filter { route in
+                // Only consider routes that are significantly different (at least 10% different in time)
+                guard let currentRoute = self.currentRoute else { return false }
+                return abs(route.expectedTravelTime - currentRoute.expectedTravelTime) > (currentRoute.expectedTravelTime * 0.1)
+            }
+            
+            // Sort by expected travel time
+            let sortedRoutes = alternateRoutes.sorted { $0.expectedTravelTime < $1.expectedTravelTime }
+            
+            // Check if any alternate route is faster
+            if let currentRoute = self.currentRoute,
+               let fastestAlternate = sortedRoutes.first,
+               fastestAlternate.expectedTravelTime < currentRoute.expectedTravelTime {
+                self.hasFasterRouteAvailable = true
+                self.alternateRoutes = sortedRoutes
+            } else {
+                self.hasFasterRouteAvailable = false
+                self.alternateRoutes = []
+            }
+        }
+    }
+    
+    // Add method to update current route
+    func updateCurrentRoute(_ route: MKRoute) {
+        self.currentRoute = route
+        self.hasFasterRouteAvailable = false
+        self.alternateRoutes = []
+    }
+    
+    // Add method to get route details
+    func getRouteDetails(_ route: MKRoute) -> (distance: String, time: String) {
+        let distance = String(format: "%.1f km", route.distance / 1000)
+        let minutes = Int(route.expectedTravelTime / 60)
+        let time = "\(minutes) min"
+        return (distance, time)
     }
 } 
 
