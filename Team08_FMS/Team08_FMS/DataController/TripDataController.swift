@@ -1279,6 +1279,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         return data
     }
     
+    
+    //Rerouting Logic Implemented 
+    
     // Add new method to check for alternate routes
     func checkForAlternateRoutes(from currentLocation: CLLocation, to destination: CLLocationCoordinate2D) {
         let request = MKDirections.Request()

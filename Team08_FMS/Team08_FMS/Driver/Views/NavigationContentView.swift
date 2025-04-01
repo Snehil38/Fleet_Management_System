@@ -13,6 +13,8 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var nextStepDistance: CLLocationDistance = 0
     @Published var alternativeRoutes: [MKRoute] = []
     @Published var recentLocations: [CLLocation] = [] // Track recent locations for smooth animation
+    @Published var hasFasterRouteAvailable = false
+    @Published var currentRoute: MKRoute?
     
     private let locationManager: CLLocationManager
     private let _destination: CLLocationCoordinate2D
@@ -570,6 +572,62 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             updateRoute(from: location, forceRecalculation: true)
         }
     }
+    
+    // MARK: - Rerouting Methods  to display in driverts App
+    
+    func checkForAlternateRoutes(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) {
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.transportType = vehicleType.routingPreference
+        request.requestsAlternateRoutes = true
+        
+        let directions = MKDirections(request: request)
+        directions.calculate { [weak self] response, error in
+            guard let self = self,
+                  let response = response,
+                  !response.routes.isEmpty else {
+                return
+            }
+            
+            // Store the current route if not already set
+            if self.currentRoute == nil {
+                self.currentRoute = response.routes[0]
+            }
+            
+            // Filter and sort alternative routes
+            let alternativeRoutes = response.routes.filter { route in
+                // Only consider routes that are significantly different
+                let timeDiff = abs(route.expectedTravelTime - (self.currentRoute?.expectedTravelTime ?? 0))
+                let timeDiffPercentage = timeDiff / (self.currentRoute?.expectedTravelTime ?? 1)
+                return timeDiffPercentage > 0.1 // 10% difference in time
+            }
+            
+            // Sort by expected travel time
+            let sortedRoutes = alternativeRoutes.sorted { $0.expectedTravelTime < $1.expectedTravelTime }
+            
+            // Update the alternative routes
+            DispatchQueue.main.async {
+                self.alternativeRoutes = sortedRoutes
+                self.hasFasterRouteAvailable = !sortedRoutes.isEmpty
+            }
+        }
+    }
+    
+    func updateCurrentRoute(_ newRoute: MKRoute) {
+        DispatchQueue.main.async {
+            self.currentRoute = newRoute
+            self.route = newRoute
+            self.hasFasterRouteAvailable = false
+            self.alternativeRoutes = []
+        }
+    }
+    
+    func getRouteDetails(_ route: MKRoute) -> (distance: String, time: String) {
+        let distance = String(format: "%.1f km", route.distance / 1000)
+        let time = String(format: "%d min", Int(route.expectedTravelTime / 60))
+        return (distance, time)
+    }
 }
 
 struct RealTimeNavigationView: View {
@@ -582,15 +640,15 @@ struct RealTimeNavigationView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var showingAlternativeRoutes = false
-    @State private var isRouteCompleted = false  // Add state for route completion
-    @State private var isDeviationAlertShown = false  // Add state for deviation alert
+    @State private var isRouteCompleted = false
+    @State private var isDeviationAlertShown = false
+    @State private var showingReroutingSuggestion = false
     
     init(destination: CLLocationCoordinate2D, destinationName: String, address: String, sourceCoordinate: CLLocationCoordinate2D?, onDismiss: @escaping () -> Void) {
         self.destination = destinationName
         self.address = address
         self.onDismiss = onDismiss
         
-        // Initialize with the provided coordinates
         _navigationManager = StateObject(wrappedValue: NavigationManager(
             destination: destination,
             sourceCoordinate: sourceCoordinate
@@ -623,6 +681,17 @@ struct RealTimeNavigationView: View {
                             isRouteCompleted = true
                         }
                     }
+                    
+                    // Check for alternate routes
+                    if let userLocation = navigationManager.userLocation {
+                        navigationManager.checkForAlternateRoutes(
+                            from: userLocation,
+                            to: navigationManager.destination
+                        )
+                        if navigationManager.hasFasterRouteAvailable {
+                            showingReroutingSuggestion = true
+                        }
+                    }
                 },
                 onRouteDeviation: {
                     // Handle route deviation
@@ -634,186 +703,43 @@ struct RealTimeNavigationView: View {
             .ignoresSafeArea()
             
             // Route Information Banner
-            VStack(spacing: 0) {
-                // Top banner
-                HStack(spacing: 16) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.white)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(destination)
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        Text(address)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(1)
-                    }
-                    
-                    Spacer()
-                    
-                    // ETA and Distance Info
-                    VStack(alignment: .trailing) {
-                        Text("\(navigationManager.remainingTime.formattedDuration)")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        Text("\(Int(navigationManager.remainingDistance / 1000)) km")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.9))
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 60) // Add top padding for status bar
-                .padding(.bottom, 16)
-                .background(Color.blue)
-                .edgesIgnoringSafeArea(.top)
-                
-                // Show instruction only if available
-                if let step = navigationManager.currentStep {
-                    HStack(spacing: 16) {
-                        // Instruction icon (turn direction)
-                        DirectionIcon(step: step)
-                            .frame(width: 30, height: 30)
-                        
-                        // Direction text
-                        Text(step.instructions)
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        // Distance to next maneuver
-                        Text("\(Int(navigationManager.nextStepDistance)) m")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(8)
-                    .padding([.horizontal, .bottom])
-                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                }
-            }
-            
-            // Bottom Control Panel - Simplified to only essential buttons
             VStack {
-                Spacer()
-                
-                // Alternative Routes Button
-                Button(action: {
-                    // Force recalculation to get alternatives
-                    if let location = navigationManager.lastLocation {
-                        navigationManager.updateRouteWithAlternatives(from: location)
-                    }
-                    showingAlternativeRoutes.toggle()
-                }) {
-                    HStack {
-                        Image(systemName: "arrow.triangle.swap")
-                        Text("Routes")
-                            .fontWeight(.semibold)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.white)
-                    .foregroundColor(.blue)
-                    .cornerRadius(20)
-                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                }
-                .padding(.bottom, 16)
-                
-                // Control buttons
-                HStack(alignment: .center, spacing: 0) {
-                    // Follow button
-                    Button(action: {
-                        isFollowingUser.toggle()
-                    }) {
-                        VStack {
-                            Image(systemName: isFollowingUser ? "location.fill" : "location")
-                                .font(.system(size: 24))
-                                .padding(.bottom, 4)
-                            Text("Follow")
-                                .font(.caption)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .foregroundColor(.blue)
-                    }
-                    
-                    // End button
-                    Button(action: {
-                        navigationManager.stopNavigation()
-                        onDismiss()
-                    }) {
-                        VStack {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 24))
-                                .padding(.bottom, 4)
-                            Text("End")
-                                .font(.caption)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .foregroundColor(.red)
-                    }
-                }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 8)
+                NavigationHeader(
+                    destination: destination,
+                    address: address,
+                    remainingDistance: navigationManager.remainingDistance,
+                    remainingTime: navigationManager.remainingTime
+                )
                 .background(Color(.systemBackground))
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-                .padding(.horizontal)
-                .padding(.bottom, 100) // Increased to prevent overlap with tab bar
+                .cornerRadius(15)
+                .shadow(radius: 5)
+                .padding(.top)
+                
+                Spacer()
             }
         }
-        .navigationBarTitle("", displayMode: .inline)
-        .navigationBarBackButtonHidden(true)
-        .navigationBarItems(leading: 
-            Button(action: {
-                navigationManager.stopNavigation()
+        .sheet(isPresented: $showingReroutingSuggestion) {
+            ReroutingSuggestionView(
+                tripController: TripDataController.shared,
+                isPresented: $showingReroutingSuggestion,
+                onRouteSelected: { route in
+                    navigationManager.updateCurrentRoute(route)
+                }
+            )
+        }
+        .alert("Route Deviation", isPresented: $isDeviationAlertShown) {
+            Button("OK") {
+                isDeviationAlertShown = false
+            }
+        } message: {
+            Text("You have deviated from the route. Recalculating...")
+        }
+        .alert("Route Completed", isPresented: $isRouteCompleted) {
+            Button("OK") {
                 onDismiss()
-            }) {
-                HStack {
-                    Image(systemName: "chevron.left")
-                    Text("Back to Home")
-                }
-                .foregroundColor(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.6))
-                .cornerRadius(20)
             }
-        )
-        .onAppear {
-            navigationManager.startNavigation()
-        }
-        .onDisappear {
-            navigationManager.stopNavigation()
-        }
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Navigation Alert"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
-        }
-        .alert(isPresented: $isDeviationAlertShown) {
-            Alert(
-                title: Text("Route Deviation Detected"),
-                message: Text("Recalculating route to destination..."),
-                dismissButton: .default(Text("OK"))
-            )
-        }
-        .sheet(isPresented: $showingAlternativeRoutes) {
-            AlternativeRoutesView(
-                routes: navigationManager.alternativeRoutes,
-                onSelectRoute: { route in
-                    navigationManager.selectRoute(route)
-                    showingAlternativeRoutes = false
-                },
-                onDismiss: {
-                    showingAlternativeRoutes = false
-                }
-            )
+        } message: {
+            Text("You have reached your destination!")
         }
     }
 }
