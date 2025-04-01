@@ -1645,7 +1645,7 @@ class SupabaseDataController: ObservableObject {
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
 
         // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
-        let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: response.data)
+        let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: jsonData)
 
         print("Decoded Maintenance Personnel Service History: \(history)")
         return history
