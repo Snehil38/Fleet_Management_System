@@ -613,7 +613,7 @@ struct DriverTabView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(trip.vehicleDetails.status != .underMaintenance ? Color.blue : Color.gray)
+                            .background((trip.vehicleDetails.status != .underMaintenance) ? Color.blue : Color.gray)
                             .cornerRadius(12)
                         }
                         .disabled(trip.vehicleDetails.status == .underMaintenance)
@@ -661,7 +661,7 @@ struct DriverTabView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(trip.vehicleDetails.status != .underMaintenance ? Color.green : Color.gray)
+                            .background((trip.vehicleDetails.status != .underMaintenance) ? Color.green : Color.gray)
                             .cornerRadius(12)
                         }
                         .disabled(trip.vehicleDetails.status == .underMaintenance)
