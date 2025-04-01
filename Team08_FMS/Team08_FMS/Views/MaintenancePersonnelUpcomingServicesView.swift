@@ -6,26 +6,47 @@ struct MaintenancePersonnelUpcomingServicesView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            Text("Driver Inspection Reports")
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.top)
-            
-            // Segmented Control for Pre/Post Trip
-            Picker("Inspection Type", selection: $selectedTab) {
-                Text("Pre-Trip (\(preTripCount))").tag(0)
-                Text("Post-Trip (\(postTripCount))").tag(1)
+            // Header with shadow
+            VStack {
+                Text("Driver Inspection Reports")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                // Segmented Control for Pre/Post Trip
+                Picker("Inspection Type", selection: $selectedTab) {
+                    Text("Pre-Trip (\(preTripIssuesCount))").tag(0)
+                    Text("Post-Trip (\(postTripIssuesCount))").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
             }
-            .pickerStyle(.segmented)
-            .padding()
+            .padding(.top)
+            .background(Color(.systemBackground))
+            .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
             
             // List of Requests
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    ForEach(selectedTab == 0 ? preTripRequests : postTripRequests) { request in
-                        NavigationLink(destination: InspectionRequestDetailView(request: request)) {
-                            InspectionRequestCard(request: request)
+                    if selectedTab == 0 {
+                        if preTripRequestsWithIssues.isEmpty {
+                            InspectionEmptyStateView(type: .preTrip)
+                        } else {
+                            ForEach(preTripRequestsWithIssues) { request in
+                                NavigationLink(destination: InspectionRequestDetailView(request: request)) {
+                                    InspectionRequestCard(request: request)
+                                }
+                            }
+                        }
+                    } else {
+                        if postTripRequestsWithIssues.isEmpty {
+                            InspectionEmptyStateView(type: .postTrip)
+                        } else {
+                            ForEach(postTripRequestsWithIssues) { request in
+                                NavigationLink(destination: InspectionRequestDetailView(request: request)) {
+                                    InspectionRequestCard(request: request)
+                                }
+                            }
                         }
                     }
                 }
@@ -35,20 +56,50 @@ struct MaintenancePersonnelUpcomingServicesView: View {
         .background(Color(.systemGroupedBackground))
     }
     
-    private var preTripRequests: [InspectionRequest] {
-        dataStore.inspectionRequests.filter { $0.type == .preTrip }
+    // MARK: - Computed Properties
+    
+    private var preTripRequestsWithIssues: [InspectionRequest] {
+        dataStore.inspectionRequests
+            .filter { $0.type == .preTrip && !$0.issues.isEmpty }
+            .sorted { $0.date > $1.date }
     }
     
-    private var postTripRequests: [InspectionRequest] {
-        dataStore.inspectionRequests.filter { $0.type == .postTrip }
+    private var postTripRequestsWithIssues: [InspectionRequest] {
+        dataStore.inspectionRequests
+            .filter { $0.type == .postTrip && !$0.issues.isEmpty }
+            .sorted { $0.date > $1.date }
     }
     
-    private var preTripCount: Int {
-        preTripRequests.count
+    private var preTripIssuesCount: Int {
+        preTripRequestsWithIssues.count
     }
     
-    private var postTripCount: Int {
-        postTripRequests.count
+    private var postTripIssuesCount: Int {
+        postTripRequestsWithIssues.count
+    }
+}
+
+// MARK: - Empty State View
+struct InspectionEmptyStateView: View {
+    let type: InspectionType
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: type == .preTrip ? "sunrise.circle.fill" : "sunset.circle.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.gray)
+            
+            Text("No \(type.rawValue) Issues")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text("All inspections are clear")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 200)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
     }
 }
 
