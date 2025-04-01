@@ -122,7 +122,9 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
     }
     
     private func startMaintenance() {
-        dataStore.updateServiceRequestStatus(request, newStatus: .inProgress)
+        Task {
+            await dataStore.updateServiceRequestStatus(request, newStatus: .inProgress)
+        }
         alertMessage = "Maintenance started successfully"
         showingAlert = true
         // Dismiss the view after a short delay
@@ -132,8 +134,10 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
     }
     
     private func completeServiceRequest() {
-        dataStore.updateServiceRequestStatus(request, newStatus: .completed)
-        dataStore.addToServiceHistory(request)
+        Task {
+            await dataStore.updateServiceRequestStatus(request, newStatus: .completed)
+            await dataStore.addToServiceHistory(from: request)
+        }
         alertMessage = "Service request marked as completed"
         showingAlert = true
         // Dismiss the view after a short delay
@@ -252,7 +256,9 @@ struct AddExpenseView: View {
             category: category
         )
         
-        dataStore.addExpense(to: request, expense: expense)
+        Task {
+            await dataStore.addExpense(to: request, expense: expense)
+        }
         description = ""
         amount = ""
         category = .parts

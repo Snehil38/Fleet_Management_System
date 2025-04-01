@@ -1622,5 +1622,236 @@ class SupabaseDataController: ObservableObject {
 //        return Trip(from: supabaseTrip, vehicle: data.vehicles)
 //    }
 
+    // MARK: - Service History
+        
+    func fetchServiceHistory() async throws -> [MaintenancePersonnelServiceHistory] {
+        print("Fetching MaintenancePersonnelServiceHistory...")
 
+        // Fetch raw data from Supabase
+        let response = try await supabase
+            .from("maintenancepersonnelservicehistory")
+            .select()
+            .execute()
+
+        // Ensure response data exists
+        let jsonData = response.data
+
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+
+        // Configure JSONDecoder with date decoding strategy
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+        // Decode raw JSON response into a dictionary
+        guard let jsonObjects = try JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] else {
+            throw NSError(domain: "DecodingError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON format"])
+        }
+
+        // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
+        let history: [MaintenancePersonnelServiceHistory] = try jsonObjects.map { obj in
+            var modifiedObj = obj
+            
+            // Extract `safetyChecks`, decode if it exists, or default to an empty array
+            if let safetyChecksString = obj["safetyChecks"] as? String,
+               let safetyChecksData = safetyChecksString.data(using: .utf8) {
+                let safetyChecks = try? decoder.decode([SafetyCheck].self, from: safetyChecksData)
+                modifiedObj["safetyChecks"] = safetyChecks ?? []
+            } else {
+                modifiedObj["safetyChecks"] = []
+            }
+
+            let modifiedData = try JSONSerialization.data(withJSONObject: modifiedObj)
+            return try decoder.decode(MaintenancePersonnelServiceHistory.self, from: modifiedData)
+        }
+
+        print("Decoded Maintenance Personnel Service History: \(history)")
+        return history
+    }
+        
+    func insertServiceHistory(history: MaintenancePersonnelServiceHistory) async throws {
+        print("Inserting MaintenancePersonnelServiceHistory: \(history)")
+        try await supabase
+            .from("maintenancepersonnelservicehistory")
+            .insert(history)
+            .execute()
+        print("Insert complete for MaintenancePersonnelServiceHistory")
+    }
+
+    // MARK: - Routine Schedule
+
+    func fetchRoutineSchedule() async throws -> [MaintenancePersonnelRoutineSchedule] {
+        print("Fetching MaintenancePersonnelRoutineSchedule...")
+
+        let response = try await supabase
+            .from("maintenancepersonnelroutineschedule")
+            .select()
+            .execute()
+
+        // Ensure response data exists
+        let jsonData = response.data
+
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Ensure this matches Supabase timestamp format
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0) // Optional: Adjust as needed
+
+        // Configure JSONDecoder with custom date formatter
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+        // Decode JSON into the struct
+        let personnelRoutineSchedule = try decoder.decode([MaintenancePersonnelRoutineSchedule].self, from: jsonData)
+
+        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
+        return personnelRoutineSchedule
+    }
+    
+    func insertRoutineSchedule(schedule: MaintenancePersonnelRoutineSchedule) async throws {
+        print("Inserting MaintenancePersonnelRoutineSchedule: \(schedule)")
+        try await supabase
+            .from("maintenancepersonnelroutineschedule")
+            .insert(schedule)
+            .execute()
+        print("Insert complete for MaintenancePersonnelRoutineSchedule")
+    }
+    
+    func deleteRoutineSchedule(schedule: MaintenancePersonnelRoutineSchedule) async throws {
+        print("Deleting MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
+        try await supabase
+            .from("maintenancepersonnelroutineschedule")
+            .delete()
+            .eq("id", value: schedule.id.uuidString)
+            .execute()
+        print("Deletion complete for MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
+    }
+
+    // MARK: - Service Request
+
+    func fetchServiceRequests() async throws -> [MaintenanceServiceRequest] {
+        print("Fetching MaintenanceServiceRequest...")
+
+        let requestResponse = try await supabase
+            .from("maintenanceservicerequest")
+            .select()
+            .execute()
+
+        let jsonData = requestResponse.data
+
+        // Decode JSON into an array of dictionaries
+        let jsonObjects = try JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] ?? []
+
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+        // Configure JSONDecoder
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+        // Convert JSON dictionaries into `MaintenanceServiceRequest` objects
+        let serviceRequests: [MaintenanceServiceRequest] = try jsonObjects.map { obj in
+            var modifiedObj = obj
+
+            // Decode `safetyChecks` JSON if present, otherwise set empty array
+            if let safetyChecksString = obj["safetyChecks"] as? String,
+               let safetyChecksData = safetyChecksString.data(using: .utf8) {
+                let safetyChecks = try? JSONDecoder().decode([SafetyCheck].self, from: safetyChecksData)
+                modifiedObj["safetyChecks"] = safetyChecks ?? []
+            } else {
+                modifiedObj["safetyChecks"] = []
+            }
+
+            // Decode `expenses` JSON if present, otherwise set empty array
+            if let expensesString = obj["expenses"] as? String,
+               let expensesData = expensesString.data(using: .utf8) {
+                let expenses = try? JSONDecoder().decode([Expense].self, from: expensesData)
+                modifiedObj["expenses"] = expenses ?? []
+            } else {
+                modifiedObj["expenses"] = []
+            }
+
+            // Convert modified dictionary back to JSON and decode into struct
+            let modifiedData = try JSONSerialization.data(withJSONObject: modifiedObj)
+            return try decoder.decode(MaintenanceServiceRequest.self, from: modifiedData)
+        }
+
+        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
+        return serviceRequests
+    }
+
+    func insertServiceRequest(request: MaintenanceServiceRequest) async throws {
+        print("Inserting MaintenanceServiceRequest: \(request)")
+        try await supabase
+            .from("maintenanceservicerequest")
+            .insert(request)
+            .execute()
+        print("Insert complete for MaintenanceServiceRequest")
+    }
+
+    // MARK: - Safety Check
+
+    func fetchSafetyChecks(for requestId: UUID) async throws -> [SafetyCheck] {
+        print("Fetching SafetyChecks for requestId: \(requestId.uuidString)")
+        let response = try await supabase
+            .from("safetycheck")
+            .select()
+            .eq("serviceRequestId", value: requestId.uuidString)
+            .execute()
+        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
+        print("Decoded SafetyChecks for requestId \(requestId.uuidString): \(safetyChecks)")
+        return safetyChecks
+    }
+    
+    func insertSafetyCheck(check: SafetyCheck) async throws {
+        print("Inserting SafetyCheck: \(check)")
+        try await supabase
+            .from("safetycheck")
+            .insert(check)
+            .execute()
+        print("Insert complete for SafetyCheck")
+    }
+
+    // MARK: - Expense
+
+    func fetchExpenses(for requestId: UUID) async throws -> [Expense] {
+        print("Fetching Expenses for requestId: \(requestId.uuidString)")
+        let response = try await supabase
+            .from("expense")
+            .select()
+            .eq("serviceRequestId", value: requestId.uuidString)
+            .execute()
+        let expenses = try JSONDecoder().decode([Expense].self, from: response.data)
+        print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
+        return expenses
+    }
+    
+    func insertExpense(expense: Expense) async throws {
+        print("Inserting Expense: \(expense)")
+        try await supabase
+            .from("expense")
+            .insert(expense)
+            .execute()
+        print("Insert complete for Expense")
+    }
+    
+    func updateServiceRequestStatus(serviceRequestId: UUID, newStatus: ServiceRequestStatus) async throws -> Bool {
+        let payload: [String: String] = ["status": newStatus.rawValue]
+        
+        // Perform the update on the Supabase table
+        let response = try await supabase
+            .from("maintenanceservicerequest")  // The table you are updating
+            .update(payload)  // Update the status column
+            .eq("id", value: serviceRequestId)  // Assuming `id` is the primary key
+            .execute()
+        
+        // Check if the response was successful
+        if response.status == 200 {
+            return true
+        } else {
+            throw NSError(domain: "SupabaseError", code: response.status, userInfo: [NSLocalizedDescriptionKey: "Failed to update service request status."])
+        }
+    }
 }

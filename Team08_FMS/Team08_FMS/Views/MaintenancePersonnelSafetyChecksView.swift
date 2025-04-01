@@ -139,7 +139,9 @@ struct SafetyCheckDetailView: View {
     }
     
     private func saveSafetyChecks() {
-        dataStore.updateSafetyChecks(for: request, checks: safetyChecks)
+        Task {
+            await dataStore.updateSafetyChecks(for: request, checks: safetyChecks)
+        }
         showingSaveAlert = true
     }
 }

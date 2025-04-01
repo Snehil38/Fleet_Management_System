@@ -5,6 +5,25 @@ enum ServiceType: String, CaseIterable, Codable {
     case repair = "Repair"
     case inspection = "Inspection"
     case emergency = "Emergency"
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        
+        // Normalize the value to lowercase for matching.
+        switch rawValue.lowercased() {
+        case "routine":
+            self = .routine
+        case "repair":
+            self = .repair
+        case "inspection":
+            self = .inspection
+        case "emergency":
+            self = .emergency
+        default:
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ServiceType value: \(rawValue)")
+        }
+    }
 }
 
 enum ServiceRequestStatus: String, CaseIterable, Codable {
@@ -13,6 +32,25 @@ enum ServiceRequestStatus: String, CaseIterable, Codable {
     case inProgress = "In Progress"
     case completed = "Completed"
     case cancelled = "Cancelled"
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        switch rawValue.lowercased() {
+        case "pending":
+            self = .pending
+        case "assigned":
+            self = .assigned
+        case "in progress":
+            self = .inProgress
+        case "completed":
+            self = .completed
+        case "cancelled":
+            self = .cancelled
+        default:
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ServiceRequestStatus value: \(rawValue)")
+        }
+    }
 }
 
 enum ServiceRequestPriority: String, CaseIterable, Codable {
@@ -20,6 +58,47 @@ enum ServiceRequestPriority: String, CaseIterable, Codable {
     case medium = "Medium"
     case high = "High"
     case urgent = "Urgent"
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        switch rawValue.lowercased() {
+        case "low":
+            self = .low
+        case "medium":
+            self = .medium
+        case "high":
+            self = .high
+        case "urgent":
+            self = .urgent
+        default:
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ServiceRequestPriority value: \(rawValue)")
+        }
+    }
+}
+
+enum ExpenseCategory: String, Codable, CaseIterable {
+    case parts = "Parts"
+    case labor = "Labor"
+    case supplies = "Supplies"
+    case other = "Other"
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        switch rawValue.lowercased() {
+        case "Parts":
+            self = .parts
+        case "Labor":
+            self = .labor
+        case "Supplies":
+            self = .supplies
+        case "Other":
+            self = .other
+        default:
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ExpenseCategory value: \(rawValue)")
+        }
+    }
 }
 
 struct SafetyCheck: Identifiable, Codable, Equatable {
@@ -105,13 +184,6 @@ struct Expense: Identifiable, Codable, Equatable {
         self.date = date
         self.category = category
     }
-}
-
-enum ExpenseCategory: String, Codable, CaseIterable {
-    case parts = "Parts"
-    case labor = "Labor"
-    case supplies = "Supplies"
-    case other = "Other"
 }
 
 struct ServiceHistory: Identifiable, Codable {

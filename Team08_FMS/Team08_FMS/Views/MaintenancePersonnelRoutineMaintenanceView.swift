@@ -99,7 +99,9 @@ struct MaintenancePersonnelRoutineScheduleDetailView: View {
         .alert("Delete Schedule", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                dataStore.deleteRoutineSchedule(schedule)
+                Task {
+                    await dataStore.deleteRoutineSchedule(schedule)
+                }
                 dismiss()
             }
         } message: {
@@ -167,7 +169,9 @@ struct MaintenancePersonnelNewRoutineScheduleView: View {
             nextServiceDate: Date().addingTimeInterval(TimeInterval(interval * 86400)),
             notes: notes
         )
-        dataStore.addRoutineSchedule(schedule)
+        Task {
+            await dataStore.addRoutineSchedule(schedule)
+        }
         dismiss()
     }
 }
