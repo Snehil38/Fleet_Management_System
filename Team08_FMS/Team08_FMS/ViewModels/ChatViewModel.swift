@@ -207,7 +207,8 @@ class ChatViewModel: ObservableObject {
                     .eq("status", value: "sent")
                     .execute()
                 
-                if let countString = try? JSONDecoder().decode([String: Int].self, from: response.data)["count"] {
+                let responseData = response.data
+                if let countString = try? JSONDecoder().decode([String: Int].self, from: responseData)["count"] {
                     await MainActor.run {
                         self.unreadCount = countString
                     }
@@ -318,7 +319,8 @@ class ChatViewModel: ObservableObject {
             .execute()
         
         // Print raw response for debugging
-        if let responseString = String(data: response.data, encoding: .utf8) {
+        let responseData = response.data
+        if let responseString = String(data: responseData, encoding: .utf8) {
             print("Raw response: \(responseString)")
         }
         
@@ -329,7 +331,7 @@ class ChatViewModel: ObservableObject {
         }
         
         let decoder = JSONDecoder()
-        if let recipients = try? decoder.decode([RecipientResponse].self, from: response.data) {
+        if let recipients = try? decoder.decode([RecipientResponse].self, from: responseData) {
             print("Found \(recipients.count) recipients")
             for recipient in recipients {
                 print("Recipient: \(recipient.name) (\(recipient.userID))")

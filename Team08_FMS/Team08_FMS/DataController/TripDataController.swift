@@ -432,190 +432,51 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         isLoading = false
     }
     
-    // Fetch all trips without driver filtering
-    @MainActor
+    // Method to fetch trips with pickup points
     func fetchAllTrips() async throws {
-        print("Fetching all trips...")
+        isLoading = true
+        error = nil
+        
         do {
-            // Create a decoder with custom date decoding strategy
-            let decoder = JSONDecoder()
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            // Fetch all trips
+            let supabaseTrips = try await supabaseController.getAllTrips()
             
-            decoder.dateDecodingStrategy = .custom { decoder in
-                let container = try decoder.singleValueContainer()
-                let dateString = try container.decode(String.self)
+            // Create an empty array to store converted Trip objects
+            var tripObjects: [Trip] = []
+            
+            // Process each Supabase trip
+            for supabaseTrip in supabaseTrips {
+                // Get the vehicle for this trip
+                let vehicle = try await supabaseController.getVehicleById(id: supabaseTrip.vehicle_id)
                 
-                // Try parsing with different date formats
-                let formats = [
-                    // Full timestamps with different variations
-                    "yyyy-MM-dd'T'HH:mm:ss",
-                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
-                    "yyyy-MM-dd'T'HH:mm:ssZ",
-                    // Date-only format (for pollution_expiry, etc.)
-                    "yyyy-MM-dd"
-                ]
+                // Convert to Trip model
+                var trip = Trip(from: supabaseTrip, vehicle: vehicle)
                 
-                for format in formats {
-                    dateFormatter.dateFormat = format
-                    if let date = dateFormatter.date(from: dateString) {
-                        return date
-                    }
-                }
+                // Fetch additional pickup points from dedicated table
+                let pickupPoints = try await supabaseController.getPickupPointsForTrip(tripId: trip.id)
+                trip.additionalPickups = pickupPoints
                 
-                // If none of the formats work, try removing microseconds
-                if let dotIndex = dateString.firstIndex(of: ".") {
-                    let truncated = String(dateString[..<dotIndex])
-                    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-                    if let date = dateFormatter.date(from: truncated) {
-                        return date
-                    }
-                }
-                
-                print("Failed to decode date string: \(dateString)")
-                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
+                tripObjects.append(trip)
             }
             
-            // Start building the query for all trips
-            let query = supabaseController.supabase
-                .from("trips")
-                .select("""
-                    id,
-                    destination,
-                    trip_status,
-                    has_completed_pre_trip,
-                    has_completed_post_trip,
-                    vehicle_id,
-                    driver_id,
-                    secondary_driver_id,
-                    start_time,
-                    end_time,
-                    notes,
-                    created_at,
-                    updated_at,
-                    is_deleted,
-                    start_latitude,
-                    start_longitude,
-                    end_latitude,
-                    end_longitude,
-                    pickup,
-                    estimated_distance,
-                    estimated_time,
-                    vehicles (
-                        id,
-                        name,
-                        year,
-                        make,
-                        model,
-                        vin,
-                        license_plate,
-                        vehicle_type,
-                        color,
-                        body_type,
-                        body_subtype,
-                        msrp,
-                        pollution_expiry,
-                        insurance_expiry,
-                        status
-                    )
-                """)
-                .eq("is_deleted", value: false)
-            
-            // Execute the query
-            let response = try await query.execute()
-            
-            // Print raw response for debugging
-//            print("Raw response for all trips: \(String(data: response.data, encoding: .utf8) ?? "nil")")
-            
-            // Define a nested struct to match the joined data structure
-            struct JoinedTripData: Codable {
-                let id: UUID
-                let destination: String
-                let trip_status: String
-                let has_completed_pre_trip: Bool
-                let has_completed_post_trip: Bool
-                let vehicle_id: UUID
-                let driver_id: UUID?
-                let secondary_driver_id: UUID?
-                let start_time: Date?
-                let end_time: Date?
-                let notes: String?
-                let created_at: Date
-                let updated_at: Date?
-                let is_deleted: Bool
-                let start_latitude: Double?
-                let start_longitude: Double?
-                let end_latitude: Double?
-                let end_longitude: Double?
-                let pickup: String?
-                let estimated_distance: Double?
-                let estimated_time: Double?
-                let vehicles: Vehicle
+            // Update published properties on the main thread
+            await MainActor.run {
+                self.allTrips = tripObjects
                 
-                // Add computed properties to parse distance and fuel cost
-                var parsedDistance: String {
-                    if let estimatedDistance = estimated_distance {
-                        return String(format: "%.1f", estimatedDistance)
-                    }
-                    guard let notes = notes,
-                          let distanceRange = notes.range(of: "Distance: "),
-                          let endRange = notes[distanceRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    return String(notes[distanceRange.upperBound..<endRange.lowerBound])
+                // Filter trips by status
+                self.upcomingTrips = tripObjects.filter { $0.status == .pending || $0.status == .assigned }
+                
+                if self.driverId != nil {
+                    self.currentTrip = tripObjects.first(where: { $0.status == .inProgress })
                 }
                 
-                var parsedFuelCost: String {
-                    guard let notes = notes,
-                          let fuelRange = notes.range(of: "Estimated Fuel Cost: "),
-                          let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
-                        return "N/A"
-                    }
-                    let dist = (Double(parsedDistance) ?? 0)*0.5
-                    return "\(dist) $"
-                }
+                self.isLoading = false
             }
-            
-            let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
-            
-            // Convert joined data to Trip objects
-            let tripsWithVehicles = joinedData.map { data -> Trip in
-                let supabaseTrip = SupabaseTrip(
-                    id: data.id,
-                    destination: data.destination,
-                    trip_status: data.trip_status,
-                    has_completed_pre_trip: data.has_completed_pre_trip,
-                    has_completed_post_trip: data.has_completed_post_trip,
-                    vehicle_id: data.vehicle_id,
-                    driver_id: data.driver_id,
-                    secondary_driver_id: data.secondary_driver_id,
-                    start_time: data.start_time,
-                    end_time: data.end_time,
-                    notes: data.notes,
-                    created_at: data.created_at,
-                    updated_at: data.updated_at ?? data.created_at,
-                    is_deleted: data.is_deleted,
-                    start_latitude: data.start_latitude,
-                    start_longitude: data.start_longitude,
-                    end_latitude: data.end_latitude,
-                    end_longitude: data.end_longitude,
-                    pickup: data.pickup,
-                    estimated_distance: data.estimated_distance,
-                    estimated_time: data.estimated_time
-                )
-                return Trip(from: supabaseTrip, vehicle: data.vehicles)
-            }
-            
-            print("Successfully processed \(tripsWithVehicles.count) all trips")
-            
-            // Update allTrips property
-            self.allTrips = tripsWithVehicles
-            
         } catch {
-            print("Error fetching all trips: \(error)")
-            throw TripError.fetchError("Failed to fetch all trips: \(error.localizedDescription)")
+            await MainActor.run {
+                self.error = .fetchError("Failed to fetch trips: \(error.localizedDescription)")
+                self.isLoading = false
+            }
         }
     }
     
@@ -1103,7 +964,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     @MainActor
     func deleteTrip(id: UUID) async throws {
         // Soft delete the trip in the database
-        supabaseController.deleteTrip(tripID: id)
+        try await supabaseController.deleteTrip(tripID: id)
         
         // Update local state
         allTrips.removeAll { $0.id == id }

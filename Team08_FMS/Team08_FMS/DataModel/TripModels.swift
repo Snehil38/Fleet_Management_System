@@ -10,7 +10,7 @@ enum TripStatus: String, Codable {
 }
 
 // Additional Pickup Model
-struct PickupPoint: Identifiable, Codable, Equatable {
+struct Trip: Identifiable, Codable, Equatable {
     let id: UUID
     let tripId: UUID
     var location: String
@@ -21,13 +21,13 @@ struct PickupPoint: Identifiable, Codable, Equatable {
     var completed: Bool
     var estimatedArrivalTime: Date?
     
-    static func == (lhs: PickupPoint, rhs: PickupPoint) -> Bool {
+    static func == (lhs: Trip, rhs: Trip) -> Bool {
         lhs.id == rhs.id
     }
 }
 
 // Trip Model
-struct Trip: Identifiable, Equatable {
+class Trip: Identifiable, Equatable {
     let id: UUID
     var destination: String
     var address: String
@@ -44,8 +44,8 @@ struct Trip: Identifiable, Equatable {
     let destinationCoordinate: CLLocationCoordinate2D
     let startingPoint: String
     let pickup: String?
-    let driverId: UUID?
-    var additionalPickups: [PickupPoint]
+    var driverId: UUID?
+    var additionalPickups: [Trip]
     
     // Computed property for display purposes
     var displayName: String {
@@ -158,7 +158,7 @@ struct Trip: Identifiable, Equatable {
                             let lngStr = components[3].trimmingCharacters(in: .whitespaces)
                             
                             if let lat = Double(latStr), let lng = Double(lngStr) {
-                                let pickup = PickupPoint(
+                                let pickup = Trip(
                                     id: UUID(),
                                     tripId: self.id,
                                     location: location,
