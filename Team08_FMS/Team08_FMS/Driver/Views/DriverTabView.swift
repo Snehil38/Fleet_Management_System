@@ -425,7 +425,6 @@ struct DriverTabView: View {
                     .cornerRadius(12)
                 }
             }
-            
             tripActionButtons(trip)
         }
     }
@@ -614,9 +613,10 @@ struct DriverTabView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(trip.hasCompletedPreTrip ? Color.blue : Color.gray)
+                            .background(trip.vehicleDetails.status != .underMaintenance ? Color.blue : Color.gray)
                             .cornerRadius(12)
                         }
+                        .disabled(trip.vehicleDetails.status == .underMaintenance)
                         
                         // Pre-Trip Inspection Button
                         Button(action: {
@@ -661,9 +661,10 @@ struct DriverTabView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(Color.green)
+                            .background(trip.vehicleDetails.status != .underMaintenance ? Color.green : Color.gray)
                             .cornerRadius(12)
                         }
+                        .disabled(trip.vehicleDetails.status == .underMaintenance)
                         
                         // SOS Button
                         Button(action: {

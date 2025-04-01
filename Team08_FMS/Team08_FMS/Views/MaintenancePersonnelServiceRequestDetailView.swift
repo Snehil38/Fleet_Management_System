@@ -262,20 +262,18 @@ struct AddExpenseView: View {
     }
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section("Expense Details") {
-                    TextField("Description", text: $description)
-                        .focused($focusedField)
-                    
-                    TextField("Amount", text: $amount)
-                        .keyboardType(.decimalPad)
-                        .focused($focusedField)
-                    
-                    Picker("Category", selection: $category) {
-                        ForEach(ExpenseCategory.allCases, id: \.self) { category in
-                            Text(category.rawValue).tag(category)
-                        }
+        Form {
+            Section("Expense Details") {
+                TextField("Description", text: $description)
+                    .focused($focusedField)
+                
+                TextField("Amount", text: $amount)
+                    .keyboardType(.decimalPad)
+                    .focused($focusedField)
+                
+                Picker("Category", selection: $category) {
+                    ForEach(ExpenseCategory.allCases, id: \.self) { category in
+                        Text(category.rawValue).tag(category)
                     }
                 }
             }
