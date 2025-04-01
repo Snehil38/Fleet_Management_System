@@ -547,7 +547,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Only update if we're moving (speed > 0.5 m/s or about 1.8 km/h)
         if speed > 0.5 {
             // Convert speed to km/h for easier calculation
-            let speedKmh = speed * 3.6
+//            let speedKmh = speed * 3.6
             
             // Update remaining time based on current speed and remaining distance
             if remainingDistance > 0 {

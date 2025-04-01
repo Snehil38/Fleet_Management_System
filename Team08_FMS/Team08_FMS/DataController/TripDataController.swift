@@ -359,10 +359,10 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        // Handle location updates if needed
-    }
+//    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+//        guard let location = locations.last else { return }
+//        // Handle location updates if needed
+//    }
     
     func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
         print("DEBUG: Successfully started monitoring region: \(region.identifier)")
@@ -840,7 +840,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     
     private func formatDate(_ date: Date) -> String {
         let calendar = Calendar.current
-        let now = Date()
+//        let now = Date()
         
         if calendar.isDateInToday(date) {
             let formatter = DateFormatter()

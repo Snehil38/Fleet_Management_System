@@ -278,7 +278,7 @@ struct CrewCardView: View {
                 Label("Delete Crew Member", systemImage: "trash")
             }
             
-            if let driver = currentCrew as? Driver {
+            if currentCrew is Driver {
                 if !isInTrip {  // Only show status change options if not in a trip
                     if currentCrew.status == .available {
                         Button {

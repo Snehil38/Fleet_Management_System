@@ -51,7 +51,7 @@ struct ChatView: View {
                 .onAppear {
                     scrollProxy = proxy
                 }
-                .onChange(of: viewModel.messages) { _ in
+                .onChange(of: viewModel.messages) { _, _ in
                     scrollToBottom()
                 }
             }

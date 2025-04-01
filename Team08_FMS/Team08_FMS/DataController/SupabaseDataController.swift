@@ -1644,11 +1644,6 @@ class SupabaseDataController: ObservableObject {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
 
-        // Decode raw JSON response into a dictionary
-        guard let jsonObjects = try JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] else {
-            throw NSError(domain: "DecodingError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON format"])
-        }
-
         // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
         let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: response.data)
 

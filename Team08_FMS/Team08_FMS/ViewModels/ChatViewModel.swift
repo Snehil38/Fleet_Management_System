@@ -67,7 +67,7 @@ class ChatViewModel: ObservableObject {
     private func setupMessageListener() async {
         // First, cleanup any existing channel
         if let channel = realtimeChannel {
-            try? await channel.unsubscribe()
+            channel.unsubscribe()
             realtimeChannel = nil
         }
         
@@ -94,7 +94,7 @@ class ChatViewModel: ObservableObject {
             }
             
             // Subscribe to the channel
-            try await channel.subscribe()
+            channel.subscribe()
             print("Successfully subscribed to realtime updates")
             
             // Store the channel reference
@@ -102,11 +102,6 @@ class ChatViewModel: ObservableObject {
                 self.realtimeChannel = channel
             }
             
-        } catch {
-            print("Error setting up realtime listener: \(error)")
-            await MainActor.run {
-                self.error = error
-            }
         }
     }
     
@@ -119,7 +114,7 @@ class ChatViewModel: ObservableObject {
         }
         
         do {
-            let currentUserId = try await supabaseDataController.getUserID()
+            let currentUserId = await supabaseDataController.getUserID()
             
             let response = try await supabaseDataController.supabase
                 .from("chat_messages")
@@ -196,7 +191,7 @@ class ChatViewModel: ObservableObject {
     private func updateUnreadCount() {
         Task {
             do {
-                let currentUserId = try await supabaseDataController.getUserID()
+                let currentUserId = await supabaseDataController.getUserID()
                 
                 let response = try await supabaseDataController.supabase
                     .from("chat_messages")
@@ -222,7 +217,7 @@ class ChatViewModel: ObservableObject {
         Task { @MainActor in
             do {
                 // Get the current user's ID
-                guard let userId = try? await supabaseDataController.getUserID() else {
+                guard let userId = await supabaseDataController.getUserID() else {
                     print("No user ID found")
                     return
                 }
@@ -236,8 +231,8 @@ class ChatViewModel: ObservableObject {
                 }
                 
                 // Get the current user's role
-                let userRole = await supabaseDataController.userRole
-                print("Current user role: \(userRole)")
+                let userRole = supabaseDataController.userRole
+                print("Current user role: \(userRole ?? "Invalid")")
                 
                 // Determine message direction based on user role
                 let (messageFleetManagerId, messageRecipientId, messageRecipientType): (UUID, UUID, String)
@@ -366,7 +361,7 @@ class ChatViewModel: ObservableObject {
         refreshTimer?.invalidate()
         if let channel = realtimeChannel {
             Task {
-                try? await channel.unsubscribe()
+                channel.unsubscribe()
             }
         }
     }
