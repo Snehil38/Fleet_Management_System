@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-import Supabase
+@preconcurrency import Supabase
 
 private struct MessagePayload: Encodable {
     let id: String

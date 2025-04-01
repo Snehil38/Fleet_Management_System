@@ -28,7 +28,7 @@ struct MaintenancePersonnelDashboardView: View {
             .sheet(isPresented: $showingProfile) {
                 profileSheet
             }
-            .onChange(of: dataStore.serviceRequests) { _ in
+            .onChange(of: dataStore.serviceRequests) { _, _ in
                 checkForCompletedRequests()
             }
         }
@@ -114,6 +114,7 @@ struct MaintenancePersonnelDashboardView: View {
             $0.status == .completed && 
             $0.completionDate?.timeIntervalSinceNow ?? 0 > -1 
         }) {
+            print(completedRequest)
             selectedStatus = .completed
         }
     }

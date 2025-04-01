@@ -583,7 +583,8 @@ struct TripDetailsView: View {
                         // Update the existing chatViewModel with the correct fleet manager ID
                         await MainActor.run {
                             // Create a new ChatViewModel with the correct fleet manager ID
-//                            let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
+                            let newViewModel = ChatViewModel(recipientId: fleetManagerId, recipientType: .driver)
+                            print(newViewModel)
                         }
                     }
                 } catch {

@@ -1730,7 +1730,7 @@ class SupabaseDataController: ObservableObject {
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
 
         // Convert JSON dictionaries into `MaintenanceServiceRequest` objects
-        let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: requestResponse.data)
+        let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: jsonData)
 
         print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
         return serviceRequests

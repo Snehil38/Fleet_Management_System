@@ -573,6 +573,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                           let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
                         return "N/A"
                     }
+                    print(endRange)
                     let dist = (Double(parsedDistance) ?? 0)*0.5
                     return "\(dist) $"
                 }
@@ -972,7 +973,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         print("Starting trip \(trip.id)")
         
         // Check if there's already a trip in progress
-        if let currentTrip = self.currentTrip {
+        if self.currentTrip != nil {
             throw TripError.updateError("Cannot start a new trip while another trip is in progress")
         }
         

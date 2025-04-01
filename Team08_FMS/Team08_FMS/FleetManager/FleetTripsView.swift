@@ -784,7 +784,7 @@ struct TripDetailView: View {
                             .onChange(of: editedNotes) { _, _ in notesEdited = true }
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
-                            if let notes = trip.notes {
+                            if trip.notes != nil {
                                 Text("Trip Details")
                                     .font(.headline)
                                     .padding(.bottom, 4)
