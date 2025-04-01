@@ -70,7 +70,9 @@ struct MaintenancePersonnelProfileView: View {
         .alert("Logout", isPresented: $showingLogoutAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Logout", role: .destructive) {
-                dismiss()
+                Task {
+                    SupabaseDataController.shared.signOut()
+                }
             }
         } message: {
             Text("Are you sure you want to logout?")
