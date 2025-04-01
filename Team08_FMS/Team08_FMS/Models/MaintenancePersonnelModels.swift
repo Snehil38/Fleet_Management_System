@@ -111,8 +111,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
                 description: request.description,
                 date: request.date,
                 completionDate: Date(),  // set to now
-                notes: request.notes,
-                safetyChecks: safetyCheckIDs
+                notes: request.notes
             )
             
             // Insert the new service history record.

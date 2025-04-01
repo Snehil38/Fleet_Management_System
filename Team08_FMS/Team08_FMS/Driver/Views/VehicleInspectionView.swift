@@ -193,7 +193,7 @@ struct VehicleInspectionView: View {
                         Task {
                             do {
                                 if isPreTrip {
-                                    try await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+                                    await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
                                 }
                                 try await SupabaseDataController.shared.insertServiceRequest(request: newRequest)
                                 print("Maintenance service request inserted successfully.")
@@ -202,7 +202,7 @@ struct VehicleInspectionView: View {
                             }
                         }
                     }
-                    onComplete(!hasIssues)
+                    onComplete(!hasIssues || !isPreTrip)
                     presentationMode.wrappedValue.dismiss()
                 }
             } message: {
