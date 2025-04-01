@@ -6,6 +6,7 @@ struct MaintenancePersonnelDashboardView: View {
     @State private var selectedStatus: ServiceRequestStatus = .pending
     @State private var showingNewRequest = false
     @State private var showingProfile = false
+    @State private var showingChat = false
     
     var body: some View {
         NavigationView {
@@ -28,7 +29,10 @@ struct MaintenancePersonnelDashboardView: View {
             .sheet(isPresented: $showingProfile) {
                 profileSheet
             }
-            .onChange(of: dataStore.serviceRequests) { _ in
+            .sheet(isPresented: $showingChat) {
+                MaintenancePersonnelChatView()
+            }
+            .onChange(of: dataStore.serviceRequests) { _, _ in
                 checkForCompletedRequests()
             }
         }
@@ -44,9 +48,16 @@ struct MaintenancePersonnelDashboardView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingProfile = true }) {
-                        Image(systemName: "person.circle.fill")
-                            .font(.title2)
+                    HStack(spacing: 16) {
+                        Button(action: { showingChat = true }) {
+                            Image(systemName: "message.fill")
+                                .font(.title2)
+                        }
+                        
+                        Button(action: { showingProfile = true }) {
+                            Image(systemName: "person.circle.fill")
+                                .font(.title2)
+                        }
                     }
                 }
             }
@@ -114,6 +125,7 @@ struct MaintenancePersonnelDashboardView: View {
             $0.status == .completed && 
             $0.completionDate?.timeIntervalSinceNow ?? 0 > -1 
         }) {
+            print(completedRequest)
             selectedStatus = .completed
         }
     }
@@ -135,6 +147,7 @@ struct ServiceRequestCard: View {
     let request: MaintenanceServiceRequest
     @ObservedObject var dataStore: MaintenancePersonnelDataStore
     @State private var expenses: [Expense] = []
+    @State private var showingChat = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -164,9 +177,24 @@ struct ServiceRequestCard: View {
                     .lineLimit(2)
                 
                 if request.status == .inProgress {
-                    Label("\(expenses.count) Expenses", systemImage: "dollarsign.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
+                    HStack {
+                        Label("\(expenses.count) Expenses", systemImage: "dollarsign.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            showingChat = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "message.fill")
+                                Text("Message")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        }
+                    }
                 }
             }
             
@@ -205,12 +233,14 @@ struct ServiceRequestCard: View {
         .onAppear {
             fetchExpensesForRequest()
         }
+        .sheet(isPresented: $showingChat) {
+            MaintenancePersonnelChatView(serviceRequest: request)
+        }
     }
     
     private func fetchExpensesForRequest() {
         Task {
             do {
-                // This method should be implemented in your data store.
                 let fetchedExpenses = try await dataStore.fetchExpenses(for: request.id)
                 await MainActor.run {
                     self.expenses = fetchedExpenses
@@ -221,7 +251,6 @@ struct ServiceRequestCard: View {
         }
     }
 }
-
 
 struct StatusFilterButton: View {
     let status: ServiceRequestStatus
