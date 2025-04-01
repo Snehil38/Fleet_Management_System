@@ -447,6 +447,7 @@ struct TripDetailView: View {
     @State private var showingAssignSheet = false
     @State private var showingDeleteAlert = false
     @StateObject private var tripController = TripDataController.shared
+    @StateObject private var supabaseDataController = SupabaseDataController.shared
     let trip: Trip
     
     // Editing state variables
@@ -483,9 +484,13 @@ struct TripDetailView: View {
     @State private var isSaving = false
     @State private var showingSaveSuccess = false
     
+    // Additional pickup point state
+    @State private var showingAddPickupSheet = false
+    @State private var additionalPickups: [PickupPoint] = []
+    
     // Location field enum
     enum LocationField {
-        case destination, address
+        case destination, address, newPickup
     }
     
     // Field validations
@@ -707,6 +712,50 @@ struct TripDetailView: View {
                     TripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
                 }
                 
+                // Additional Pickup Points Section (only show for non-delivered trips)
+                if trip.status != .delivered {
+                    Section(header: Text("ADDITIONAL PICKUP POINTS")) {
+                        if trip.additionalPickups.isEmpty && additionalPickups.isEmpty {
+                            Text("No additional pickup points")
+                                .foregroundColor(.secondary)
+                                .padding(.vertical, 8)
+                        } else {
+                            ForEach(trip.additionalPickups + additionalPickups) { pickup in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(pickup.location)
+                                        .font(.headline)
+                                    Text(pickup.address)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    
+                                    if pickup.completed {
+                                        HStack {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundColor(.green)
+                                            Text("Completed")
+                                                .font(.caption)
+                                                .foregroundColor(.green)
+                                        }
+                                        .padding(.top, 4)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        
+                        Button(action: {
+                            showingAddPickupSheet = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.blue)
+                                Text("Add Pickup Point")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+                
                 // Delivery Status Section
                 Section(header: Text("DELIVERY STATUS")) {
                     TripDetailRow(icon: statusIcon, title: "Status", value: statusText)
@@ -721,60 +770,6 @@ struct TripDetailView: View {
                         value: trip.hasCompletedPostTrip ? "Completed" : "Required"
                     )
                 }
-                
-                // Proof of Delivery Section (for completed trips)
-//                if trip.status == .delivered {
-//                    Section(header: Text("PROOF OF DELIVERY")) {
-//                        Button(action: {
-//                            do {
-//                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip, signature: fleetManagerSignature)
-//                                showingDeliveryReceipt = true
-//                            } catch {
-//                                pdfError = error.localizedDescription
-//                                showingPDFError = true
-//                            }
-//                        }) {
-//                            HStack {
-//                                Image(systemName: "doc.text.fill")
-//                                    .foregroundColor(.blue)
-//                                Text("Delivery Receipt")
-//                                Spacer()
-//                                Image(systemName: "chevron.right")
-//                                    .foregroundColor(.gray)
-//                            }
-//                        }
-//                        
-//                        Button(action: {
-//                            showingSignatureSheet = true
-//                        }) {
-//                            HStack {
-//                                Image(systemName: "signature")
-//                                    .foregroundColor(.blue)
-//                                Text("Fleet Manager Signature")
-//                                Spacer()
-//                                if fleetManagerSignature != nil {
-//                                    Image(systemName: "checkmark.circle.fill")
-//                                        .foregroundColor(.green)
-//                                }
-//                                Image(systemName: "chevron.right")
-//                                    .foregroundColor(.gray)
-//                            }
-//                        }
-//                        
-//                        if let pdfData = pdfData {
-//                            ShareLink(item: pdfData, preview: SharePreview("Delivery Receipt", image: Image(systemName: "doc.fill"))) {
-//                                HStack {
-//                                    Image(systemName: "square.and.arrow.up")
-//                                        .foregroundColor(.blue)
-//                                    Text("Download Receipt")
-//                                    Spacer()
-//                                    Image(systemName: "chevron.right")
-//                                        .foregroundColor(.gray)
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
                 
                 // Notes Section
                 Section(header: Text("NOTES")) {
@@ -940,6 +935,12 @@ struct TripDetailView: View {
                 }
             } message: {
                 Text(pdfError ?? "Failed to generate delivery receipt")
+            }
+            .sheet(isPresented: $showingAddPickupSheet) {
+                AddPickupPointView(tripId: trip.id) { newPickup in
+                    additionalPickups.append(newPickup)
+                    showingAddPickupSheet = false
+                }
             }
         }
     }
@@ -1674,6 +1675,172 @@ struct SignatureCaptureView: View {
                     .foregroundColor(.red)
             }
             .padding()
+        }
+    }
+}
+
+// New view for adding a pickup point
+struct AddPickupPointView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var supabaseDataController = SupabaseDataController.shared
+    
+    let tripId: UUID
+    let onAdd: (PickupPoint) -> Void
+    
+    @State private var location = ""
+    @State private var address = ""
+    @State private var searchResults: [MKLocalSearchCompletion] = []
+    @State private var searchCompleter = MKLocalSearchCompleter()
+    @State private var searchCompleterDelegate: TripsSearchCompleterDelegate? = nil
+    @State private var activeTextField: TripDetailView.LocationField? = nil
+    @State private var locationCoordinate: CLLocationCoordinate2D?
+    @State private var isSaving = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var locationSelected = false
+    
+    var isFormValid: Bool {
+        !location.isEmpty && !address.isEmpty && locationCoordinate != nil
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("PICKUP LOCATION")) {
+                    TextField("Location Name", text: $location)
+                        .onChange(of: location) { newValue in
+                            if locationSelected && !newValue.isEmpty {
+                                // If a location was previously selected and user is editing
+                                locationSelected = false
+                            }
+                            
+                            if !locationSelected && newValue.count > 2 {
+                                searchCompleter.queryFragment = newValue
+                                activeTextField = .newPickup
+                            } else {
+                                searchResults = []
+                            }
+                        }
+                    
+                    TextField("Address", text: $address)
+                    
+                    if !searchResults.isEmpty && activeTextField == .newPickup && !locationSelected {
+                        TripsLocationSearchResults(results: searchResults) { result in
+                            locationSelected = true
+                            searchForLocation(result.title)
+                        }
+                    }
+                }
+                
+                if locationCoordinate != nil {
+                    Section {
+                        Button(action: savePickupPoint) {
+                            if isSaving {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            } else {
+                                Text("Add Pickup Point")
+                            }
+                        }
+                        .disabled(!isFormValid || isSaving)
+                    }
+                }
+            }
+            .navigationTitle("Add Pickup Point")
+            .navigationBarItems(
+                leading: Button("Cancel") {
+                    dismiss()
+                },
+                trailing: EmptyView()
+            )
+            .alert("Error", isPresented: $showError) {
+                Button("OK") { showError = false }
+            } message: {
+                Text(errorMessage)
+            }
+            .onAppear {
+                setupSearchCompleter()
+            }
+        }
+    }
+    
+    private func setupSearchCompleter() {
+        searchCompleter.resultTypes = [.pointOfInterest, .address, .query]
+        searchCompleter.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
+            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+        )
+        let delegate = TripsSearchCompleterDelegate { results in
+            self.searchResults = results
+        }
+        searchCompleter.delegate = delegate
+        searchCompleterDelegate = delegate
+    }
+    
+    private func searchForLocation(_ query: String) {
+        let searchRequest = MKLocalSearch.Request()
+        searchRequest.naturalLanguageQuery = query
+        searchRequest.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
+            span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 30)
+        )
+        searchRequest.resultTypes = [.pointOfInterest, .address]
+        
+        MKLocalSearch(request: searchRequest).start { response, error in
+            guard let response = response, error == nil,
+                  let mapItem = response.mapItems.first else { return }
+            
+            self.location = mapItem.name ?? query
+            self.address = [
+                mapItem.placemark.thoroughfare,
+                mapItem.placemark.locality,
+                mapItem.placemark.administrativeArea,
+                mapItem.placemark.postalCode
+            ].compactMap { $0 }.joined(separator: ", ")
+            
+            self.locationCoordinate = mapItem.placemark.coordinate
+            self.searchResults = []
+        }
+    }
+    
+    private func savePickupPoint() {
+        guard let coordinate = locationCoordinate else { return }
+        
+        isSaving = true
+        
+        Task {
+            do {
+                try await supabaseDataController.addPickupPointToTrip(
+                    tripId: tripId,
+                    location: location,
+                    address: address,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                
+                let newPickup = PickupPoint(
+                    id: UUID(),
+                    tripId: tripId,
+                    location: location,
+                    address: address,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude,
+                    sequence: 1,
+                    completed: false,
+                    estimatedArrivalTime: nil
+                )
+                
+                await MainActor.run {
+                    isSaving = false
+                    onAdd(newPickup)
+                }
+            } catch {
+                await MainActor.run {
+                    isSaving = false
+                    errorMessage = "Failed to add pickup point: \(error.localizedDescription)"
+                    showError = true
+                }
+            }
         }
     }
 } 

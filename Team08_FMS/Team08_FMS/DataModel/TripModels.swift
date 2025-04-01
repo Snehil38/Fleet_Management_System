@@ -9,6 +9,23 @@ enum TripStatus: String, Codable {
     case assigned = "assigned"
 }
 
+// Additional Pickup Model
+struct PickupPoint: Identifiable, Codable, Equatable {
+    let id: UUID
+    let tripId: UUID
+    var location: String
+    var address: String
+    var latitude: Double
+    var longitude: Double
+    var sequence: Int
+    var completed: Bool
+    var estimatedArrivalTime: Date?
+    
+    static func == (lhs: PickupPoint, rhs: PickupPoint) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 // Trip Model
 struct Trip: Identifiable, Equatable {
     let id: UUID
@@ -28,34 +45,46 @@ struct Trip: Identifiable, Equatable {
     let startingPoint: String
     let pickup: String?
     let driverId: UUID?
+    var additionalPickups: [PickupPoint]
     
     // Computed property for display purposes
     var displayName: String {
         pickup ?? "Trip-\(id.uuidString.prefix(8))"
     }
     
-    static func == (lhs: Trip, rhs: Trip) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.destination == rhs.destination &&
-               lhs.address == rhs.address &&
-               lhs.eta == rhs.eta &&
-               lhs.distance == rhs.distance &&
-               lhs.status == rhs.status &&
-               lhs.hasCompletedPreTrip == rhs.hasCompletedPreTrip &&
-               lhs.hasCompletedPostTrip == rhs.hasCompletedPostTrip &&
-               lhs.vehicleDetails == rhs.vehicleDetails &&
-               lhs.notes == rhs.notes &&
-               lhs.startTime == rhs.startTime &&
-               lhs.endTime == rhs.endTime &&
-               lhs.sourceCoordinate.latitude == rhs.sourceCoordinate.latitude &&
-               lhs.sourceCoordinate.longitude == rhs.sourceCoordinate.longitude &&
-               lhs.destinationCoordinate.latitude == rhs.destinationCoordinate.latitude &&
-               lhs.destinationCoordinate.longitude == rhs.destinationCoordinate.longitude &&
-               lhs.startingPoint == rhs.startingPoint &&
-               lhs.pickup == rhs.pickup &&
-               lhs.driverId == rhs.driverId
+    // Static function to create empty trip
+    static var empty: Trip {
+        let emptyVehicle = Vehicle.empty
+        let emptySupabaseTrip = SupabaseTrip(
+            id: UUID(),
+            destination: "",
+            trip_status: "pending",
+            has_completed_pre_trip: false,
+            has_completed_post_trip: false,
+            vehicle_id: emptyVehicle.id,
+            driver_id: nil,
+            secondary_driver_id: nil,
+            start_time: nil,
+            end_time: nil,
+            notes: "",
+            created_at: Date(),
+            updated_at: nil,
+            is_deleted: false,
+            start_latitude: 0,
+            start_longitude: 0,
+            end_latitude: 0,
+            end_longitude: 0,
+            pickup: "",
+            estimated_distance: 0,
+            estimated_time: 0
+        )
+        return Trip(from: emptySupabaseTrip, vehicle: emptyVehicle)
     }
     
+    static func == (lhs: Trip, rhs: Trip) -> Bool {
+        return lhs.id == rhs.id
+    }
+
     init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
         self.id = supabaseTrip.id
         self.destination = supabaseTrip.destination
@@ -69,6 +98,7 @@ struct Trip: Identifiable, Equatable {
         self.endTime = supabaseTrip.end_time
         self.pickup = supabaseTrip.pickup
         self.driverId = supabaseTrip.driver_id
+        self.additionalPickups = []
         
         // Set distance using estimated_distance if available
         if let estimatedDistance = supabaseTrip.estimated_distance {
@@ -112,6 +142,41 @@ struct Trip: Identifiable, Equatable {
             longitude: supabaseTrip.end_longitude ?? 0
         )
         self.startingPoint = supabaseTrip.pickup ?? "N/A"
+        
+        // Parse additional pickups from notes if they exist
+        if let notes = supabaseTrip.notes, notes.contains("Additional Pickups:") {
+            let pickupsSection = notes.components(separatedBy: "Additional Pickups:").last
+            if let pickupLines = pickupsSection?.components(separatedBy: "\n").filter({ !$0.isEmpty }) {
+                var sequence = 1
+                for line in pickupLines {
+                    if line.contains("|") {
+                        let components = line.components(separatedBy: "|")
+                        if components.count >= 4 {
+                            let location = components[0].trimmingCharacters(in: .whitespaces)
+                            let address = components[1].trimmingCharacters(in: .whitespaces)
+                            let latStr = components[2].trimmingCharacters(in: .whitespaces)
+                            let lngStr = components[3].trimmingCharacters(in: .whitespaces)
+                            
+                            if let lat = Double(latStr), let lng = Double(lngStr) {
+                                let pickup = PickupPoint(
+                                    id: UUID(),
+                                    tripId: self.id,
+                                    location: location,
+                                    address: address,
+                                    latitude: lat,
+                                    longitude: lng,
+                                    sequence: sequence,
+                                    completed: false,
+                                    estimatedArrivalTime: nil
+                                )
+                                self.additionalPickups.append(pickup)
+                                sequence += 1
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -1702,7 +1702,7 @@ class SupabaseDataController: ObservableObject {
             .execute()
         print("Insert complete for MaintenancePersonnelRoutineSchedule")
     }
-    
+
     func deleteRoutineSchedule(schedule: MaintenancePersonnelRoutineSchedule) async throws {
         print("Deleting MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
         try await supabase
@@ -1834,6 +1834,95 @@ class SupabaseDataController: ObservableObject {
             return true
         } else {
             throw NSError(domain: "SupabaseError", code: response.status, userInfo: [NSLocalizedDescriptionKey: "Failed to update service request status."])
+        }
+    }
+
+    // Add a new function to add additional pickup points to a trip
+    public func addPickupPointToTrip(tripId: UUID, location: String, address: String, latitude: Double, longitude: Double) async throws {
+        do {
+            // Simplified approach: first get the current trip notes
+            let response = try await supabase
+                .from("trips")
+                .select("notes")
+                .eq("id", value: tripId)
+                .execute()
+            
+            var notes = ""
+            
+            // Parse the response to extract notes
+            if let jsonData = response.data as? [[String: Any]], 
+               let firstResult = jsonData.first,
+               let existingNotes = firstResult["notes"] as? String {
+                notes = existingNotes
+            }
+            
+            // Prepare the updated notes with the new pickup point
+            if !notes.contains("Additional Pickups:") {
+                // Add a new section for additional pickups
+                notes += "\n\nAdditional Pickups:\n"
+            }
+            
+            // Add the new pickup point
+            notes += "\(location) | \(address) | \(latitude) | \(longitude)\n"
+            
+            // Update the trip notes
+            try await supabase
+                .from("trips")
+                .update(["notes": notes])
+                .eq("id", value: tripId)
+                .execute()
+            
+            print("Added pickup point to trip successfully")
+        } catch {
+            print("Error adding pickup point to trip: \(error)")
+            throw error
+        }
+    }
+    
+    // Mark a pickup point as completed in the trip notes
+    public func markPickupPointCompleted(tripId: UUID, location: String, address: String) async throws {
+        do {
+            // Simplified approach: first get the current trip notes
+            let response = try await supabase
+                .from("trips")
+                .select("notes")
+                .eq("id", value: tripId)
+                .execute()
+            
+            var notes = ""
+            
+            // Parse the response to extract notes
+            if let jsonData = response.data as? [[String: Any]], 
+               let firstResult = jsonData.first,
+               let existingNotes = firstResult["notes"] as? String {
+                notes = existingNotes
+            }
+            
+            // Find and mark the pickup point as completed
+            let pickupLines = notes.components(separatedBy: "\n")
+            var updatedLines = [String]()
+            
+            for line in pickupLines {
+                if line.contains(location) && line.contains(address) && !line.contains("[COMPLETED]") {
+                    updatedLines.append("\(line) [COMPLETED]")
+                } else {
+                    updatedLines.append(line)
+                }
+            }
+            
+            let updatedNotes = updatedLines.joined(separator: "\n")
+            
+            // Update the trip notes
+            try await supabase
+                .from("trips")
+                .update(["notes": updatedNotes])
+                .eq("id", value: tripId)
+                .execute()
+            
+            print("Marked pickup point as completed successfully")
+        } catch {
+            print("Error marking pickup point as completed: \(error)")
+            throw error
         }
     }
 }

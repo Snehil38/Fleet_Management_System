@@ -139,21 +139,42 @@ struct Vehicle: Identifiable, Codable, Equatable {
                lhs.driverId == rhs.driverId
     }
     
-    static func mockVehicle(licensePlate: String = "Unknown") -> Vehicle {
+    static func mockVehicle(licensePlate: String) -> Vehicle {
         Vehicle(
+            id: UUID(),
             name: "Mock Vehicle",
-            year: 2024,
-            make: "Generic",
-            model: "Model",
-            vin: "12345678901234567",
+            year: 2023,
+            make: "Unknown",
+            model: "Unknown",
+            vin: "Unknown",
             licensePlate: licensePlate,
             vehicleType: .truck,
-            color: "White",
+            color: "Unknown",
             bodyType: .cargo,
-            bodySubtype: "Standard",
-            msrp: 50000.0,
-            pollutionExpiry: Date().addingTimeInterval(365*24*60*60),
-            insuranceExpiry: Date().addingTimeInterval(365*24*60*60),
+            bodySubtype: "Unknown",
+            msrp: 0.0,
+            pollutionExpiry: Date(),
+            insuranceExpiry: Date(),
+            status: .available
+        )
+    }
+    
+    static var empty: Vehicle {
+        Vehicle(
+            id: UUID(),
+            name: "",
+            year: 0,
+            make: "",
+            model: "",
+            vin: "",
+            licensePlate: "",
+            vehicleType: .truck,
+            color: "",
+            bodyType: .cargo,
+            bodySubtype: "",
+            msrp: 0.0,
+            pollutionExpiry: Date(),
+            insuranceExpiry: Date(),
             status: .available
         )
     }
