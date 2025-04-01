@@ -1647,7 +1647,7 @@ class SupabaseDataController: ObservableObject {
         // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
         let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: jsonData)
 
-        print("Decoded Maintenance Personnel Service History: \(history)")
+//        print("Decoded Maintenance Personnel Service History: \(history)")
         return history
     }
         
@@ -1685,7 +1685,7 @@ class SupabaseDataController: ObservableObject {
         // Decode JSON into the struct
         let personnelRoutineSchedule = try decoder.decode([MaintenancePersonnelRoutineSchedule].self, from: jsonData)
 
-        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
+//        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
         return personnelRoutineSchedule
     }
     
@@ -1732,12 +1732,12 @@ class SupabaseDataController: ObservableObject {
         // Convert JSON dictionaries into `MaintenanceServiceRequest` objects
         let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: jsonData)
 
-        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
+//        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
         return serviceRequests
     }
 
     func insertServiceRequest(request: MaintenanceServiceRequest) async throws {
-        print("Inserting MaintenanceServiceRequest: \(request)")
+//        print("Inserting MaintenanceServiceRequest: \(request)")
         try await supabase
             .from("maintenanceservicerequest")
             .insert(request)
@@ -1748,31 +1748,31 @@ class SupabaseDataController: ObservableObject {
     // MARK: - Safety Check
 
     func fetchSafetyChecks(requestId: UUID) async throws -> [SafetyCheck] {
-        print("Fetching SafetyChecks for requestId: \(requestId)")
+//        print("Fetching SafetyChecks for requestId: \(requestId)")
         let response = try await supabase
             .from("safetycheck")
             .select()
             .eq("requestID", value: requestId)
             .execute()
         let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
-        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
+//        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
         return safetyChecks
     }
     
     func fetchSafetyChecks(historyId: UUID) async throws -> [SafetyCheck] {
-        print("Fetching SafetyChecks for requestId: \(historyId)")
+//        print("Fetching SafetyChecks for requestId: \(historyId)")
         let response = try await supabase
             .from("safetycheck")
             .select()
             .eq("historyID", value: historyId)
             .execute()
         let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
-        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
+//        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
         return safetyChecks
     }
     
     func insertSafetyCheck(check: SafetyCheck) async throws {
-        print("Inserting SafetyCheck: \(check)")
+//        print("Inserting SafetyCheck: \(check)")
         try await supabase
             .from("safetycheck")
             .insert(check)
@@ -1783,7 +1783,7 @@ class SupabaseDataController: ObservableObject {
     // MARK: - Expense
 
     func fetchExpenses(for requestId: UUID) async throws -> [Expense] {
-        print("Fetching Expenses for requestId: \(requestId.uuidString)")
+//        print("Fetching Expenses for requestId: \(requestId.uuidString)")
         let response = try await supabase
             .from("expense")
             .select()
@@ -1801,7 +1801,7 @@ class SupabaseDataController: ObservableObject {
         
         // Decode JSON into Expense objects
         let expenses = try decoder.decode([Expense].self, from: response.data)
-        print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
+//        print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
         return expenses
     }
     
@@ -1830,5 +1830,27 @@ class SupabaseDataController: ObservableObject {
         } else {
             throw NSError(domain: "SupabaseError", code: response.status, userInfo: [NSLocalizedDescriptionKey: "Failed to update service request status."])
         }
+    }
+    
+    func fetchAllExpense() async throws -> [Expense] {
+        // Fetch expenses from Supabase filtered by requestID
+        let response = try await supabase
+            .from("expense")
+            .select()
+            .execute()
+        
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        // Configure JSONDecoder with the custom date decoding strategy
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+        
+        // Decode JSON into an array of Expense objects
+        let expenses = try decoder.decode([Expense].self, from: response.data)
+        
+        return expenses
     }
 }
