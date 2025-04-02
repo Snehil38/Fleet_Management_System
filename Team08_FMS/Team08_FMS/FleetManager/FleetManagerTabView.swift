@@ -10,7 +10,9 @@ import SwiftUI
 struct FleetManagerTabView: View {
     @StateObject private var vehicleManager = VehicleManager()
     @StateObject private var dataManager = CrewDataController.shared
+    @StateObject private var notificationsViewModel = NotificationsViewModel()
     @State private var refreshTask: Task<Void, Never>?
+    @State private var showingNotifications = false
 
     var body: some View {
         TabView {
@@ -44,6 +46,7 @@ struct FleetManagerTabView: View {
                     Text("Crew")
                 }
         }
+        .notificationBanner(viewModel: notificationsViewModel, showingNotifications: $showingNotifications)
         .task {
             // Initial load
             vehicleManager.loadVehicles()

@@ -22,43 +22,45 @@ struct Notification: Identifiable, Codable {
         
         // Handle multiple date formats
         let dateString = try container.decode(String.self, forKey: .created_at)
+        print("Attempting to parse date: \(dateString)")
         
         // Try different date formats
-        if let date = Notification.supabaseDateFormatter.date(from: dateString) {
+        if let date = Notification.postgresDateFormatter.date(from: dateString) {
+            print("Successfully parsed with postgres formatter")
             created_at = date
-        } else if let date = Notification.supabaseMicrosecondsFormatter.date(from: dateString) {
+        } else if let date = Notification.backupDateFormatter.date(from: dateString) {
+            print("Successfully parsed with backup formatter")
             created_at = date
         } else if let date = Notification.iso8601Formatter.date(from: dateString) {
+            print("Successfully parsed with ISO8601 formatter")
             created_at = date
-        } else if let timestamp = Double(dateString) {
-            created_at = Date(timeIntervalSince1970: timestamp)
         } else {
-            print("Failed to parse date: \(dateString)")
+            print("Failed to parse date with all formatters")
             throw DecodingError.dataCorruptedError(forKey: .created_at,
                   in: container,
-                  debugDescription: "Date string \(dateString) cannot be parsed")
+                  debugDescription: "Could not parse date string: \(dateString)")
         }
     }
     
-    // Supabase PostgreSQL timestamp format without microseconds
-    private static let supabaseDateFormatter: DateFormatter = {
+    // Primary Postgres timestamp format (2025-03-31 06:20:09+00)
+    private static let postgresDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ssZ"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
     }()
     
-    // Supabase PostgreSQL timestamp format with microseconds
-    private static let supabaseMicrosecondsFormatter: DateFormatter = {
+    // Backup formatter for alternative format (2025-03-31T06:20:09+00:00)
+    private static let backupDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZZZZZ" // Format for timestamps with microseconds
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
     }()
     
-    // ISO8601 formatter as fallback
+    // ISO8601 formatter as final fallback
     private static let iso8601Formatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -72,9 +74,12 @@ final class NotificationsViewModel: ObservableObject {
     @Published var unreadCount: Int = 0
     @Published var isLoading = false
     @Published var error: Error?
+    @Published var currentBannerNotification: Notification?
+    @Published var showBanner = false
     
     private var realtimeChannel: RealtimeChannel?
     private let supabaseDataController = SupabaseDataController.shared
+    private var bannerWorkItem: DispatchWorkItem?
     
     init() {
         Task {
@@ -99,6 +104,11 @@ final class NotificationsViewModel: ObservableObject {
             Task { @MainActor in
                 print("Received notification update: \(payload)")
                 await self.loadNotifications()
+                
+                // Show banner for new notifications
+                if payload.event == "INSERT" {
+                    await self.showLatestNotificationBanner()
+                }
             }
         }
         
@@ -108,6 +118,22 @@ final class NotificationsViewModel: ObservableObject {
         await MainActor.run {
             self.realtimeChannel = channel
         }
+    }
+    
+    private func showLatestNotificationBanner() async {
+        guard let latestNotification = notifications.first(where: { !$0.is_read }) else { return }
+        
+        // Cancel any pending banner dismissal
+        bannerWorkItem?.cancel()
+        
+        // Show the new notification banner
+        currentBannerNotification = latestNotification
+        showBanner = true
+    }
+    
+    func dismissBanner() {
+        showBanner = false
+        currentBannerNotification = nil
     }
     
     func loadNotifications() async {
@@ -122,8 +148,9 @@ final class NotificationsViewModel: ObservableObject {
                 .limit(50)
                 .execute()
             
+            print("Raw response data: \(String(data: response.data, encoding: .utf8) ?? "none")")
+            
             let decoder = JSONDecoder()
-            // We don't need to set dateDecodingStrategy since we handle it in the Notification model
             
             let fetchedNotifications = try decoder.decode([Notification].self, from: response.data)
             
@@ -131,12 +158,15 @@ final class NotificationsViewModel: ObservableObject {
                 self.notifications = fetchedNotifications
                 self.unreadCount = fetchedNotifications.filter { !$0.is_read }.count
                 self.isLoading = false
+                self.error = nil
             }
         } catch {
             print("Error loading notifications: \(error)")
             await MainActor.run {
                 self.error = error
                 self.isLoading = false
+                self.notifications = []
+                self.unreadCount = 0
             }
         }
     }
