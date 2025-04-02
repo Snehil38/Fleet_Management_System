@@ -565,12 +565,14 @@ struct ExpenseFormView: View {
     @State private var date = Date()
     
     var body: some View {
-        Form {
-            Section(header: Text("Expense Details")) {
-                TextField("Description", text: $description)
-                TextField("Amount", text: $amount)
-                    .keyboardType(.decimalPad)
-                DatePicker("Date", selection: $date, displayedComponents: [.date])
+        NavigationView {
+            Form {
+                Section(header: Text("Expense Details")) {
+                    TextField("Description", text: $description)
+                    TextField("Amount", text: $amount)
+                        .keyboardType(.decimalPad)
+                    DatePicker("Date", selection: $date, displayedComponents: [.date])
+                }
             }
         }
         .navigationTitle("Add Expense")

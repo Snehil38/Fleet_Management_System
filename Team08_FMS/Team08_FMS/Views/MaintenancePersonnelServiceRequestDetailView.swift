@@ -277,20 +277,20 @@ struct AddExpenseView: View {
                     }
                 }
             }
-            .navigationTitle("Add Expense")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
+        }
+        .navigationTitle("Add Expense")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    isPresented = false
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add") {
-                        addExpense()
-                    }
-                    .disabled(description.isEmpty || amount.isEmpty || !isValidAmount)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Add") {
+                    addExpense()
                 }
+                .disabled(description.isEmpty || amount.isEmpty || !isValidAmount)
             }
         }
     }
