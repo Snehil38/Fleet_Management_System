@@ -73,7 +73,7 @@ struct MaintenancePersonnelDashboardView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("Maintenance Dashboard")
+            .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
