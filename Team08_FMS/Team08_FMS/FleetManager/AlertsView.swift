@@ -139,11 +139,11 @@ struct EmptysStateView: View {
             
             VStack(spacing: 8) {
                 Text("No Alerts")
-                    .font(.title2.weight(.semibold))
+                    .font(.system(.title2, design: .default).weight(.semibold))
                     .foregroundColor(.primary)
                 
                 Text("You're all caught up!")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.secondary)
             }
         }

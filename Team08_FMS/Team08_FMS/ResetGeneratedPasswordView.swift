@@ -459,7 +459,7 @@ struct ResetPasswordCriteriaView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Password Requirements")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
             

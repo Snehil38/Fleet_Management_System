@@ -29,7 +29,7 @@ struct MaintenancePersonnelTabView: View {
                 // Header
                 HStack {
                     Text("Home")
-                        .font(.title)
+                        .font(.system(.title, design: .default))
                         .fontWeight(.bold)
                     Spacer()
                     HStack(spacing: 15) {

@@ -26,17 +26,32 @@ private struct VehicleCard: View {
         case .decommissioned: return .red
         }
     }
+    
+    private var totalDistance: Double {
+        TripDataController.shared.allTrips
+            .filter { $0.vehicleDetails.id == vehicle.id && $0.status == .delivered }
+            .reduce(0.0) { sum, trip in
+                if let estimatedDistance = Double(trip.distance.replacingOccurrences(of: " km", with: "")) {
+                    return sum + estimatedDistance
+                }
+                return sum
+            }
+    }
+    
+    private var needsMaintenance: Bool {
+        return totalDistance >= 10000
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             // Header with vehicle name and status
             HStack {
                 Text(vehicle.name)
-                    .font(.headline)
+                    .font(.system(.headline, design: .default))
                     .foregroundColor(.primary)
                 Spacer()
                 Text(vehicle.status.rawValue.capitalized)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -89,29 +104,26 @@ private struct VehicleCard: View {
                         }
                     }
                 }
-
-//                if let trip = currentTrip {
-//                    Button(action: {
-//                        do {
-//                            pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip)
-//                            showingDeliveryReceipt = true
-//                        } catch {
-//                            pdfError = error.localizedDescription
-//                            showingPDFError = true
-//                        }
-//                    }) {
-//                        HStack {
-//                            Image(systemName: "doc.text.fill")
-//                                .foregroundColor(.blue)
-//                            Text("Delivery Receipt")
-//                                .foregroundColor(.blue)
-//                            Spacer()
-//                            Image(systemName: "chevron.right")
-//                                .foregroundColor(.gray)
-//                        }
-//                        .padding(.top, 8)
-//                    }
-//                }
+                
+                // Add maintenance indicator
+                if needsMaintenance {
+                    Divider()
+                    HStack {
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .foregroundColor(.orange)
+                        Text("Service Required")
+                            .foregroundColor(.orange)
+                            .font(.subheadline)
+                        Text("(\(String(format: "%.1f", totalDistance)) km)")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.orange)
+                            .font(.caption)
+                    }
+                    .padding(.top, 4)
+                }
             }
             .padding()
         }
@@ -393,9 +405,9 @@ struct VehiclesView: View {
                                 .font(.system(size: 40))
                                 .foregroundColor(.orange)
                             Text("Failed to load vehicles")
-                                .font(.headline)
+                                .font(.system(.headline, design: .default))
                             Text(vehicleManager.loadError ?? "Unknown error")
-                                .font(.subheadline)
+                                .font(.system(.subheadline, design: .default))
                                 .foregroundColor(.gray)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal)
@@ -468,7 +480,7 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .fontWeight(.medium)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -486,9 +498,9 @@ private struct MaintenanceEmptyStateView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.secondary)
             Text("No vehicles found")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             Text("Add a new vehicle or try different filters")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.secondary)
         }
         .padding()
