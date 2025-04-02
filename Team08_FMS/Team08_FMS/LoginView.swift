@@ -63,6 +63,7 @@ struct LoginView: View {
     @State private var isLoading: Bool = false
     @State private var navigateToVerify = false
     @State private var isPasswordVisible: Bool = false
+    @State private var navigateToForgotPassword = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -153,6 +154,18 @@ struct LoginView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(isLoading || !isValidEmail(email) || !isValidPassword(password))
+            
+            // Forgot Password Button
+            Button(action: {
+                navigateToForgotPassword = true
+            }) {
+                Text("Forgot Password?")
+                    .foregroundColor(.blue)
+                    .font(.footnote)
+            }
+            .padding(.top, 5)
+
+            Spacer()
         }
         .padding()
         .alert(isPresented: $dataController.showAlert) {
@@ -160,6 +173,9 @@ struct LoginView: View {
         }
         .navigationDestination(isPresented: $navigateToVerify) {
             VerifyOTPView(email: email)
+        }
+        .navigationDestination(isPresented: $navigateToForgotPassword) { // Navigate to Forget Password View
+            ForgotPasswordView()
         }
     }
     
@@ -175,7 +191,6 @@ struct LoginView: View {
         return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
     }
 }
-
 
 struct PasswordCriteriaView: View {
     let password: String

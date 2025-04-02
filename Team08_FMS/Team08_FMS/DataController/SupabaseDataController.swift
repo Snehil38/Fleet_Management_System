@@ -327,6 +327,34 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
+    // Function to send an OTP for a forgot-password scenario.
+    func sendOTPForForgotPassword(email: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        Task {
+            do {
+                // Attempt to send an OTP via email. Note: 'shouldCreateUser' is false because this is for password recovery.
+                _ = try await supabase.auth.signInWithOTP(email: email, shouldCreateUser: false)
+                completion(.success(()))
+            } catch {
+                print("Error sending OTP: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    // Function to verify the OTP entered by the user during password recovery.
+    func verifyOTPForForgotPassword(email: String, otp: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        Task {
+            do {
+                // Verify the OTP code. Adjust the 'type' parameter if your backend expects a different OTP type.
+                _ = try await supabase.auth.verifyOTP(email: email, token: otp, type: .magiclink)
+                completion(.success(()))
+            } catch {
+                print("OTP verification failed: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
+    
     func sendOTP(email: String, completion: @escaping (Bool, String?) -> Void) {
         Task {
             if !isGenPass {

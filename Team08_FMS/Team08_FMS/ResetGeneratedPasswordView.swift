@@ -124,6 +124,169 @@ struct ResetGeneratedPasswordView: View {
     }
 }
 
+struct ForgotPasswordView: View {
+    enum Step {
+        case enterEmail
+        case enterOTP
+        case resetPassword
+    }
+    
+    @State private var email: String = ""
+    @State private var otp: String = ""
+    @State private var newPassword: String = ""
+    @State private var confirmPassword: String = ""
+    
+    @State private var step: Step = .enterEmail
+    @State private var isNewPasswordVisible = false
+    @State private var isLoading: Bool = false
+    @State private var alertMessage: String = ""
+    @State private var showingAlert: Bool = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                if step == .enterEmail {
+                    Text("Enter your email")
+                        .font(.largeTitle)
+                        .padding()
+                    
+                    TextField("Enter your email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                        .padding()
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(8)
+                    
+                    Button("Send OTP") {
+                        isLoading = true
+                        SupabaseDataController.shared.sendOTPForForgotPassword(email: email) { result in
+                            isLoading = false
+                            switch result {
+                            case .success:
+                                alertMessage = "OTP sent to your email."
+                                showingAlert = true
+                                step = .enterOTP
+                            case .failure(let error):
+                                alertMessage = error.localizedDescription
+                                showingAlert = true
+                            }
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(email.isEmpty)
+                }
+                else if step == .enterOTP {
+                    Text("Enter OTP")
+                        .font(.title2)
+                        .padding()
+                    
+                    TextField("Enter OTP", text: $otp)
+                        .keyboardType(.numberPad)
+                        .padding()
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(8)
+                    
+                    Button("Verify OTP") {
+                        isLoading = true
+                        SupabaseDataController.shared.verifyOTPForForgotPassword(email: email, otp: otp) { result in
+                            isLoading = false
+                            switch result {
+                            case .success:
+                                alertMessage = "OTP verified successfully."
+                                showingAlert = true
+                                step = .resetPassword
+                            case .failure(let error):
+                                alertMessage = error.localizedDescription
+                                showingAlert = true
+                            }
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(otp.isEmpty)
+                }
+                else if step == .resetPassword {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("New Password")
+                            .font(.headline)
+                        
+                        // New Password Field with toggle to view/hide text
+                        ZStack(alignment: .trailing) {
+                            Group {
+                                if isNewPasswordVisible {
+                                    TextField("Enter new password", text: $newPassword)
+                                        .autocapitalization(.none)
+                                        .padding(10)
+                                        .background(Color(UIColor.systemGray6))
+                                        .cornerRadius(8)
+                                } else {
+                                    SecureField("Enter new password", text: $newPassword)
+                                        .autocapitalization(.none)
+                                        .padding(10)
+                                        .background(Color(UIColor.systemGray6))
+                                        .cornerRadius(8)
+                                }
+                            }
+                            Button(action: {
+                                isNewPasswordVisible.toggle()
+                            }) {
+                                Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundColor(.gray)
+                                    .padding(.trailing, 30)
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        SecureField("Confirm new password", text: $confirmPassword)
+                            .padding(10)
+                            .background(Color(UIColor.systemGray6))
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                        
+                        ResetPasswordCriteriaView(newPassword: newPassword, confirmPassword: confirmPassword)
+                            .padding(.horizontal)
+                        
+                        Button("Reset Password") {
+                            Task {
+                                let updated = await SupabaseDataController.shared.resetPassword(newPassword: newPassword)
+                                if updated {
+                                    alertMessage = "Password successfully reset."
+                                } else {
+                                    alertMessage = "Error updating password."
+                                }
+                                showingAlert = true
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(!isPasswordValid)
+                        .padding(.horizontal)
+                    }
+                    .padding()
+                }
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Forgot Password")
+            .navigationBarTitleDisplayMode(.inline)
+            .alert(isPresented: $showingAlert) {
+                Alert(title: Text("Alert"),
+                      message: Text(alertMessage),
+                      dismissButton: .default(Text("OK")))
+            }
+        }
+    }
+    
+    // Password validation logic
+    private var isPasswordValid: Bool {
+        let hasMinLength = newPassword.count >= 6
+        let hasUppercase = newPassword.rangeOfCharacter(from: .uppercaseLetters) != nil
+        let hasSpecialChar = newPassword.rangeOfCharacter(from: CharacterSet(charactersIn: "#$@!%&*?")) != nil
+        let hasNumber = newPassword.rangeOfCharacter(from: .decimalDigits) != nil
+        let passwordsMatch = newPassword == confirmPassword && !newPassword.isEmpty
+        return hasMinLength && hasUppercase && hasSpecialChar && hasNumber && passwordsMatch
+    }
+}
+
 struct ResetPasswordView: View {
     @Environment(\.presentationMode) var presentationMode
     
@@ -264,7 +427,6 @@ struct ResetPasswordView: View {
         }
     }
 }
-
 
 // Custom button style for primary actions
 struct PrimaryButtonStyle: ButtonStyle {
