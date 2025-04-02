@@ -947,9 +947,8 @@ class SupabaseDataController: ObservableObject {
             // This significantly reduces the data transfer size
             let response = try await supabase
                 .from("vehicles")
-                .select("id, name, year, make, model, vin, license_plate, vehicle_type, color, body_type, body_subtype, msrp, pollution_expiry, insurance_expiry, status, driver_id")
+                .select()
                 .notEquals("status", value: "Decommissioned")
-                .limit(100) // Add pagination to improve performance
                 .execute()
             
             let data = response.data
@@ -1175,7 +1174,9 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId
+            driver_id: vehicle.driverId,
+            lastMaintenanceDistance: vehicle.lastMaintenanceDistance,
+            totalDistance: vehicle.totalDistance
 //            pollution_certificate: pollutionCertBase64,
 //            rc: rcBase64,
 //            insurance: insuranceBase64
@@ -1227,7 +1228,9 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId
+            driver_id: vehicle.driverId,
+            lastMaintenanceDistance: vehicle.lastMaintenanceDistance,
+            totalDistance: vehicle.totalDistance
         )
 
         do {
@@ -1267,6 +1270,36 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("vehicles")
                 .update(["status": newStatus.rawValue])
+                .eq("id", value: vehicleID)
+                .execute()
+            
+            print("Update success: \(response)")
+        } catch {
+            print("Error updating vehicle: \(error)")
+        }
+    }
+    
+    func updateVehicleLastMaintenance(lastMaintenanceDistance: Int, vehicleID: UUID) async {
+        do {
+            // 6. Update the payload in Supabase by filtering with the vehicle's `id`
+            let response = try await supabase
+                .from("vehicles")
+                .update(["lastMaintenanceDistance": lastMaintenanceDistance])
+                .eq("id", value: vehicleID)
+                .execute()
+            
+            print("Update success: \(response)")
+        } catch {
+            print("Error updating vehicle: \(error)")
+        }
+    }
+    
+    func updateVehicleTotalMaintenance(totalDistance: Int, vehicleID: UUID) async {
+        do {
+            // 6. Update the payload in Supabase by filtering with the vehicle's `id`
+            let response = try await supabase
+                .from("vehicles")
+                .update(["totalDistance": totalDistance])
                 .eq("id", value: vehicleID)
                 .execute()
             

@@ -220,18 +220,11 @@ private struct OdometerSection: View {
     @State private var showingServiceAlert = false
     
     var totalDistance: Double {
-        TripDataController.shared.allTrips
-            .filter { $0.vehicleDetails.id == vehicle.id && $0.status == .delivered }
-            .reduce(0.0) { sum, trip in
-                if let estimatedDistance = Double(trip.distance.replacingOccurrences(of: " km", with: "")) {
-                    return sum + estimatedDistance
-                }
-                return sum
-            }
+        Double(vehicle.totalDistance)
     }
     
     var needsMaintenance: Bool {
-        return totalDistance >= 10000
+        return (Int(totalDistance) - vehicle.lastMaintenanceDistance) >= 10000
     }
     
     var body: some View {
@@ -269,8 +262,23 @@ private struct OdometerSection: View {
         }
         .alert("Service Required", isPresented: $showingServiceAlert) {
             Button("Schedule Service", role: .destructive) {
-                // Here you would typically navigate to service scheduling
-                // For now we just dismiss the alert
+                Task {
+                    let maintenanceRequest = MaintenanceServiceRequest(
+                        vehicleId: vehicle.id,
+                        vehicleName: vehicle.name,
+                        serviceType: .routine,
+                        description: "Perform routine maintenance check and oil change",
+                        priority: .medium,
+                        date: Date(),
+                        dueDate: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date(),
+                        status: .assigned,
+                        notes: "Maintenance scheduled; verify fluid levels and tire pressure.",
+                        issueType: "Routine"
+                    )
+                    try await SupabaseDataController.shared.insertServiceRequest(request: maintenanceRequest)
+                    await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
+                    await SupabaseDataController.shared.updateVehicleLastMaintenance(lastMaintenanceDistance: Int(totalDistance), vehicleID: vehicle.id)
+                }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
@@ -593,14 +601,7 @@ struct VehicleDetailView: View {
             LabeledContent(label: "MSRP", value: "$\(String(format: "%.2f", vehicle.msrp))")
             
             // Add odometer reading
-            let totalDistance = TripDataController.shared.allTrips
-                .filter { $0.vehicleDetails.id == vehicle.id && $0.status == .delivered }
-                .reduce(0.0) { sum, trip in
-                    if let estimatedDistance = Double(trip.distance.replacingOccurrences(of: " km", with: "")) {
-                        return sum + estimatedDistance
-                    }
-                    return sum
-                }
+            let totalDistance = Double(vehicle.totalDistance)
             LabeledContent(label: "Odometer", value: String(format: "%.1f km", totalDistance))
         }
     }
@@ -770,8 +771,6 @@ struct VehicleDetailView: View {
                 self.serviceRequests = updatedRequests
                 self.totalExpenses = totalCost
             }
-        } catch {
-            print("Error loading service requests: \(error)")
         }
     }
     

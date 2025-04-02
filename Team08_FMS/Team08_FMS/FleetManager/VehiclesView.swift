@@ -38,8 +38,8 @@ private struct VehicleCard: View {
             }
     }
     
-    private var needsMaintenance: Bool {
-        return totalDistance >= 10000
+    var needsMaintenance: Bool {
+        return (Int(totalDistance) - vehicle.lastMaintenanceDistance) >= 10000
     }
 
     var body: some View {
@@ -156,7 +156,23 @@ private struct VehicleCard: View {
                 if vehicle.status == .available {
                     Button {
                         Task {
+                            let maintenanceRequest = MaintenanceServiceRequest(
+                                vehicleId: vehicle.id,
+                                vehicleName: vehicle.name,
+                                serviceType: .routine,
+                                description: "Perform routine maintenance check and oil change",
+                                priority: .medium,
+                                date: Date(),
+                                dueDate: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date(),
+                                status: .assigned,
+                                notes: "Maintenance scheduled; verify fluid levels and tire pressure.",
+                                issueType: "Routine"
+                            )
+                            
+                            try await SupabaseDataController.shared.insertServiceRequest(request: maintenanceRequest)
                             await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
+                            await SupabaseDataController.shared.updateVehicleLastMaintenance(lastMaintenanceDistance: vehicle.totalDistance, vehicleID: vehicle.id)
+                            
                             if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
                                 await MainActor.run {
                                     vehicleManager.vehicles[index].status = .underMaintenance
