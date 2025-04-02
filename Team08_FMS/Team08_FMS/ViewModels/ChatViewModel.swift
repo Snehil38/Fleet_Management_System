@@ -114,23 +114,35 @@ class ChatViewModel: ObservableObject {
         }
         
         do {
-            let currentUserId = await supabaseDataController.getUserID()
+            guard let currentUserId = await supabaseDataController.getUserID() else {
+                print("No current user ID found")
+                return
+            }
             let userRole = supabaseDataController.userRole
             
             // Build the query based on user role and recipient type
             let query = supabaseDataController.supabase
                 .from("chat_messages")
                 .select()
-                .eq("recipient_type", value: recipientType.rawValue)
             
-            // Add the appropriate ID filters based on user role
+            // Add the appropriate filters based on user role
             if userRole == "fleet_manager" {
                 // Fleet manager viewing messages: show messages where they are sender or recipient
-                query.eq("recipient_id", value: recipientId)
-            } else {
-                // Driver/Maintenance viewing messages: show messages between them and fleet manager
-                query.eq("recipient_id", value: currentUserId)
-                    .eq("fleet_manager_id", value: recipientId)
+                query
+                    .eq("fleet_manager_id", value: currentUserId.uuidString)
+                    .eq("recipient_id", value: recipientId.uuidString)
+                    .eq("recipient_type", value: recipientType.rawValue)
+                    .or("recipient_id.eq.\(currentUserId.uuidString),fleet_manager_id.eq.\(recipientId.uuidString)")
+            } else if userRole == "driver" {
+                // Driver viewing messages: show messages between them and fleet manager
+                query
+                    .eq("recipient_type", value: RecipientType.driver.rawValue)
+                    .or("recipient_id.eq.\(currentUserId.uuidString),fleet_manager_id.eq.\(currentUserId.uuidString)")
+            } else if userRole == "maintenance" {
+                // Maintenance viewing messages: show messages between them and fleet manager
+                query
+                    .eq("recipient_type", value: RecipientType.maintenance.rawValue)
+                    .or("recipient_id.eq.\(currentUserId.uuidString),fleet_manager_id.eq.\(currentUserId.uuidString)")
             }
             
             // Add ordering and execute
@@ -178,11 +190,11 @@ class ChatViewModel: ObservableObject {
                 // Update isFromCurrentUser for each message
                 for index in fetchedMessages.indices {
                     var message = fetchedMessages[index]
-                    message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                    message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
                     fetchedMessages[index] = message
                     
                     // Mark as read if needed
-                    if message.recipient_id == currentUserId && message.status == .sent {
+                    if message.recipient_id.uuidString == currentUserId.uuidString && message.status == .sent {
                         Task {
                             await self.markMessageAsRead(message.id)
                         }
@@ -195,10 +207,10 @@ class ChatViewModel: ObservableObject {
             }
             
         } catch {
+            print("Error loading messages: \(error)")
             await MainActor.run {
                 self.error = error
                 self.isLoading = false
-                print("Error loading messages: \(error)")
             }
         }
     }
@@ -257,11 +269,19 @@ class ChatViewModel: ObservableObject {
                     messageFleetManagerId = userId
                     messageRecipientId = recipientId
                     messageRecipientType = recipientType.rawValue
-                } else {
-                    // Driver/maintenance sending to fleet manager
+                } else if userRole == "driver" {
+                    // Driver sending to fleet manager
                     messageFleetManagerId = fleetManagerId
-                    messageRecipientId = userId  // Set the sender's ID as recipient_id
-                    messageRecipientType = recipientType.rawValue
+                    messageRecipientId = userId
+                    messageRecipientType = RecipientType.driver.rawValue
+                } else if userRole == "maintenance" {
+                    // Maintenance sending to fleet manager
+                    messageFleetManagerId = fleetManagerId
+                    messageRecipientId = userId
+                    messageRecipientType = RecipientType.maintenance.rawValue
+                } else {
+                    print("Invalid user role")
+                    return
                 }
                 
                 print("Sending message with:")

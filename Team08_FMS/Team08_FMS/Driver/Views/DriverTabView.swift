@@ -1452,7 +1452,7 @@ struct SOSModalView: View {
                     // Chat View
                     if let manager = profileManager.fleetManager {
                         if let userID = manager.userID {
-                            ChatView(recipientType: .maintenance, recipientId: userID, recipientName: manager.name)
+                            ChatView(recipientType: .driver, recipientId: userID, recipientName: manager.name)
                                 .frame(maxHeight: .infinity)
                         } else {
                             Text("Unable to start chat: Fleet manager information is incomplete")
