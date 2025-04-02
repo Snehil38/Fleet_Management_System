@@ -272,7 +272,7 @@ private struct OdometerSection: View {
                 // Here you would typically navigate to service scheduling
                 // For now we just dismiss the alert
             }
-            Button("Remind Later", role: .cancel) { }
+            Button("Cancel", role: .cancel) { }
         } message: {
             Text("This vehicle has covered \(String(format: "%.1f", totalDistance)) km and requires maintenance service. Please schedule a service check as soon as possible.")
         }
