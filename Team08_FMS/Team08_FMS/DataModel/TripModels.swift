@@ -3,15 +3,15 @@ import CoreLocation
 
 // Trip Status Enum
 enum TripStatus: String, Codable {
-    case pending = "upcoming"
+    case pending = "pending"
     case inProgress = "current"
     case delivered = "delivered"
     case assigned = "assigned"
 }
 
-// Trip Model
-struct Trip: Identifiable, Equatable {
-    let id: UUID
+// Trip Model - Only for main trips
+class Trip: Identifiable, Equatable {
+    var id: UUID
     var destination: String
     var address: String
     var eta: String
@@ -27,35 +27,51 @@ struct Trip: Identifiable, Equatable {
     let destinationCoordinate: CLLocationCoordinate2D
     let startingPoint: String
     let pickup: String?
-    let driverId: UUID?
+    var driverId: UUID?
+    let middlePickup: String?
+    let middlePickupCoordinate: CLLocationCoordinate2D?
     
     // Computed property for display purposes
     var displayName: String {
-        pickup ?? "Trip-\(id.uuidString.prefix(8))"
+        return pickup ?? "Trip-\(id.uuidString.prefix(8))"
+    }
+    
+    // Static function to create empty trip
+    static var empty: Trip {
+        let emptyVehicle = Vehicle.empty
+        let emptySupabaseTrip = SupabaseTrip(
+            id: UUID(),
+            destination: "",
+            trip_status: "pending",
+            has_completed_pre_trip: false,
+            has_completed_post_trip: false,
+            vehicle_id: emptyVehicle.id,
+            driver_id: nil,
+            secondary_driver_id: nil,
+            start_time: nil,
+            end_time: nil,
+            notes: "",
+            created_at: Date(),
+            updated_at: nil,
+            is_deleted: false,
+            start_latitude: 0,
+            start_longitude: 0,
+            end_latitude: 0,
+            end_longitude: 0,
+            pickup: "",
+            estimated_distance: 0,
+            estimated_time: 0,
+            middle_pickup: nil,
+            middle_pickup_latitude: nil,
+            middle_pickup_longitude: nil
+        )
+        return Trip(from: emptySupabaseTrip, vehicle: emptyVehicle)
     }
     
     static func == (lhs: Trip, rhs: Trip) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.destination == rhs.destination &&
-               lhs.address == rhs.address &&
-               lhs.eta == rhs.eta &&
-               lhs.distance == rhs.distance &&
-               lhs.status == rhs.status &&
-               lhs.hasCompletedPreTrip == rhs.hasCompletedPreTrip &&
-               lhs.hasCompletedPostTrip == rhs.hasCompletedPostTrip &&
-               lhs.vehicleDetails == rhs.vehicleDetails &&
-               lhs.notes == rhs.notes &&
-               lhs.startTime == rhs.startTime &&
-               lhs.endTime == rhs.endTime &&
-               lhs.sourceCoordinate.latitude == rhs.sourceCoordinate.latitude &&
-               lhs.sourceCoordinate.longitude == rhs.sourceCoordinate.longitude &&
-               lhs.destinationCoordinate.latitude == rhs.destinationCoordinate.latitude &&
-               lhs.destinationCoordinate.longitude == rhs.destinationCoordinate.longitude &&
-               lhs.startingPoint == rhs.startingPoint &&
-               lhs.pickup == rhs.pickup &&
-               lhs.driverId == rhs.driverId
+        return lhs.id == rhs.id
     }
-    
+
     init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
         self.id = supabaseTrip.id
         self.destination = supabaseTrip.destination
@@ -69,6 +85,23 @@ struct Trip: Identifiable, Equatable {
         self.endTime = supabaseTrip.end_time
         self.pickup = supabaseTrip.pickup
         self.driverId = supabaseTrip.driver_id
+        self.middlePickup = supabaseTrip.middle_pickup
+        
+        // Set coordinates from the trip data
+        self.sourceCoordinate = CLLocationCoordinate2D(
+            latitude: supabaseTrip.start_latitude ?? 0,
+            longitude: supabaseTrip.start_longitude ?? 0
+        )
+        self.destinationCoordinate = CLLocationCoordinate2D(
+            latitude: supabaseTrip.end_latitude ?? 0,
+            longitude: supabaseTrip.end_longitude ?? 0
+        )
+        self.middlePickupCoordinate = supabaseTrip.middle_pickup_latitude != nil && supabaseTrip.middle_pickup_longitude != nil ?
+            CLLocationCoordinate2D(
+                latitude: supabaseTrip.middle_pickup_latitude!,
+                longitude: supabaseTrip.middle_pickup_longitude!
+            ) : nil
+        self.startingPoint = supabaseTrip.pickup ?? "N/A"
         
         // Set distance using estimated_distance if available
         if let estimatedDistance = supabaseTrip.estimated_distance {
@@ -101,22 +134,11 @@ struct Trip: Identifiable, Equatable {
         } else {
             self.eta = "N/A"
         }
-        
-        // Set coordinates from the trip data
-        self.sourceCoordinate = CLLocationCoordinate2D(
-            latitude: supabaseTrip.start_latitude ?? 0,
-            longitude: supabaseTrip.start_longitude ?? 0
-        )
-        self.destinationCoordinate = CLLocationCoordinate2D(
-            latitude: supabaseTrip.end_latitude ?? 0,
-            longitude: supabaseTrip.end_longitude ?? 0
-        )
-        self.startingPoint = supabaseTrip.pickup ?? "N/A"
     }
 }
 
 // Delivery Details Model
-struct DeliveryDetails: Identifiable, Equatable {
+struct DeliveryDetails: Identifiable {
     let id: UUID
     let location: String
     let date: String
@@ -124,26 +146,6 @@ struct DeliveryDetails: Identifiable, Equatable {
     let driver: String
     let vehicle: String
     let notes: String
-    
-    init(id: UUID = UUID(), location: String, date: String, status: String, driver: String, vehicle: String, notes: String) {
-        self.id = id
-        self.location = location
-        self.date = date
-        self.status = status
-        self.driver = driver
-        self.vehicle = vehicle
-        self.notes = notes
-    }
-    
-    static func == (lhs: DeliveryDetails, rhs: DeliveryDetails) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.location == rhs.location &&
-               lhs.date == rhs.date &&
-               lhs.status == rhs.status &&
-               lhs.driver == rhs.driver &&
-               lhs.vehicle == rhs.vehicle &&
-               lhs.notes == rhs.notes
-    }
 }
 
 // Supabase Trip Model
@@ -169,6 +171,9 @@ struct SupabaseTrip: Codable, Identifiable {
     let pickup: String?
     let estimated_distance: Double?
     let estimated_time: Double?
+    let middle_pickup: String?
+    let middle_pickup_latitude: Double?
+    let middle_pickup_longitude: Double?
 }
 
 extension TimeInterval {

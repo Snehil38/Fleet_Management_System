@@ -154,8 +154,7 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Monthly Fuel Expenses",
                             amount: "$\(String(format: "%.2f", totalFuelCost))",
-                            trend: .negative
-                        )
+                            trend: .negative                        )
 
                         // Monthly Salary Expenses
                         FinancialCard(
@@ -167,7 +166,7 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Service Expenses",
                             amount: "$\(String(format: "%.2f", totalServiceExpenses))",
-                            trend: .negative
+                            trend:  .negative
                         )
                         
                         // Total Expenses
@@ -181,15 +180,14 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Trip Revenue",
                             amount: "$\(String(format: "%.2f", totalTripRevenue))",
-                            trend: .positive
+                            trend:  .positive
                         )
 
                         // Total Revenue
                         FinancialCard(
                             title: "Total Revenue",
                             amount: "$\(String(format: "%.2f", totalRevenue))",
-                            trend: .positive
-                        )
+                            trend: (totalRevenue > 0) ? .positive : .negative                        )
                     }
                     .padding(.horizontal)
                 }
@@ -357,36 +355,116 @@ struct AlertCard: View {
 struct RouteInformationView: View {
     @Binding var pickupLocation: String
     @Binding var dropoffLocation: String
-    let onPickupClear: () -> Void
-    let onDropoffClear: () -> Void
-    let onPickupChange: (String) -> Void
-    let onDropoffChange: (String) -> Void
-    let onLocationRequest: () -> Void
+    @Binding var middlePickupLocation: String
+    @Binding var showMiddlePickup: Bool
+    
+    var onPickupClear: () -> Void
+    var onDropoffClear: () -> Void
+    var onMiddlePickupClear: () -> Void
+    var onPickupChange: (String) -> Void
+    var onDropoffChange: (String) -> Void
+    var onMiddlePickupChange: (String) -> Void
+    var onLocationRequest: () -> Void
     
     var body: some View {
-        CardView(title: "ROUTE INFORMATION", systemImage: "map") {
+        CardView(title: "ROUTE INFORMATION", systemImage: "map.fill") {
             VStack(spacing: 16) {
-                // Pickup Location
-                LocationInputField(
-                    icon: "mappin.circle.fill",
-                    iconColor: Color(red: 0.2, green: 0.5, blue: 1.0),
-                    placeholder: "Enter pickup location (address, landmark, etc.)",
-                    text: $pickupLocation,
-                    onClear: onPickupClear,
-                    onChange: onPickupChange,
-                    showLocationButton: true,
-                    onLocationRequest: onLocationRequest
-                )
+                // Pickup Location Field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Pickup Location")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        TextField("Enter pickup location", text: $pickupLocation)
+                            .onChange(of: pickupLocation) { newValue in
+                                onPickupChange(newValue)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 16)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        
+                        // Clear button
+                        if !pickupLocation.isEmpty {
+                            Button(action: onPickupClear) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.trailing, 8)
+                        }
+                        
+                        // Current location button
+                        Button(action: onLocationRequest) {
+                            Image(systemName: "location.fill")
+                                .foregroundColor(.blue)
+                                .padding(10)
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                    }
+                }
                 
-                // Dropoff Location
-                LocationInputField(
-                    icon: "mappin.and.ellipse",
-                    iconColor: Color(red: 0.9, green: 0.3, blue: 0.3),
-                    placeholder: "Enter dropoff location (address, landmark, etc.)",
-                    text: $dropoffLocation,
-                    onClear: onDropoffClear,
-                    onChange: onDropoffChange
-                )
+                // Toggle for Middle Pickup
+                Toggle("Add Middle Pickup Point", isOn: $showMiddlePickup)
+                    .tint(.blue)
+                    .padding(.vertical, 8)
+                
+                // Middle Pickup Location Field (only shown when toggle is on)
+                if showMiddlePickup {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Middle Pickup Location")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        HStack {
+                            TextField("Enter middle pickup location", text: $middlePickupLocation)
+                                .onChange(of: middlePickupLocation) { _, newValue in
+                                    onMiddlePickupChange(newValue)
+                                }
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 16)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            
+                            // Clear button
+                            if !middlePickupLocation.isEmpty {
+                                Button(action: onMiddlePickupClear) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(.trailing, 8)
+                            }
+                        }
+                    }
+                }
+                
+                // Dropoff Location Field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Dropoff Location")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        TextField("Enter dropoff location", text: $dropoffLocation)
+                            .onChange(of: dropoffLocation) { _, newValue in
+                                onDropoffChange(newValue)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 16)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        
+                        // Clear button
+                        if !dropoffLocation.isEmpty {
+                            Button(action: onDropoffClear) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.trailing, 8)
+                        }
+                    }
+                }
             }
         }
     }
@@ -449,6 +527,12 @@ struct AddTripView: View {
     )
     @State private var routePolyline: MKPolyline?
     
+    // Middle pickup point state
+    @State private var showMiddlePickup = false
+    @State private var middlePickupLocation = ""
+    @State private var middlePickupCoordinate: CLLocationCoordinate2D?
+    @State private var middlePickupSelected = false
+    
     // Search state
     @State private var searchResults: [MKLocalSearchCompletion] = []
     @State private var activeTextField: LocationField? = nil
@@ -478,12 +562,13 @@ struct AddTripView: View {
     let cargoTypes = ["General Goods", "Perishable", "Hazardous", "Heavy Machinery", "Liquids", "Livestock"]
     
     enum LocationField {
-        case pickup, dropoff
+        case pickup, middle, dropoff
     }
     
     // Validation for location and vehicle selection
     private var isLocationValid: Bool {
-        !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation
+        !pickupLocation.isEmpty && !dropoffLocation.isEmpty && pickupLocation != dropoffLocation &&
+        (!showMiddlePickup || (showMiddlePickup && !middlePickupLocation.isEmpty))
     }
     
     private var isVehicleSelected: Bool {
@@ -511,6 +596,7 @@ struct AddTripView: View {
                     MapView(
                         pickupCoordinate: pickupCoordinate,
                         dropoffCoordinate: dropoffCoordinate,
+                        middleCoordinate: showMiddlePickup ? middlePickupCoordinate : nil,
                         routePolyline: routePolyline,
                         region: $region
                     )
@@ -522,6 +608,8 @@ struct AddTripView: View {
                         RouteInformationView(
                             pickupLocation: $pickupLocation,
                             dropoffLocation: $dropoffLocation,
+                            middlePickupLocation: $middlePickupLocation,
+                            showMiddlePickup: $showMiddlePickup,
                             onPickupClear: {
                                 pickupLocation = ""
                                 pickupCoordinate = nil
@@ -532,6 +620,12 @@ struct AddTripView: View {
                                 dropoffLocation = ""
                                 dropoffCoordinate = nil
                                 dropoffLocationSelected = false
+                                updateMapRegion()
+                            },
+                            onMiddlePickupClear: {
+                                middlePickupLocation = ""
+                                middlePickupCoordinate = nil
+                                middlePickupSelected = false
                                 updateMapRegion()
                             },
                             onPickupChange: { newValue in
@@ -564,6 +658,21 @@ struct AddTripView: View {
                                     searchResults = []
                                 }
                             },
+                            onMiddlePickupChange: { newValue in
+                                if middlePickupSelected && !newValue.isEmpty {
+                                    // If a location was previously selected and user is editing, allow new search
+                                    if newValue != middlePickupLocation {
+                                        middlePickupSelected = false
+                                    }
+                                }
+                                
+                                if !middlePickupSelected && newValue.count > 2 {
+                                    searchCompleter.queryFragment = newValue
+                                    activeTextField = .middle
+                                } else {
+                                    searchResults = []
+                                }
+                            },
                             onLocationRequest: {
                                 isRequestingLocation = true
                                 locationManager.requestLocation()
@@ -572,14 +681,18 @@ struct AddTripView: View {
                         
                         if !searchResults.isEmpty && activeTextField != nil && 
                           ((activeTextField == .pickup && !pickupLocationSelected) || 
+                           (activeTextField == .middle && !middlePickupSelected) ||
                            (activeTextField == .dropoff && !dropoffLocationSelected)) {
                             LocationSearchResults(results: searchResults) { result in
                                 if activeTextField == .pickup {
                                     pickupLocationSelected = true
-                                    searchForLocation(result.title, isPickup: true)
+                                    searchForLocation(result.title, isPickup: true, isMiddle: false)
+                                } else if activeTextField == .middle {
+                                    middlePickupSelected = true
+                                    searchForLocation(result.title, isPickup: false, isMiddle: true)
                                 } else {
                                     dropoffLocationSelected = true
-                                    searchForLocation(result.title, isPickup: false)
+                                    searchForLocation(result.title, isPickup: false, isMiddle: false)
                                 }
                             }
                         }
@@ -840,7 +953,7 @@ struct AddTripView: View {
         activeTextField = nil
     }
     
-    private func searchForLocation(_ query: String, isPickup: Bool) {
+    private func searchForLocation(_ query: String, isPickup: Bool, isMiddle: Bool = false) {
         let searchRequest = MKLocalSearch.Request()
         searchRequest.naturalLanguageQuery = query
         searchRequest.region = MKCoordinateRegion(
@@ -855,6 +968,9 @@ struct AddTripView: View {
             if isPickup {
                 self.pickupLocation = mapItem.name ?? query
                 self.pickupCoordinate = mapItem.placemark.coordinate
+            } else if isMiddle {
+                self.middlePickupLocation = mapItem.name ?? query
+                self.middlePickupCoordinate = mapItem.placemark.coordinate
             } else {
                 self.dropoffLocation = mapItem.name ?? query
                 self.dropoffCoordinate = mapItem.placemark.coordinate
@@ -865,25 +981,37 @@ struct AddTripView: View {
     }
     
     private func updateMapRegion() {
-        if let pickup = pickupCoordinate, let dropoff = dropoffCoordinate {
-            let centerLat = (pickup.latitude + dropoff.latitude) / 2
-            let centerLon = (pickup.longitude + dropoff.longitude) / 2
-            let latDelta = abs(pickup.latitude - dropoff.latitude) * 1.5
-            let lonDelta = abs(pickup.longitude - dropoff.longitude) * 1.5
-            region = MKCoordinateRegion(
+        // Collect all coordinates that are not nil
+        var coordinates: [CLLocationCoordinate2D] = []
+        if let pickup = pickupCoordinate { coordinates.append(pickup) }
+        if let middle = middlePickupCoordinate { coordinates.append(middle) }
+        if let dropoff = dropoffCoordinate { coordinates.append(dropoff) }
+        
+        // If we have coordinates, calculate a region that encompasses all points
+        if !coordinates.isEmpty {
+            var minLat = coordinates[0].latitude
+            var maxLat = coordinates[0].latitude
+            var minLon = coordinates[0].longitude
+            var maxLon = coordinates[0].longitude
+            
+            for coordinate in coordinates {
+                minLat = min(minLat, coordinate.latitude)
+                maxLat = max(maxLat, coordinate.latitude)
+                minLon = min(minLon, coordinate.longitude)
+                maxLon = max(maxLon, coordinate.longitude)
+            }
+            
+            let centerLat = (minLat + maxLat) / 2
+            let centerLon = (minLon + maxLon) / 2
+            let latDelta = (maxLat - minLat) * 1.5
+            let lonDelta = (maxLon - minLon) * 1.5
+            
+            let mapRegionToUse = MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
                 span: MKCoordinateSpan(latitudeDelta: max(latDelta, 0.02), longitudeDelta: max(lonDelta, 0.02))
             )
-        } else if let pickup = pickupCoordinate {
-            region = MKCoordinateRegion(
-                center: pickup,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-            )
-        } else if let dropoff = dropoffCoordinate {
-            region = MKCoordinateRegion(
-                center: dropoff,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-            )
+            
+            self.region = mapRegionToUse
         }
     }
     
@@ -897,19 +1025,30 @@ struct AddTripView: View {
             }
         }
         
+        // Need at least pickup and dropoff coordinates
         guard let pickup = pickupCoordinate, let dropoff = dropoffCoordinate else {
             return
         }
         
         isCalculating = true
         
+        // If we have a middle pickup point, calculate a route with waypoints
+        if showMiddlePickup, let middle = middlePickupCoordinate {
+            calculateRouteWithWaypoint(pickup: pickup, middle: middle, dropoff: dropoff)
+        } else {
+            // Calculate direct route from pickup to dropoff
+            calculateDirectRoute(from: pickup, to: dropoff)
+        }
+    }
+    
+    private func calculateDirectRoute(from pickup: CLLocationCoordinate2D, to dropoff: CLLocationCoordinate2D) {
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: pickup))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: dropoff))
         request.transportType = .automobile
         
         let directions = MKDirections(request: request)
-        directions.calculate { response, error in
+        directions.calculate { [self] response, error in
             self.isCalculating = false
             
             guard let route = response?.routes.first, error == nil else {
@@ -918,34 +1057,62 @@ struct AddTripView: View {
                 return
             }
             
-            // Get the route polyline
+            // Process route results
             self.routePolyline = route.polyline
-            
-            // Get distance in kilometers
             self.distance = route.distance / 1000
-            
-            // Cost parameters
-            let costPerKm = 5.0         // Additional cost per kilometer (e.g., maintenance, driver, etc.)
-            let baseCost = 50.0         // Base cost for starting the trip
-
-            // Fuel efficiency parameters
-            let fuelConsumptionRate = 8.5   // Liters per 100 km (adjust as needed)
-            let fuelPricePerLiter = 1.50    // Price per liter in dollars (adjust as needed)
-
-            // Calculate fuel cost using realistic fuel consumption formula
-            // Fuel cost = (distance / 100) * fuelConsumptionRate * fuelPricePerLiter
-            fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
-
-            // Calculate total trip cost including the base cost, per km cost, and fuel cost
-            tripCost = baseCost + (distance * costPerKm) + fuelCost
-            
-            // Calculate estimated travel time and update delivery date
-            let estimatedHours = self.distance / 40.0 // Assuming average speed of 40 km/h
-            let timeInterval = estimatedHours * 3600 // Convert hours to seconds
-            self.deliveryDate = self.startDate.addingTimeInterval(timeInterval)
-            
+            self.fuelCost = self.calculateCost(distance: self.distance)
+            self.tripCost = 50.0 + (self.distance * 5.0) + self.fuelCost
             self.updateMapRegion()
         }
+    }
+    
+    private func calculateRouteWithWaypoint(pickup: CLLocationCoordinate2D, middle: CLLocationCoordinate2D, dropoff: CLLocationCoordinate2D) {
+        // Create a simple polyline through all points
+        let points = [pickup, middle, dropoff]
+        self.routePolyline = MKPolyline(coordinates: points, count: points.count)
+        
+        // Set the map region to show all points
+        let mapRegionToUse = MKCoordinateRegion(
+            center: middle,
+            span: MKCoordinateSpan(
+                latitudeDelta: max(0.02, max(abs(pickup.latitude - dropoff.latitude), abs(middle.latitude - pickup.latitude), abs(middle.latitude - dropoff.latitude)) * 2),
+                longitudeDelta: max(0.02, max(abs(pickup.longitude - dropoff.longitude), abs(middle.longitude - pickup.longitude), abs(middle.longitude - dropoff.longitude)) * 2)
+            )
+        )
+        
+        self.region = mapRegionToUse
+        
+        // Calculate distance manually (this is simplified)
+        let distance1 = calculateDistance(from: pickup, to: middle)
+        let distance2 = calculateDistance(from: middle, to: dropoff)
+        self.distance = (distance1 + distance2) / 1000
+        
+        // Calculate cost based on distance
+        self.fuelCost = calculateCost(distance: self.distance)
+    }
+    
+    private func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> CLLocationDistance {
+        let fromLocation = CLLocation(latitude: from.latitude, longitude: from.longitude)
+        let toLocation = CLLocation(latitude: to.latitude, longitude: to.longitude)
+        return fromLocation.distance(from: toLocation)
+    }
+    
+    private func calculateCost(distance: Double) -> Double {
+        // Cost parameters
+        let costPerKm = 5.0         // Additional cost per kilometer
+        let baseCost = 50.0         // Base cost for starting the trip
+        
+        // Fuel efficiency parameters
+        let fuelConsumptionRate = 8.5   // Liters per 100 km
+        let fuelPricePerLiter = 1.50    // Price per liter in dollars
+        
+        // Calculate fuel cost
+        let fuelCost = (distance / 100.0) * fuelConsumptionRate * fuelPricePerLiter
+        
+        // Calculate total trip cost
+        let tripCost = baseCost + (distance * costPerKm) + fuelCost
+        
+        return tripCost
     }
     
     private func calculateStraightLineDistance(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) {
@@ -970,11 +1137,6 @@ struct AddTripView: View {
         // Calculate total trip cost including the base cost, per km cost, and fuel cost
         tripCost = baseCost + (distance * costPerKm) + fuelCost
         
-        // Calculate estimated travel time and update delivery date
-        let estimatedHours = distance / 40.0 // Assuming average speed of 40 km/h
-        let timeInterval = estimatedHours * 3600 // Convert hours to seconds
-        deliveryDate = startDate.addingTimeInterval(timeInterval)
-        
         // Create a simple polyline between points for visualization
         let points = [source, destination]
         routePolyline = MKPolyline(coordinates: points, count: points.count)
@@ -984,6 +1146,13 @@ struct AddTripView: View {
         Task {
             guard let vehicle = selectedVehicle else { return }
             let estimatedHours = distance / 40.0
+            
+            var tripNotes = "Cargo Type: \(cargoType)\nEstimated Distance: \(String(format: "%.1f", distance)) km\nEstimated Fuel Cost: $\(String(format: "%.2f", fuelCost))"
+            
+            // Add middle pickup point information if applicable
+            if showMiddlePickup && !middlePickupLocation.isEmpty {
+                tripNotes += "\n\nMiddle Pickup Point: \(middlePickupLocation)"
+            }
             
             do {
                 let success = try await supabaseDataController.createTrip(
@@ -997,10 +1166,13 @@ struct AddTripView: View {
                     startLong: pickupCoordinate?.longitude,
                     endLat: dropoffCoordinate?.latitude,
                     endLong: dropoffCoordinate?.longitude,
-                    notes: "Cargo Type: \(cargoType)\nEstimated Distance: \(String(format: "%.1f", distance)) km\nEstimated Fuel Cost: $\(String(format: "%.2f", fuelCost))",
+                    notes: tripNotes,
                     distance: distance,
                     time: estimatedHours,
-                    cost: fuelCost
+                    cost: fuelCost,
+                    middlePickup: showMiddlePickup ? middlePickupLocation : nil,
+                    middlePickupLat: middlePickupCoordinate?.latitude,
+                    middlePickupLong: middlePickupCoordinate?.longitude
                 )
                 
                 if success {
@@ -1012,7 +1184,7 @@ struct AddTripView: View {
                 }
             } catch {
                 showingAlert = true
-                alertMessage = "Error: \(error.localizedDescription)"
+                alertMessage = "Failed to create trip: \(error.localizedDescription)"
             }
         }
     }
@@ -1167,26 +1339,17 @@ struct LocationSearchResults: View {
 
 // MapView component to display route
 struct MapView: UIViewRepresentable {
-    let pickupCoordinate: CLLocationCoordinate2D?
-    let dropoffCoordinate: CLLocationCoordinate2D?
-    let routePolyline: MKPolyline?
+    var pickupCoordinate: CLLocationCoordinate2D?
+    var dropoffCoordinate: CLLocationCoordinate2D?
+    var middleCoordinate: CLLocationCoordinate2D?
+    var routePolyline: MKPolyline?
     @Binding var region: MKCoordinateRegion
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
+        mapView.showsUserLocation = true
         mapView.region = region
-        
-        // Enhanced map with maximum detail
-        mapView.mapType = .mutedStandard // Using muted standard for a cleaner look with all details
-        mapView.pointOfInterestFilter = .includingAll
-        mapView.showsBuildings = true
-        mapView.showsTraffic = true
-//        mapView.showsPointsOfInterest = true
-        mapView.pointOfInterestFilter = nil
-        mapView.showsCompass = true
-        mapView.showsScale = true
-        
         return mapView
     }
     
@@ -1197,18 +1360,26 @@ struct MapView: UIViewRepresentable {
         mapView.removeAnnotations(mapView.annotations)
         mapView.removeOverlays(mapView.overlays)
         
-        // Add pickup annotation
-        if let coordinate = pickupCoordinate {
+        // Add pickup annotation if available
+        if let pickup = pickupCoordinate {
             let annotation = MKPointAnnotation()
-            annotation.coordinate = coordinate
+            annotation.coordinate = pickup
             annotation.title = "Pickup"
             mapView.addAnnotation(annotation)
         }
         
-        // Add dropoff annotation
-        if let coordinate = dropoffCoordinate {
+        // Add middle pickup annotation if available
+        if let middle = middleCoordinate {
             let annotation = MKPointAnnotation()
-            annotation.coordinate = coordinate
+            annotation.coordinate = middle
+            annotation.title = "Middle Pickup"
+            mapView.addAnnotation(annotation)
+        }
+        
+        // Add dropoff annotation if available
+        if let dropoff = dropoffCoordinate {
+            let annotation = MKPointAnnotation()
+            annotation.coordinate = dropoff
             annotation.title = "Dropoff"
             mapView.addAnnotation(annotation)
         }
@@ -1216,30 +1387,37 @@ struct MapView: UIViewRepresentable {
         // Add route polyline if available
         if let polyline = routePolyline {
             mapView.addOverlay(polyline)
-            
-            // Adjust the visible region to show the entire route
-            if pickupCoordinate != nil && dropoffCoordinate != nil {
-                mapView.setVisibleMapRect(
-                    polyline.boundingMapRect,
-                    edgePadding: UIEdgeInsets(top: 40, left: 40, bottom: 40, right: 40),
-                    animated: true
-                )
-            }
         }
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(self)
     }
     
     class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: MapView
+        
+        init(_ parent: MapView) {
+            self.parent = parent
+        }
+        
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = UIColor.systemBlue
+                renderer.lineWidth = 5
+                return renderer
+            }
+            return MKOverlayRenderer(overlay: overlay)
+        }
+        
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            if annotation is MKUserLocation {
+            guard !annotation.isKind(of: MKUserLocation.self) else {
                 return nil
             }
             
             let identifier = "LocationPin"
-            var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+            var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
             
             if annotationView == nil {
                 annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
@@ -1248,24 +1426,20 @@ struct MapView: UIViewRepresentable {
                 annotationView?.annotation = annotation
             }
             
-            // Set color based on title
-            if annotation.title == "Pickup" {
-                annotationView?.markerTintColor = .green
-            } else {
-                annotationView?.markerTintColor = .red
+            if let markerView = annotationView as? MKMarkerAnnotationView {
+                if annotation.title == "Pickup" {
+                    markerView.markerTintColor = .systemGreen
+                    markerView.glyphImage = UIImage(systemName: "arrow.up.circle.fill")
+                } else if annotation.title == "Middle Pickup" {
+                    markerView.markerTintColor = .systemOrange
+                    markerView.glyphImage = UIImage(systemName: "plus.circle.fill")
+                } else {
+                    markerView.markerTintColor = .systemRed
+                    markerView.glyphImage = UIImage(systemName: "arrow.down.circle.fill")
+                }
             }
             
             return annotationView
-        }
-        
-        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            if let polyline = overlay as? MKPolyline {
-                let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = .blue
-                renderer.lineWidth = 4
-                return renderer
-            }
-            return MKOverlayRenderer(overlay: overlay)
         }
     }
 }
@@ -1321,10 +1495,8 @@ struct LocationInputField: View {
             
             TextField(placeholder, text: $text)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                .onChange(of: text) { _, newValue in
-                    onChange(newValue)
-                }
-            
+                .onChange(of: text, perform: onChange)
+             
             if !text.isEmpty {
                 Button(action: onClear) {
                     Image(systemName: "xmark.circle.fill")

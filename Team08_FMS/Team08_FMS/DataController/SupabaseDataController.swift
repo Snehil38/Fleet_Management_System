@@ -3,6 +3,13 @@ import Supabase
 import Combine
 import SwiftSMTP
 
+enum SupabaseError: Error {
+    case responseDataMissing
+    case decodingFailed
+    case resourceNotFound
+    case serverError(Int)
+}
+
 struct GeofenceEvents: Codable, Identifiable {
     
     let id: UUID
@@ -47,15 +54,15 @@ class SupabaseDataController: ObservableObject {
     @Published var session: Session?
     @Published var geofenceEvents: [GeofenceEvents] = []
     
-     let supabase = SupabaseClient(
+    let supabase = SupabaseClient(
         supabaseURL: URL(string: "https://tkfrvzxwjlimhhvdwwqi.supabase.co")!,
         supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrZnJ2enh3amxpbWhodmR3d3FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTA5MjUsImV4cCI6MjA1Nzc4NjkyNX0.7vNQWGbjOYFeynNt8N8V-DzoJbS3qq28o3LAa1XvLnw"
     )
     
     private init() {
-//        Task {
-//            await checkSession()
-//        }
+        //        Task {
+        //            await checkSession()
+        //        }
     }
     
     func sendEmail(toName: String, toEmail: String, subject: String, text: String) {
@@ -99,11 +106,11 @@ class SupabaseDataController: ObservableObject {
             UserDefaults.standard.set(accessToken, forKey: "accessToken")
             UserDefaults.standard.set(refreshToken, forKey: "refreshToken")
             UserDefaults.standard.synchronize()  // Ensure they are saved
-
+            
             // Verify the values were saved
             print("Saved accessToken: \(UserDefaults.standard.string(forKey: "accessToken") ?? "nil")")
             print("Saved refreshToken: \(UserDefaults.standard.string(forKey: "refreshToken") ?? "nil")")
-
+            
             try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
             print("Session set manually: \(userSession)")
         } catch {
@@ -122,7 +129,7 @@ class SupabaseDataController: ObservableObject {
         UserDefaults.standard.set(accessToken, forKey: "accessToken")
         UserDefaults.standard.set(refreshToken, forKey: "refreshToken")
         UserDefaults.standard.synchronize()  // Ensure they are saved
-
+        
         // Verify the values were saved
         print("Saved accessToken: \(UserDefaults.standard.string(forKey: "accessToken") ?? "nil")")
         print("Saved refreshToken: \(UserDefaults.standard.string(forKey: "refreshToken") ?? "nil")")
@@ -134,13 +141,13 @@ class SupabaseDataController: ObservableObject {
             print("No saved session found in UserDefaults")
             return
         }
-
+        
         print("Retrieved accessToken: \(accessToken)")
         print("Retrieved refreshToken: \(refreshToken)")
-
+        
         do {
             try await supabase.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
-
+            
             // Ensure session is valid
             await MainActor.run {
                 session = supabase.auth.currentSession
@@ -157,7 +164,7 @@ class SupabaseDataController: ObservableObject {
             print("Auto-login failed: \(error)")
         }
     }
-
+    
     func checkSession() async {
         do {
             let session = try await supabase.auth.session
@@ -214,7 +221,7 @@ class SupabaseDataController: ObservableObject {
             print(password)
             let signUpResponse = try await supabase.auth.signUp(email: email, password: password)
             
-//            let userID = signUpResponse.user.id
+            //            let userID = signUpResponse.user.id
             
             let userRole = UserRole(user_id: signUpResponse.user.id, role_id: roleID)
             try await supabase
@@ -230,14 +237,14 @@ class SupabaseDataController: ObservableObject {
             
             let inviteEmail = """
             Dear \(name),
-
+            
             Welcome to Fleet Management System! We're excited to have you on board.
-
+            
             Your login credentials as a \(role) are as follows:
-
+            
             - Email: \(email)
             - Password: \(password)
-
+            
             Please log into the app and update your password for security.
             """
             
@@ -251,7 +258,7 @@ class SupabaseDataController: ObservableObject {
             return nil
         }
     }
-
+    
     func signInWithPassword(email: String, password: String, roleName: String, completion: @escaping (Bool, String?) -> Void) {
         Task {
             do {
@@ -394,7 +401,7 @@ class SupabaseDataController: ObservableObject {
         struct GenPassRow: Codable {
             let is_gen: Bool
         }
-
+        
         do {
             let response = try await supabase
                 .from("gen_pass")
@@ -408,10 +415,10 @@ class SupabaseDataController: ObservableObject {
             if let jsonString = String(data: responseData, encoding: .utf8) {
                 print("Raw JSON: \(jsonString)")
             }
-
+            
             // Decode JSON
             let decodedRows = try JSONDecoder().decode([GenPassRow].self, from: responseData)
-
+            
             // Extract first row
             if let firstRow = decodedRows.first {
                 await MainActor.run {
@@ -464,17 +471,17 @@ class SupabaseDataController: ObservableObject {
             let changes = myChannel.postgresChange(AnyAction.self, schema: "public", table: "geofence_events")
             await myChannel.subscribe()
             for await change in changes {
-              switch change {
-              case .insert(let action):
-                  print(action)
-                  await fetchGeofenceEvents()
-              case .update(let action):
-                  print(action)
-                  await fetchGeofenceEvents()
-              case .delete(let action):
-                  print(action)
-                  await fetchGeofenceEvents()
-              }
+                switch change {
+                case .insert(let action):
+                    print(action)
+                    await fetchGeofenceEvents()
+                case .update(let action):
+                    print(action)
+                    await fetchGeofenceEvents()
+                case .delete(let action):
+                    print(action)
+                    await fetchGeofenceEvents()
+                }
             }
         }
     }
@@ -485,7 +492,7 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("geofence_events")
                 .select("*")
-                // Optionally, order by timestamp descending
+            // Optionally, order by timestamp descending
                 .order("timestamp", ascending: false)
                 .execute()
             
@@ -576,31 +583,31 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             let data = response.data
-
+            
             // Print raw JSON response for debugging
             if let rawJSON = String(data: data, encoding: .utf8) {
                 print("Raw JSON Response for Fleet Manager: \(rawJSON)")
             }
-
+            
             // Decode JSON as an array of dictionaries and extract the first record
             guard let jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]],
                   !jsonArray.isEmpty else {
                 print("No fleet manager found for userID: \(userID)")
                 return nil
             }
-
+            
             // Convert the first record back to Data
             let transformedData = try JSONSerialization.data(withJSONObject: jsonArray[0], options: [])
-
+            
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
+            
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .formatted(dateFormatter)
-
+            
             // Decode into FleetManager model
             let fleetManager = try decoder.decode(FleetManager.self, from: transformedData)
             print("Decoded Fleet Manager: \(fleetManager)")
@@ -610,7 +617,7 @@ class SupabaseDataController: ObservableObject {
             return nil
         }
     }
-
+    
     func fetchFleetManagers() async throws -> [FleetManager] {
         do {
             let response = try await supabase
@@ -620,25 +627,25 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             let data = response.data
-
+            
             // Decode JSON as an array of dictionaries first
             guard let jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
                 print("Invalid JSON structure")
                 return []
             }
-
+            
             // Convert transformed array back to Data
             let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
-
+            
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
+            
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .formatted(dateFormatter)
-
+            
             // Decode into FleetManager model
             let fleetManagers = try decoder.decode([FleetManager].self, from: transformedData)
             print("Decoded Fleet Managers: \(fleetManagers)")
@@ -722,13 +729,13 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             let data = response.data
-
+            
             // Decode JSON as an array of dictionaries first
             guard var jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
                 print("Invalid JSON structure")
                 return []
             }
-
+            
             // Fix date format for driverLicenseExpiry
             for i in 0..<jsonArray.count {
                 if let expiryDateString = jsonArray[i]["driverLicenseExpiry"] as? String {
@@ -748,29 +755,29 @@ class SupabaseDataController: ObservableObject {
                     }
                 }
             }
-
+            
             // Convert transformed array back to Data
             let transformedData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
-
+            
             // Custom Date Formatter (Supports Fractional Seconds)
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Allows fractional seconds
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
+            
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .formatted(dateFormatter)
-
+            
             // Decode into Driver model
             let drivers = try decoder.decode([Driver].self, from: transformedData)
-//            print("Decoded Drivers: \(drivers)")
+            //            print("Decoded Drivers: \(drivers)")
             return drivers
         } catch {
             print("Error fetching drivers: \(error)")
             return []
         }
     }
-
+    
     func fetchMaintenancePersonnelByUserID(userID: UUID) async throws -> MaintenancePersonnel? {
         do {
             let response = try await supabase
@@ -824,16 +831,16 @@ class SupabaseDataController: ObservableObject {
                 .execute()
             
             let data = response.data
-
+            
             // Custom Date Formatter
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Fractional seconds support
             dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
+            
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .formatted(dateFormatter)
-
+            
             // Decode data
             let personnels = try decoder.decode([MaintenancePersonnel].self, from: data)
             return personnels
@@ -842,7 +849,7 @@ class SupabaseDataController: ObservableObject {
             return []
         }
     }
-
+    
     func insertDriver(driver: Driver, password: String) async throws {
         do {
             // Set up a custom JSONEncoder with ISO8601 format including milliseconds.
@@ -945,7 +952,7 @@ class SupabaseDataController: ObservableObject {
             return []
         }
     }
-
+    
     func updateDriverStatus(newStatus: Status, userID: UUID?, id: UUID?) async {
         // Use [String: String] since newStatus.rawValue is a String.
         let payload: [String: String] = ["status": newStatus.rawValue]
@@ -1011,17 +1018,17 @@ class SupabaseDataController: ObservableObject {
     func softDeleteDriver(for userID: UUID) async {
         do {
             let response = try await supabase
-            .from("driver")
-            .update(["isDeleted": true])
-            .eq("id", value: userID)
-            .execute()
+                .from("driver")
+                .update(["isDeleted": true])
+                .eq("id", value: userID)
+                .execute()
             
             let response2 = try await supabase
                 .from("user_roles")
                 .update(["isDeleted": true])
                 .eq("user_id", value: userID)
                 .execute()
-        
+            
             let data = response.data
             let data2 = response2.data
             let jsonString = String(data: data, encoding: .utf8)
@@ -1071,15 +1078,15 @@ class SupabaseDataController: ObservableObject {
                 print("Driver JSON to insert: \(personnelJSONString)")
             }
             
-        let response = try await supabase
-            .from("driver")
-            .update(driver)
-            .eq("id", value: driver.id)
-            .execute()
-        
-        let data = response.data
-        let jsonString = String(data: data, encoding: .utf8)
-        print("Update response data: \(jsonString ?? "")")
+            let response = try await supabase
+                .from("driver")
+                .update(driver)
+                .eq("id", value: driver.id)
+                .execute()
+            
+            let data = response.data
+            let jsonString = String(data: data, encoding: .utf8)
+            print("Update response data: \(jsonString ?? "")")
         } catch {
             print("Exception updating driver details: \(error.localizedDescription)")
         }
@@ -1120,16 +1127,16 @@ class SupabaseDataController: ObservableObject {
         dateFormatter.dateFormat = "yyyy-MM-dd"
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
+        
         // 2. Convert your `Vehicle`'s dates to strings
         let pollutionExpiryString = dateFormatter.string(from: vehicle.pollutionExpiry)
         let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
-
+        
         // 3. Convert document `Data` fields to Base64 strings (if they exist)
-//        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
-//        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
-//        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
-
+        //        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+        //        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+        //        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+        
         // 5. Create an instance of the payload
         let payload = VehiclePayload(
             id: vehicle.id,
@@ -1148,11 +1155,11 @@ class SupabaseDataController: ObservableObject {
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
             driver_id: vehicle.driverId
-//            pollution_certificate: pollutionCertBase64,
-//            rc: rcBase64,
-//            insurance: insuranceBase64
+            //            pollution_certificate: pollutionCertBase64,
+            //            rc: rcBase64,
+            //            insurance: insuranceBase64
         )
-
+        
         do {
             // 6. Insert the payload into Supabase
             let response = try await supabase
@@ -1165,23 +1172,23 @@ class SupabaseDataController: ObservableObject {
             print("Error inserting vehicle: \(error.localizedDescription)")
         }
     }
-
+    
     func updateVehicle(vehicle: Vehicle) async throws {
         // 1. Create a date formatter for encoding date fields as "yyyy-MM-dd"
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
+        
         // 2. Convert your `Vehicle`'s dates to strings
         let pollutionExpiryString = dateFormatter.string(from: vehicle.pollutionExpiry)
         let insuranceExpiryString = dateFormatter.string(from: vehicle.insuranceExpiry)
-
+        
         // 3. Convert document `Data` fields to Base64 strings (if they exist)
-//        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
-//        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
-//        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
-
+        //        let pollutionCertBase64 = vehicle.documents?.pollutionCertificate?.base64EncodedString()
+        //        let rcBase64 = vehicle.documents?.rc?.base64EncodedString()
+        //        let insuranceBase64 = vehicle.documents?.insurance?.base64EncodedString()
+        
         // 5. Create an instance of the update payload with current vehicle details.
         let payload = VehiclePayload(
             id: vehicle.id,
@@ -1201,7 +1208,7 @@ class SupabaseDataController: ObservableObject {
             status: vehicle.status,
             driver_id: vehicle.driverId
         )
-
+        
         do {
             // 6. Update the payload in Supabase by filtering with the vehicle's `id`
             let response = try await supabase
@@ -1212,12 +1219,12 @@ class SupabaseDataController: ObservableObject {
             
             print("Update success: \(response)")
             print("Payload: \(payload)")
-
+            
         } catch {
             print("Error updating vehicle: \(error.localizedDescription)")
         }
     }
-
+    
     func softDeleteVehichle(vehicleID: UUID) async {
         do {
             // 6. Update the payload in Supabase by filtering with the vehicle's `id`
@@ -1250,7 +1257,7 @@ class SupabaseDataController: ObservableObject {
     
     // MARK: - Trip Management
     
-    struct TripPayload: Codable {
+    struct TripPayload: Encodable {
         let destination: String
         let vehicle_id: UUID
         let driver_id: UUID?
@@ -1265,9 +1272,12 @@ class SupabaseDataController: ObservableObject {
         let estimated_distance: Double?
         let estimated_time: Double?
         let estimated_cost: Double?
+        let middle_pickup: String?
+        let middle_pickup_latitude: Double?
+        let middle_pickup_longitude: Double?
     }
     
-    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?, distance: Double? = nil, time: Double? = nil, cost: Double? = nil) async throws -> Bool {
+    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?, distance: Double? = nil, time: Double? = nil, cost: Double? = nil, middlePickup: String? = nil, middlePickupLat: Double? = nil, middlePickupLong: Double? = nil) async throws -> Bool {
         let payload = TripPayload(
             destination: destination,
             vehicle_id: vehicleId,
@@ -1282,7 +1292,10 @@ class SupabaseDataController: ObservableObject {
             pickup: name,
             estimated_distance: distance,
             estimated_time: time,
-            estimated_cost: cost
+            estimated_cost: cost,
+            middle_pickup: middlePickup,
+            middle_pickup_latitude: middlePickupLat,
+            middle_pickup_longitude: middlePickupLong
         )
         
         do {
@@ -1361,7 +1374,7 @@ class SupabaseDataController: ObservableObject {
             }
         }
     }
-
+    
     // Optimized function to fetch a single vehicle with all details including documents
     func fetchVehicleDetails(vehicleId: UUID) async throws -> Vehicle? {
         do {
@@ -1395,12 +1408,12 @@ class SupabaseDataController: ObservableObject {
             return nil
         }
     }
-
+    
     // Add these new public methods
     public func databaseFrom(_ table: String) -> PostgrestQueryBuilder {
         return supabase.from(table)
     }
-
+    
     public func updateTrip(id: UUID, status: String) async throws {
         try await supabase
             .from("trips")
@@ -1423,7 +1436,7 @@ class SupabaseDataController: ObservableObject {
             throw error
         }
     }
-
+    
     public func updateTrip(id: UUID, secondaryDriverId: UUID) async throws {
         do {
             let response = try await supabase
@@ -1496,161 +1509,35 @@ class SupabaseDataController: ObservableObject {
         return availableDrivers
     }
     
-//    func fetchTripByID(tripID: UUID) async throws -> Trip {
-//        let decoder = JSONDecoder()
-//        let dateFormatter = DateFormatter()
-//        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-//        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-//        
-//        decoder.dateDecodingStrategy = .custom { decoder in
-//            let container = try decoder.singleValueContainer()
-//            let dateString = try container.decode(String.self)
-//            let formats = [
-//                "yyyy-MM-dd'T'HH:mm:ss",
-//                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
-//                "yyyy-MM-dd'T'HH:mm:ssZ",
-//                "yyyy-MM-dd"
-//            ]
-//            for format in formats {
-//                dateFormatter.dateFormat = format
-//                if let date = dateFormatter.date(from: dateString) {
-//                    return date
-//                }
-//            }
-//            if let dotIndex = dateString.firstIndex(of: ".") {
-//                let truncated = String(dateString[..<dotIndex])
-//                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-//                if let date = dateFormatter.date(from: truncated) {
-//                    return date
-//                }
-//            }
-//            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
-//        }
-//        
-//        let query = supabase
-//            .from("trips")
-//            .select("""
-//                id,
-//                destination,
-//                trip_status,
-//                has_completed_pre_trip,
-//                has_completed_post_trip,
-//                vehicle_id,
-//                driver_id,
-//                start_time,
-//                end_time,
-//                notes,
-//                created_at,
-//                updated_at,
-//                is_deleted,
-//                start_latitude,
-//                start_longitude,
-//                end_latitude,
-//                end_longitude,
-//                pickup,
-//                vehicles (
-//                    id,
-//                    name,
-//                    year,
-//                    make,
-//                    model,
-//                    vin,
-//                    license_plate,
-//                    vehicle_type,
-//                    color,
-//                    body_type,
-//                    body_subtype,
-//                    msrp,
-//                    pollution_expiry,
-//                    insurance_expiry,
-//                    status
-//                )
-//            """)
-//            .eq("is_deleted", value: false)
-//            .eq("id", value: tripID)
-//        
-//        let response = try await query.execute()
-//        
-//        struct JoinedTripData: Codable {
-//            let id: UUID
-//            let destination: String
-//            let trip_status: String
-//            let has_completed_pre_trip: Bool
-//            let has_completed_post_trip: Bool
-//            let vehicle_id: UUID
-//            let driver_id: UUID?
-//            let start_time: Date?
-//            let end_time: Date?
-//            let notes: String?
-//            let created_at: Date
-//            let updated_at: Date?
-//            let is_deleted: Bool
-//            let start_latitude: Double?
-//            let start_longitude: Double?
-//            let end_latitude: Double?
-//            let end_longitude: Double?
-//            let pickup: String?
-//            let vehicles: Vehicle
-//        }
-//        
-//        let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
-//        guard let data = joinedData.first else {
-//            throw TripError.fetchError("No trip found with the given ID.")
-//        }
-//        
-//        let supabaseTrip = SupabaseTrip(
-//            id: data.id,
-//            destination: data.destination,
-//            trip_status: data.trip_status,
-//            has_completed_pre_trip: data.has_completed_pre_trip,
-//            has_completed_post_trip: data.has_completed_post_trip,
-//            vehicle_id: data.vehicle_id,
-//            driver_id: data.driver_id,
-//            start_time: data.start_time,
-//            end_time: data.end_time,
-//            notes: data.notes,
-//            created_at: data.created_at,
-//            updated_at: data.updated_at ?? data.created_at,
-//            is_deleted: data.is_deleted,
-//            start_latitude: data.start_latitude,
-//            start_longitude: data.start_longitude,
-//            end_latitude: data.end_latitude,
-//            end_longitude: data.end_longitude,
-//            pickup: data.pickup
-//        )
-//        
-//        return Trip(from: supabaseTrip, vehicle: data.vehicles)
-//    }
-
     // MARK: - Service History
-        
+    
     func fetchServiceHistory() async throws -> [MaintenancePersonnelServiceHistory] {
         print("Fetching MaintenancePersonnelServiceHistory...")
-
+        
         // Fetch raw data from Supabase
         let response = try await supabase
             .from("maintenancepersonnelservicehistory")
             .select()
             .execute()
-
+        
         // Ensure response data exists
         let jsonData = response.data
-
+        
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-
+        
         // Configure JSONDecoder with date decoding strategy
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
-
+        
         // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
         let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: jsonData)
-
-//        print("Decoded Maintenance Personnel Service History: \(history)")
+        
+        //        print("Decoded Maintenance Personnel Service History: \(history)")
         return history
     }
-        
+    
     func insertServiceHistory(history: MaintenancePersonnelServiceHistory) async throws {
         print("Inserting MaintenancePersonnelServiceHistory: \(history)")
         try await supabase
@@ -1659,33 +1546,33 @@ class SupabaseDataController: ObservableObject {
             .execute()
         print("Insert complete for MaintenancePersonnelServiceHistory")
     }
-
+    
     // MARK: - Routine Schedule
-
+    
     func fetchRoutineSchedule() async throws -> [MaintenancePersonnelRoutineSchedule] {
         print("Fetching MaintenancePersonnelRoutineSchedule...")
-
+        
         let response = try await supabase
             .from("maintenancepersonnelroutineschedule")
             .select()
             .execute()
-
+        
         // Ensure response data exists
         let jsonData = response.data
-
+        
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Ensure this matches Supabase timestamp format
         dateFormatter.timeZone = TimeZone(secondsFromGMT: 0) // Optional: Adjust as needed
-
+        
         // Configure JSONDecoder with custom date formatter
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
-
+        
         // Decode JSON into the struct
         let personnelRoutineSchedule = try decoder.decode([MaintenancePersonnelRoutineSchedule].self, from: jsonData)
-
-//        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
+        
+        //        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
         return personnelRoutineSchedule
     }
     
@@ -1707,35 +1594,35 @@ class SupabaseDataController: ObservableObject {
             .execute()
         print("Deletion complete for MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
     }
-
+    
     // MARK: - Service Request
-
+    
     func fetchServiceRequests() async throws -> [MaintenanceServiceRequest] {
         print("Fetching MaintenanceServiceRequest...")
-
+        
         let requestResponse = try await supabase
             .from("maintenanceservicerequest")
             .select()
             .execute()
-
+        
         let jsonData = requestResponse.data
-
+        
         // Configure DateFormatter for timestamp decoding
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
+        
         // Configure JSONDecoder
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .formatted(dateFormatter)
-
+        
         // Convert JSON dictionaries into `MaintenanceServiceRequest` objects
         let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: jsonData)
-
-//        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
+        
+        //        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
         return serviceRequests
     }
-
+    
     func insertServiceRequest(request: MaintenanceServiceRequest) async throws {
         print("Inserting MaintenanceServiceRequest: \(request)")
         try await supabase
@@ -1744,46 +1631,46 @@ class SupabaseDataController: ObservableObject {
             .execute()
         print("Insert complete for MaintenanceServiceRequest")
     }
-
+    
     // MARK: - Safety Check
-
+    
     func fetchSafetyChecks(requestId: UUID) async throws -> [SafetyCheck] {
-//        print("Fetching SafetyChecks for requestId: \(requestId)")
+        //        print("Fetching SafetyChecks for requestId: \(requestId)")
         let response = try await supabase
             .from("safetycheck")
             .select()
             .eq("requestID", value: requestId)
             .execute()
         let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
-//        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
+        //        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
         return safetyChecks
     }
     
     func fetchSafetyChecks(historyId: UUID) async throws -> [SafetyCheck] {
-//        print("Fetching SafetyChecks for requestId: \(historyId)")
+        //        print("Fetching SafetyChecks for requestId: \(historyId)")
         let response = try await supabase
             .from("safetycheck")
             .select()
             .eq("historyID", value: historyId)
             .execute()
         let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
-//        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
+        //        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
         return safetyChecks
     }
     
     func insertSafetyCheck(check: SafetyCheck) async throws {
-//        print("Inserting SafetyCheck: \(check)")
+        //        print("Inserting SafetyCheck: \(check)")
         try await supabase
             .from("safetycheck")
             .insert(check)
             .execute()
         print("Insert complete for SafetyCheck")
     }
-
+    
     // MARK: - Expense
-
+    
     func fetchExpenses(for requestId: UUID) async throws -> [Expense] {
-//        print("Fetching Expenses for requestId: \(requestId.uuidString)")
+        //        print("Fetching Expenses for requestId: \(requestId.uuidString)")
         let response = try await supabase
             .from("expense")
             .select()
@@ -1801,7 +1688,7 @@ class SupabaseDataController: ObservableObject {
         
         // Decode JSON into Expense objects
         let expenses = try decoder.decode([Expense].self, from: response.data)
-//        print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
+        //        print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
         return expenses
     }
     
