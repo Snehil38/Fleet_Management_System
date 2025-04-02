@@ -9,6 +9,29 @@ struct NotificationsView: View {
             ZStack {
                 if viewModel.isLoading && viewModel.notifications.isEmpty {
                     ProgressView()
+                } else if let error = viewModel.error {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.red)
+                        Text("Error Loading Notifications")
+                            .font(.headline)
+                        Text(error.localizedDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        Button("Try Again") {
+                            Task {
+                                await viewModel.loadNotifications()
+                            }
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding()
                 } else if viewModel.notifications.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "bell.slash")
@@ -26,6 +49,15 @@ struct NotificationsView: View {
                             NotificationCell(notification: notification) {
                                 Task {
                                     await viewModel.markAsRead(notification.id)
+                                }
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    Task {
+                                        await viewModel.deleteNotification(notification.id)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
                         }

@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct AlertsView: View {
-    @ObservedObject var supabase = SupabaseDataController.shared
-    @State private var events: [GeofenceEvents] = []
+    @StateObject private var viewModel = NotificationsViewModel()
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
@@ -11,23 +10,70 @@ struct AlertsView: View {
                 .ignoresSafeArea()
 
             VStack {
-                if events.isEmpty {
-                    EmptysStateView()
+                if viewModel.isLoading && viewModel.notifications.isEmpty {
+                    ProgressView("Loading alerts...")
+                        .padding()
+                } else if let error = viewModel.error {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.red)
+                        
+                        Text("Error Loading Alerts")
+                            .font(.headline)
+                        
+                        Text(error.localizedDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button {
+                            Task {
+                                await viewModel.loadNotifications()
+                            }
+                        } label: {
+                            Text("Try Again")
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                } else if viewModel.notifications.isEmpty {
+                    AlertEmptyStateView()
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
                             // Summary Cards Section
-//                            SummarySection()
-//                                .padding(.top, 8)
-//                                .padding(.horizontal)
+                            AlertSummarySection(
+                                unreadCount: viewModel.unreadCount,
+                                totalCount: viewModel.notifications.count
+                            )
+                            .padding(.top, 8)
+                            .padding(.horizontal)
                             
-                            // Alerts List
-                            AlertsListView()
-                                .padding(.top, 16)
+                            // Notifications List
+                            NotificationsListView(
+                                notifications: viewModel.notifications,
+                                onMarkAsRead: { notification in
+                                    Task {
+                                        await viewModel.markAsRead(notification.id)
+                                    }
+                                },
+                                onDelete: { notification in
+                                    Task {
+                                        await viewModel.deleteNotification(notification.id)
+                                    }
+                                }
+                            )
+                            .padding(.top, 16)
                         }
                     }
                     .refreshable {
-                        loadData()
+                        await viewModel.loadNotifications()
                     }
                 }
             }
@@ -35,7 +81,6 @@ struct AlertsView: View {
         .navigationTitle("Alerts")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Back Button for modal views
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     HStack(spacing: 4) {
@@ -44,86 +89,29 @@ struct AlertsView: View {
                     }
                 }
             }
-        }
-        .onAppear {
-            loadData()
-        }
-    }
-
-    // MARK: - Helper Methods
-    
-    func loadData() {
-        events = supabase.geofenceEvents.sorted(by: { $0.timestamp > $1.timestamp })
-    }
-    
-    func markAsRead(_ event: GeofenceEvents) {
-        if let index = events.firstIndex(where: { $0.id == event.id }) {
-            events[index].isRead = true
-        }
-    }
-    
-    func deleteEvent(_ event: GeofenceEvents) {
-        events.removeAll { $0.id == event.id }
-    }
-    
-    // MARK: - UI Components
-    
-    @ViewBuilder
-    private func SummarySection() -> some View {
-        HStack(spacing: 12) {
-            // Unread Card
-            SummaryCard(
-                icon: "bell.fill",
-                title: "Unread",
-                count: events.filter { !$0.isRead }.count,
-                color: .blue
-            )
             
-            // Total Card
-            SummaryCard(
-                icon: "bell",
-                title: "Total",
-                count: events.count,
-                color: .gray
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private func AlertsListView() -> some View {
-        LazyVStack(spacing: 12) {
-            ForEach(events) { event in
-                AlertRow(event: event)
-                    .padding(.horizontal)
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        if !event.isRead {
-                            Button {
-                                withAnimation {
-                                    markAsRead(event)
-                                }
-                            } label: {
-                                Label("Mark as Read", systemImage: "checkmark")
-                            }
-                            .tint(.blue)
+            if !viewModel.notifications.isEmpty {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        Task {
+                            await viewModel.markAllAsRead()
                         }
+                    }) {
+                        Text("Mark All as Read")
+                            .font(.subheadline)
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            withAnimation {
-                                deleteEvent(event)
-                            }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+                }
             }
+        }
+        .task {
+            await viewModel.loadNotifications()
         }
     }
 }
 
 // MARK: - Supporting Views
 
-struct EmptysStateView: View {
+struct AlertEmptyStateView: View {
     var body: some View {
         VStack(spacing: 24) {
             ZStack {
@@ -152,7 +140,32 @@ struct EmptysStateView: View {
     }
 }
 
-struct SummaryCard: View {
+struct AlertSummarySection: View {
+    let unreadCount: Int
+    let totalCount: Int
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Unread Card
+            AlertSummaryCard(
+                icon: "bell.fill",
+                title: "Unread",
+                count: unreadCount,
+                color: .blue
+            )
+            
+            // Total Card
+            AlertSummaryCard(
+                icon: "bell",
+                title: "Total",
+                count: totalCount,
+                color: .gray
+            )
+        }
+    }
+}
+
+struct AlertSummaryCard: View {
     let icon: String
     let title: String
     let count: Int
@@ -192,50 +205,104 @@ struct SummaryCard: View {
     }
 }
 
-struct AlertRow: View {
-    var event: GeofenceEvents
+struct NotificationsListView: View {
+    let notifications: [Notification]
+    let onMarkAsRead: (Notification) -> Void
+    let onDelete: (Notification) -> Void
+    
+    var body: some View {
+        LazyVStack(spacing: 12) {
+            ForEach(notifications) { notification in
+                AlertNotificationRow(notification: notification)
+                    .padding(.horizontal)
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        if !notification.is_read {
+                            Button {
+                                onMarkAsRead(notification)
+                            } label: {
+                                Label("Mark as Read", systemImage: "checkmark")
+                            }
+                            .tint(.blue)
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            onDelete(notification)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+}
 
+struct AlertNotificationRow: View {
+    let notification: Notification
+    
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: event.isRead ? "bell" : "bell.fill")
+            Image(systemName: iconForType(notification.type))
                 .font(.system(size: 24))
-                .foregroundColor(event.isRead ? .gray : .blue)
+                .foregroundColor(colorForType(notification.type))
                 .padding(6)
                 .background(Color(UIColor.systemGray6))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(event.message)
-                    .font(event.isRead ? .body : .headline)
+                Text(notification.message)
+                    .font(notification.is_read ? .body : .headline)
                     .foregroundColor(.primary)
                     .lineLimit(2)
 
-                Text("Trip: \(event.tripId.uuidString)")
+                Text(timeAgo(notification.created_at))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Spacer()
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(event.timestamp, style: .time)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-
-                Text(event.timestamp, style: .date)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(event.isRead ? Color(UIColor.systemBackground) : Color.blue.opacity(0.1))
+                .fill(notification.is_read ? Color(UIColor.systemBackground) : Color.blue.opacity(0.1))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(UIColor.separator), lineWidth: event.isRead ? 0.5 : 0)
+                .stroke(Color(UIColor.separator), lineWidth: notification.is_read ? 0.5 : 0)
         )
+    }
+    
+    private func timeAgo(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
+    private func iconForType(_ type: String) -> String {
+        switch type.lowercased() {
+        case "chat_message":
+            return "message.fill"
+        case "emergency":
+            return "exclamationmark.triangle.fill"
+        case "maintenance":
+            return "wrench.fill"
+        default:
+            return "bell.fill"
+        }
+    }
+    
+    private func colorForType(_ type: String) -> Color {
+        switch type.lowercased() {
+        case "chat_message":
+            return .blue
+        case "emergency":
+            return .red
+        case "maintenance":
+            return .orange
+        default:
+            return .gray
+        }
     }
 }
