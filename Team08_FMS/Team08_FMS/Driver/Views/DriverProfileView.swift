@@ -1,87 +1,88 @@
 import SwiftUI
+import Foundation
+
+// For files within the same Xcode project but not in a separate module,
+// we don't need to import them as modules.
+// Make sure these files are included in the target's Compile Sources build phase.
 
 struct DriverProfileView: View {
     @StateObject private var supabaseDataController = SupabaseDataController.shared
+    @StateObject private var languageManager = LanguageManager.shared
     @State private var driver: Driver?
-    @State private var showingStatusChangeAlert = false
-    @State private var pendingStatus: Status?
+    @State private var isEditMode = false
+    @State private var updatedName = ""
+    @State private var updatedEmail = ""
+    @State private var updatedPhone = ""
+    @State private var updatedLicense = ""
+    @State private var updatedExperience = ""
+    @State private var updatedSalary = ""
+    @State private var updatedStatus: Status
     @State private var showAlert = false
+    @State private var alertMessage = ""
     @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingLogoutAlert = false
+    @State private var showingLanguageSettings = false
+
+    init(driver: Driver = Driver(
+        userID: UUID(),
+        id: UUID(), 
+        name: "John Doe", 
+        profileImage: nil,
+        email: "john.doe@example.com", 
+        phoneNumber: 1234567890,
+        driverLicenseNumber: "DL12345",
+        driverLicenseExpiry: Date().addingTimeInterval(60*60*24*365),
+        assignedVehicleID: nil,
+        address: "123 Main St",
+        salary: 55000, 
+        yearsOfExperience: 5,
+        createdAt: Date(),
+        updatedAt: Date(),
+        isDeleted: false,
+        status: .available
+    )) {
+        _driver = State(initialValue: driver)
+        _updatedName = State(initialValue: driver.name)
+        _updatedEmail = State(initialValue: driver.email)
+        _updatedPhone = State(initialValue: "\(driver.phoneNumber)")
+        _updatedLicense = State(initialValue: driver.driverLicenseNumber)
+        _updatedExperience = State(initialValue: "\(driver.yearsOfExperience)")
+        _updatedSalary = State(initialValue: "\(driver.salary)")
+        _updatedStatus = State(initialValue: driver.status)
+    }
 
     var body: some View {
         NavigationView {
             Group {
                 if let driver = driver {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            profileHeader(for: driver)
-                            statusToggle(for: driver)
-                            contactInformation(for: driver)
-                            licenseInformation(for: driver)
-                            experienceDetails(for: driver)
-                            resetPasswordButton
-                            logoutButton
-                        }
-                        .padding()
-                        .background(Color(.systemGroupedBackground))
-                    }
+                    driverContentView(driver: driver)
                 } else {
-                    ProgressView("Loading...")
+                    ProgressView("Loading...".localized)
                         .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                 }
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Profile")
+            .navigationTitle("Driver Profile".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Back") {
+                    Button("Back".localized) {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
             }
-            .alert(isPresented: $showingStatusChangeAlert) {
-                if pendingStatus == .available {
-                    return Alert(
-                        title: Text("Confirm Status Change"),
-                        message: Text("Your status will be updated to Available."),
-                        dismissButton: .default(Text("OK"), action: {
-                            Task {
-                                if let userID = await supabaseDataController.getUserID() {
-                                    await supabaseDataController.updateDriverStatus(newStatus: .available, userID: userID, id: nil)
-                                    self.driver?.status = .available
-                                }
-                            }
-                        })
-                    )
-                } else {
-                    return Alert(
-                        title: Text("Confirm Status Change"),
-                        message: Text("Your status will be updated to Unavailable."),
-                        primaryButton: .cancel(Text("Cancel")),
-                        secondaryButton: .default(Text("Confirm"), action: {
-                            Task {
-                                if let driver = driver {
-                                    await supabaseDataController.updateDriverStatus(newStatus: .offDuty, userID: nil, id: driver.id)
-                                    self.driver?.status = .offDuty
-                                }
-                            }
-                        })
-                    )
-                }
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text("Confirmation".localized),
+                    message: Text(alertMessage),
+                    primaryButton: .destructive(Text("Delete".localized)) {
+                        // Delete action would be implemented in a real app
+                        dismiss()
+                    },
+                    secondaryButton: .cancel(Text("Cancel".localized))
+                )
             }
-//            .alert(isPresented: $showAlert) {
-//                Alert(
-//                    title: Text("Alert"),
-//                    message: Text("Are you sure you want to log out?"),
-//                    primaryButton: .destructive(Text("Yes")) {
-//                        Task {
-//                            SupabaseDataController.shared.signOut()
-//                        }
-//                    },
-//                    secondaryButton: .cancel()
-//                )
-//            }
             .task {
                 if let userID = await supabaseDataController.getUserID() {
                     do {
@@ -93,205 +94,302 @@ struct DriverProfileView: View {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .languageDidChange)) { _ in
+                // Fix the objectWillChange issue
+                // Instead of sending objectWillChange directly, 
+                // we'll just reload the driver data to refresh the view
+                func refreshDriver() async {
+                    do {
+                        guard let userID = await supabaseDataController.getUserID() else { return }
+                        if let fetchedDriver = try await supabaseDataController.fetchDriverByUserID(userID: userID) {
+                            self.driver = fetchedDriver
+                        }
+                    } catch {
+                        print("Error refreshing driver after language change: \(error)")
+                    }
+                }
+                Task {
+                    await refreshDriver()
+                }
+            }
+            .sheet(isPresented: $showingLanguageSettings) {
+                LanguageSettingsView()
+            }
         }
     }
     
-    // MARK: - View Components
+    // Break down the view into smaller pieces
+    @ViewBuilder
+    private func driverContentView(driver: Driver) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Profile Header
+                profileHeaderSection(driver: driver)
+                
+                // Personal Information
+                personalInfoSection(driver: driver)
+                
+                // Employment Information
+                employmentInfoSection(driver: driver)
+                
+                // Performance Section
+                performanceSection()
+                
+                // App Settings
+                appSettingsSection()
+                
+                // Delete Button (if not in edit mode)
+                if !isEditMode {
+                    deleteButtonSection()
+                }
+            }
+            .padding()
+        }
+    }
     
-    private func profileHeader(for driver: Driver) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "person.circle.fill")
+    // Profile Header Section
+    @ViewBuilder
+    private func profileHeaderSection(driver: Driver) -> some View {
+        HStack(alignment: .top) {
+            Image(systemName: "person.fill")
                 .resizable()
-                .scaledToFit()
-                .frame(width: 110, height: 110)
-                .foregroundColor(.blue)
-                .padding(8)
-                .background(Color.blue.opacity(0.1))
+                .frame(width: 80, height: 80)
+                .padding()
+                .background(Color.gray.opacity(0.2))
                 .clipShape(Circle())
             
-            Text(driver.name)
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text(driver.email)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-    }
-    
-    private func statusToggle(for driver: Driver) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("Status")
-                    .font(.headline)
-                Spacer()
-                Text(driver.status == .available ? "Available" : "Unavailable")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(driver.status == .available ? .green : .red)
+            VStack(alignment: .leading, spacing: 8) {
+                if isEditMode {
+                    TextField("Name".localized, text: $updatedName)
+                        .font(.title)
+                        .padding(.vertical, 4)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(5)
+                } else {
+                    Text(driver.name)
+                        .font(.title)
+                        .fontWeight(.bold)
+                }
                 
-                Toggle("", isOn: statusToggleBinding(for: driver))
-                    .tint(.green)
-            }
-            .padding(.horizontal)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-    }
-    
-    private func contactInformation(for driver: Driver) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("CONTACT INFORMATION")
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
-            
-            VStack(spacing: 0) {
-                infoRow(title: "Phone", value: "\(driver.phoneNumber)")
-                Divider()
-                infoRow(title: "Email", value: driver.email)
-            }
-            .background(Color(.systemBackground))
-            .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        }
-    }
-    
-    private func licenseInformation(for driver: Driver) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("LICENSE INFORMATION")
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
-            
-            VStack(spacing: 0) {
-                NavigationLink {
-                    LicenseDetailView(
-                        name: driver.name,
-                        licenseNumber: driver.driverLicenseNumber,
-                        expiryDate: driver.driverLicenseExpiry != nil ? formattedDate(driver.driverLicenseExpiry!) : "N/A"
-                    )
-                } label: {
-                    HStack {
-                        Text("Driver License")
-                            .font(.headline)
-                            .foregroundColor(.blue)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.gray)
-                    }
-                    .padding()
+                HStack {
+                    Text("Status:".localized)
+                    DriverStatusBadge(status: driver.status)
                 }
-                Divider()
-                infoRow(title: "License Number", value: driver.driverLicenseNumber)
-                Divider()
-                infoRow(title: "Expiry Date", value: driver.driverLicenseExpiry != nil ? formattedDate(driver.driverLicenseExpiry!) : "N/A")
             }
-            .background(Color(.systemBackground))
-            .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        }
-    }
-    
-    private func experienceDetails(for driver: Driver) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("EXPERIENCE & DETAILS")
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
             
-            VStack(spacing: 0) {
-                infoRow(title: "Experience", value: "\(driver.yearsOfExperience) Years")
-                Divider()
-                infoRow(title: "Salary", value: "$\(driver.salary)")
-            }
-            .background(Color(.systemBackground))
-            .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        }
-    }
-    
-    private var resetPasswordButton: some View {
-        NavigationLink(destination: ResetPasswordView()) {
-            HStack {
-                Image(systemName: "lock.rotation")
-                    .foregroundColor(.blue)
-                Text("Reset Password")
-                    .font(.headline)
-                    .foregroundColor(.blue)
-                Spacer()
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-            .padding(.horizontal)
-        }
-    }
-    
-    private var logoutButton: some View {
-        Button {
-            Task { supabaseDataController.signOut() }
-        } label: {
-            HStack {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .foregroundColor(.red)
-                Text("Logout")
-                    .font(.headline)
-                    .foregroundColor(.red)
-                Spacer()
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(20)
-        }
-        .padding(.top, 20)
-        .padding(.horizontal)
-    }
-    
-    // MARK: - Helper Functions
-    
-    private func infoRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.headline)
             Spacer()
-            Text(value)
-                .foregroundColor(.gray)
-                .font(.subheadline)
+            
+            Button(action: {
+                if isEditMode {
+                    saveChanges()
+                }
+                isEditMode.toggle()
+            }) {
+                Text(isEditMode ? "Save".localized : "Edit".localized)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
         }
         .padding()
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 2)
     }
     
-    private func statusToggleBinding(for driver: Driver) -> Binding<Bool> {
-        Binding<Bool>(
-            get: { driver.status == .available },
-            set: { newValue in
-                let newStatus: Status = newValue ? .available : .offDuty
-                if newStatus != driver.status {
-                    pendingStatus = newStatus
-                    showingStatusChangeAlert = true
+    // Personal Information Section
+    @ViewBuilder
+    private func personalInfoSection(driver: Driver) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Personal Information".localized)
+                .font(.headline)
+                .padding(.bottom, 5)
+            
+            DriverInfoRow(title: "Email".localized, value: driver.email, editableValue: $updatedEmail, isEditMode: isEditMode)
+            DriverInfoRow(title: "Phone".localized, value: "\(driver.phoneNumber)", editableValue: $updatedPhone, isEditMode: isEditMode)
+            DriverInfoRow(title: "Driver License".localized, value: driver.driverLicenseNumber, editableValue: $updatedLicense, isEditMode: isEditMode)
+            
+            if isEditMode {
+                VStack(alignment: .leading) {
+                    Text("Status".localized)
+                        .fontWeight(.semibold)
+                    
+                    Picker("Status".localized, selection: $updatedStatus) {
+                        // Fix for Status.allCases issue
+                        // Instead of using allCases, manually enumerate the status values
+                        Text("Available".localized).tag(Status.available)
+                        Text("Busy".localized).tag(Status.busy)
+                        Text("Off Duty".localized).tag(Status.offDuty)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.bottom)
                 }
             }
-        )
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 2)
     }
     
-    // Helper to format dates
-    func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
+    // Employment Information Section
+    @ViewBuilder
+    private func employmentInfoSection(driver: Driver) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Employment Information".localized)
+                .font(.headline)
+                .padding(.bottom, 5)
+            
+            DriverInfoRow(title: "Years of Experience".localized, value: "\(driver.yearsOfExperience)", editableValue: $updatedExperience, isEditMode: isEditMode)
+            DriverInfoRow(title: "Salary".localized, value: "$\(String(format: "%.2f", driver.salary))", editableValue: $updatedSalary, isEditMode: isEditMode)
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 2)
+    }
+    
+    // Performance Section (placeholder)
+    @ViewBuilder
+    private func performanceSection() -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Performance Metrics".localized)
+                .font(.headline)
+                .padding(.bottom, 5)
+            
+            Text("Performance data would be displayed here.".localized)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 2)
+    }
+    
+    // App Settings Section
+    @ViewBuilder
+    private func appSettingsSection() -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("App Settings".localized)
+                .font(.headline)
+                .padding(.bottom, 5)
+            
+            Button(action: {
+                showingLanguageSettings = true
+            }) {
+                HStack {
+                    Image(systemName: "globe")
+                        .foregroundColor(.blue)
+                    Text("Language".localized)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Text(languageManager.currentLanguage.uppercased())
+                        .foregroundColor(.gray)
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 2)
+    }
+    
+    // Delete Button Section
+    @ViewBuilder
+    private func deleteButtonSection() -> some View {
+        Button(action: {
+            // Delete action would be implemented in a real app
+            showAlert = true
+            alertMessage = "Are you sure you want to delete this driver?".localized
+        }) {
+            Text("Delete Driver".localized)
+                .foregroundColor(.white)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.red)
+                .cornerRadius(10)
+        }
+    }
+    
+    private func saveChanges() {
+        // Validate input
+        guard let phoneNumber = Int(updatedPhone) else {
+            showAlert = true
+            alertMessage = "Phone number must be numeric.".localized
+            return
+        }
+        
+        guard let experience = Int(updatedExperience) else {
+            showAlert = true
+            alertMessage = "Experience must be a number.".localized
+            return
+        }
+        
+        guard let salary = Double(updatedSalary) else {
+            showAlert = true
+            alertMessage = "Salary must be a number.".localized
+            return
+        }
+        
+        // Update driver object
+        driver?.name = updatedName
+        driver?.email = updatedEmail
+        driver?.phoneNumber = phoneNumber
+        driver?.driverLicenseNumber = updatedLicense
+        driver?.yearsOfExperience = experience
+        driver?.salary = salary
+        driver?.status = updatedStatus
+        
+        // Show success message
+        showAlert = true
+        alertMessage = "Driver information updated successfully.".localized
     }
 }
- 
+
+struct DriverInfoRow: View {
+    var title: String
+    var value: String
+    @Binding var editableValue: String
+    var isEditMode: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .fontWeight(.semibold)
+            
+            if isEditMode {
+                TextField(title, text: $editableValue)
+                    .padding(8)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(5)
+            } else {
+                Text(value)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+struct DriverStatusBadge: View {
+    var status: Status
+    
+    var body: some View {
+        Text(status.rawValue.capitalized.localized)
+            .font(.subheadline)
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(status.color)
+            .cornerRadius(10)
+    }
+}
+
 struct LicenseDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let name: String
@@ -306,7 +404,7 @@ struct LicenseDetailView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Driver License")
+            .navigationTitle("Driver License".localized)
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -314,7 +412,7 @@ struct LicenseDetailView: View {
     private var licenseCard: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("DRIVER LICENSE")
+                Text("DRIVER LICENSE".localized)
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
@@ -346,7 +444,7 @@ struct LicenseDetailView: View {
                     }
                     
                     HStack(spacing: 4) {
-                        Text("EXP")
+                        Text("EXP".localized)
                             .font(.caption)
                             .foregroundColor(.gray)
                         Text(expiryDate)
@@ -354,7 +452,7 @@ struct LicenseDetailView: View {
                     }
                     
                     HStack(spacing: 4) {
-                        Text("NAME")
+                        Text("NAME".localized)
                             .font(.caption)
                             .foregroundColor(.gray)
                         Text(name)

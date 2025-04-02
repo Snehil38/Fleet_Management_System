@@ -1,0 +1,128 @@
+/* Common UI Elements */
+"Done" = "Done";
+"Cancel" = "Cancel";
+"Save" = "Save";
+"Edit" = "Edit";
+"Delete" = "Delete";
+"Back" = "Back";
+"Next" = "Next";
+"Previous" = "Previous";
+"Search" = "Search";
+"Settings" = "Settings";
+"Profile" = "Profile";
+"Logout" = "Logout";
+
+/* Language Settings */
+"Language" = "Language";
+"Choose Language" = "Choose Language";
+"The app will use the selected language for all text elements." = "The app will use the selected language for all text elements.";
+
+/* Login and Authentication */
+"Login" = "Login";
+"Email" = "Email";
+"Password" = "Password";
+"Forgot Password" = "Forgot Password";
+"Sign In" = "Sign In";
+"Sign Out" = "Sign Out";
+"Select Your Role" = "Select Your Role";
+"Fleet Manager" = "Fleet Manager";
+"Driver" = "Driver";
+"Maintenance Personnel" = "Maintenance Personnel";
+
+/* Dashboard and Navigation */
+"Dashboard" = "Dashboard";
+"Trips" = "Trips";
+"Vehicles" = "Vehicles";
+"Crew" = "Crew";
+"Maintenance" = "Maintenance";
+"Notifications" = "Notifications";
+"Statistics" = "Statistics";
+"Reports" = "Reports";
+
+/* Trips */
+"Current" = "Current";
+"Upcoming" = "Upcoming";
+"Completed" = "Completed";
+"Trip Details" = "Trip Details";
+"Destination" = "Destination";
+"Distance" = "Distance";
+"Duration" = "Duration";
+"Status" = "Status";
+"Pending" = "Pending";
+"In Progress" = "In Progress";
+"Delivered" = "Delivered";
+"Assigned" = "Assigned";
+"Unassigned" = "Unassigned";
+"Assign Driver" = "Assign Driver";
+"Trip ID" = "Trip ID";
+
+/* Vehicles */
+"Vehicle Details" = "Vehicle Details";
+"License Plate" = "License Plate";
+"Make" = "Make";
+"Model" = "Model";
+"Year" = "Year";
+"VIN" = "VIN";
+"Fuel Type" = "Fuel Type";
+"Fuel Level" = "Fuel Level";
+"Odometer" = "Odometer";
+"Last Maintenance" = "Last Maintenance";
+"Available" = "Available";
+"In Use" = "In Use";
+"Under Maintenance" = "Under Maintenance";
+
+/* Driver */
+"Driver Details" = "Driver Details";
+"License" = "License";
+"Experience" = "Experience";
+"Phone" = "Phone";
+"Address" = "Address";
+"Salary" = "Salary";
+"Years" = "Years";
+"Driver Status" = "Driver Status";
+"Available" = "Available";
+"On Trip" = "On Trip";
+"Off Duty" = "Off Duty";
+
+/* Maintenance */
+"Maintenance Records" = "Maintenance Records";
+"Scheduled" = "Scheduled";
+"Completed" = "Completed";
+"Overdue" = "Overdue";
+"Service Type" = "Service Type";
+"Service Date" = "Service Date";
+"Notes" = "Notes";
+"Report Issue" = "Report Issue";
+"Schedule Maintenance" = "Schedule Maintenance";
+
+/* SOS Button */
+"SOS" = "SOS";
+"Emergency" = "Emergency";
+"Contact" = "Contact";
+"Select Contact" = "Select Contact";
+"Fleet Manager" = "Fleet Manager";
+"Maintenance" = "Maintenance";
+"Call" = "Call";
+"Message" = "Message";
+"Emergency Assistance" = "Emergency Assistance";
+
+/* Error Messages */
+"Error" = "Error";
+"Something went wrong" = "Something went wrong";
+"Please try again" = "Please try again";
+"Network error" = "Network error";
+"Check your internet connection" = "Check your internet connection";
+"Invalid input" = "Invalid input";
+"Field cannot be empty" = "Field cannot be empty";
+"Invalid email format" = "Invalid email format";
+"Password too short" = "Password too short";
+"Passwords don't match" = "Passwords don't match";
+
+/* Confirmation Messages */
+"Success" = "Success";
+"Information updated successfully" = "Information updated successfully";
+"Changes saved" = "Changes saved";
+"Are you sure?" = "Are you sure?";
+"This action cannot be undone" = "This action cannot be undone";
+"Yes" = "Yes";
+"No" = "No"; 

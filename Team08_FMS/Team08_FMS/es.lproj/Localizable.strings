@@ -1,0 +1,128 @@
+/* Common UI Elements */
+"Done" = "Hecho";
+"Cancel" = "Cancelar";
+"Save" = "Guardar";
+"Edit" = "Editar";
+"Delete" = "Eliminar";
+"Back" = "Atrás";
+"Next" = "Siguiente";
+"Previous" = "Anterior";
+"Search" = "Buscar";
+"Settings" = "Configuración";
+"Profile" = "Perfil";
+"Logout" = "Cerrar Sesión";
+
+/* Language Settings */
+"Language" = "Idioma";
+"Choose Language" = "Elegir Idioma";
+"The app will use the selected language for all text elements." = "La aplicación usará el idioma seleccionado para todos los elementos de texto.";
+
+/* Login and Authentication */
+"Login" = "Iniciar Sesión";
+"Email" = "Correo Electrónico";
+"Password" = "Contraseña";
+"Forgot Password" = "Olvidé mi Contraseña";
+"Sign In" = "Iniciar Sesión";
+"Sign Out" = "Cerrar Sesión";
+"Select Your Role" = "Selecciona tu Rol";
+"Fleet Manager" = "Gerente de Flota";
+"Driver" = "Conductor";
+"Maintenance Personnel" = "Personal de Mantenimiento";
+
+/* Dashboard and Navigation */
+"Dashboard" = "Panel";
+"Trips" = "Viajes";
+"Vehicles" = "Vehículos";
+"Crew" = "Equipo";
+"Maintenance" = "Mantenimiento";
+"Notifications" = "Notificaciones";
+"Statistics" = "Estadísticas";
+"Reports" = "Informes";
+
+/* Trips */
+"Current" = "Actuales";
+"Upcoming" = "Próximos";
+"Completed" = "Completados";
+"Trip Details" = "Detalles del Viaje";
+"Destination" = "Destino";
+"Distance" = "Distancia";
+"Duration" = "Duración";
+"Status" = "Estado";
+"Pending" = "Pendiente";
+"In Progress" = "En Progreso";
+"Delivered" = "Entregado";
+"Assigned" = "Asignado";
+"Unassigned" = "Sin Asignar";
+"Assign Driver" = "Asignar Conductor";
+"Trip ID" = "ID del Viaje";
+
+/* Vehicles */
+"Vehicle Details" = "Detalles del Vehículo";
+"License Plate" = "Matrícula";
+"Make" = "Marca";
+"Model" = "Modelo";
+"Year" = "Año";
+"VIN" = "VIN";
+"Fuel Type" = "Tipo de Combustible";
+"Fuel Level" = "Nivel de Combustible";
+"Odometer" = "Odómetro";
+"Last Maintenance" = "Último Mantenimiento";
+"Available" = "Disponible";
+"In Use" = "En Uso";
+"Under Maintenance" = "En Mantenimiento";
+
+/* Driver */
+"Driver Details" = "Detalles del Conductor";
+"License" = "Licencia";
+"Experience" = "Experiencia";
+"Phone" = "Teléfono";
+"Address" = "Dirección";
+"Salary" = "Salario";
+"Years" = "Años";
+"Driver Status" = "Estado del Conductor";
+"Available" = "Disponible";
+"On Trip" = "En Viaje";
+"Off Duty" = "Fuera de Servicio";
+
+/* Maintenance */
+"Maintenance Records" = "Registros de Mantenimiento";
+"Scheduled" = "Programado";
+"Completed" = "Completado";
+"Overdue" = "Atrasado";
+"Service Type" = "Tipo de Servicio";
+"Service Date" = "Fecha de Servicio";
+"Notes" = "Notas";
+"Report Issue" = "Reportar Problema";
+"Schedule Maintenance" = "Programar Mantenimiento";
+
+/* SOS Button */
+"SOS" = "SOS";
+"Emergency" = "Emergencia";
+"Contact" = "Contacto";
+"Select Contact" = "Seleccionar Contacto";
+"Fleet Manager" = "Gerente de Flota";
+"Maintenance" = "Mantenimiento";
+"Call" = "Llamar";
+"Message" = "Mensaje";
+"Emergency Assistance" = "Asistencia de Emergencia";
+
+/* Error Messages */
+"Error" = "Error";
+"Something went wrong" = "Algo salió mal";
+"Please try again" = "Por favor intente de nuevo";
+"Network error" = "Error de red";
+"Check your internet connection" = "Verifique su conexión a internet";
+"Invalid input" = "Entrada inválida";
+"Field cannot be empty" = "El campo no puede estar vacío";
+"Invalid email format" = "Formato de correo inválido";
+"Password too short" = "Contraseña demasiado corta";
+"Passwords don't match" = "Las contraseñas no coinciden";
+
+/* Confirmation Messages */
+"Success" = "Éxito";
+"Information updated successfully" = "Información actualizada con éxito";
+"Changes saved" = "Cambios guardados";
+"Are you sure?" = "¿Está seguro?";
+"This action cannot be undone" = "Esta acción no se puede deshacer";
+"Yes" = "Sí";
+"No" = "No"; 

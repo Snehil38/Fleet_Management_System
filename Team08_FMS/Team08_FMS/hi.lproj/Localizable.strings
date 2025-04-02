@@ -1,0 +1,128 @@
+/* Common UI Elements */
+"Done" = "पूर्ण";
+"Cancel" = "रद्द करें";
+"Save" = "सहेजें";
+"Edit" = "संपादित करें";
+"Delete" = "हटाएं";
+"Back" = "वापस";
+"Next" = "अगला";
+"Previous" = "पिछला";
+"Search" = "खोज";
+"Settings" = "सेटिंग्स";
+"Profile" = "प्रोफ़ाइल";
+"Logout" = "लॉगआउट";
+
+/* Language Settings */
+"Language" = "भाषा";
+"Choose Language" = "भाषा चुनें";
+"The app will use the selected language for all text elements." = "ऐप सभी टेक्स्ट तत्वों के लिए चयनित भाषा का उपयोग करेगा।";
+
+/* Login and Authentication */
+"Login" = "लॉगिन";
+"Email" = "ईमेल";
+"Password" = "पासवर्ड";
+"Forgot Password" = "पासवर्ड भूल गए";
+"Sign In" = "साइन इन";
+"Sign Out" = "साइन आउट";
+"Select Your Role" = "अपनी भूमिका चुनें";
+"Fleet Manager" = "फ्लीट मैनेजर";
+"Driver" = "ड्राइवर";
+"Maintenance Personnel" = "रखरखाव कर्मी";
+
+/* Dashboard and Navigation */
+"Dashboard" = "डैशबोर्ड";
+"Trips" = "यात्राएं";
+"Vehicles" = "वाहन";
+"Crew" = "क्रू";
+"Maintenance" = "रखरखाव";
+"Notifications" = "सूचनाएं";
+"Statistics" = "आंकड़े";
+"Reports" = "रिपोर्ट";
+
+/* Trips */
+"Current" = "वर्तमान";
+"Upcoming" = "आगामी";
+"Completed" = "पूर्ण";
+"Trip Details" = "यात्रा विवरण";
+"Destination" = "गंतव्य";
+"Distance" = "दूरी";
+"Duration" = "अवधि";
+"Status" = "स्थिति";
+"Pending" = "अपूर्ण";
+"In Progress" = "प्रगति में";
+"Delivered" = "पहुंचाया गया";
+"Assigned" = "असाइन किया गया";
+"Unassigned" = "असाइन नहीं किया गया";
+"Assign Driver" = "ड्राइवर असाइन करें";
+"Trip ID" = "यात्रा आईडी";
+
+/* Vehicles */
+"Vehicle Details" = "वाहन विवरण";
+"License Plate" = "लाइसेंस प्लेट";
+"Make" = "निर्माता";
+"Model" = "मॉडल";
+"Year" = "वर्ष";
+"VIN" = "वीआईएन";
+"Fuel Type" = "ईंधन प्रकार";
+"Fuel Level" = "ईंधन स्तर";
+"Odometer" = "ओडोमीटर";
+"Last Maintenance" = "अंतिम रखरखाव";
+"Available" = "उपलब्ध";
+"In Use" = "उपयोग में";
+"Under Maintenance" = "रखरखाव के अधीन";
+
+/* Driver */
+"Driver Details" = "ड्राइवर विवरण";
+"License" = "लाइसेंस";
+"Experience" = "अनुभव";
+"Phone" = "फोन";
+"Address" = "पता";
+"Salary" = "वेतन";
+"Years" = "वर्ष";
+"Driver Status" = "ड्राइवर स्थिति";
+"Available" = "उपलब्ध";
+"On Trip" = "यात्रा पर";
+"Off Duty" = "ड्यूटी से बाहर";
+
+/* Maintenance */
+"Maintenance Records" = "रखरखाव रिकॉर्ड";
+"Scheduled" = "निर्धारित";
+"Completed" = "पूर्ण";
+"Overdue" = "विलंबित";
+"Service Type" = "सेवा प्रकार";
+"Service Date" = "सेवा तिथि";
+"Notes" = "नोट्स";
+"Report Issue" = "समस्या रिपोर्ट करें";
+"Schedule Maintenance" = "रखरखाव शेड्यूल करें";
+
+/* SOS Button */
+"SOS" = "एसओएस";
+"Emergency" = "आपातकालीन";
+"Contact" = "संपर्क";
+"Select Contact" = "संपर्क चुनें";
+"Fleet Manager" = "फ्लीट मैनेजर";
+"Maintenance" = "रखरखाव";
+"Call" = "कॉल";
+"Message" = "संदेश";
+"Emergency Assistance" = "आपातकालीन सहायता";
+
+/* Error Messages */
+"Error" = "त्रुटि";
+"Something went wrong" = "कुछ गलत हो गया";
+"Please try again" = "कृपया पुनः प्रयास करें";
+"Network error" = "नेटवर्क त्रुटि";
+"Check your internet connection" = "अपना इंटरनेट कनेक्शन जांचें";
+"Invalid input" = "अमान्य इनपुट";
+"Field cannot be empty" = "फ़ील्ड खाली नहीं हो सकता";
+"Invalid email format" = "अमान्य ईमेल प्रारूप";
+"Password too short" = "पासवर्ड बहुत छोटा है";
+"Passwords don't match" = "पासवर्ड मेल नहीं खाते";
+
+/* Confirmation Messages */
+"Success" = "सफलता";
+"Information updated successfully" = "जानकारी सफलतापूर्वक अपडेट की गई";
+"Changes saved" = "परिवर्तन सहेजे गए";
+"Are you sure?" = "क्या आप निश्चित हैं?";
+"This action cannot be undone" = "यह क्रिया पूर्ववत नहीं की जा सकती";
+"Yes" = "हां";
+"No" = "नहीं"; 
