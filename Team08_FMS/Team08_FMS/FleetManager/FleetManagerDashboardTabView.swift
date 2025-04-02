@@ -421,7 +421,7 @@ struct RouteInformationView: View {
                         
                         HStack {
                             TextField("Enter middle pickup location", text: $middlePickupLocation)
-                                .onChange(of: middlePickupLocation) { newValue in
+                                .onChange(of: middlePickupLocation) { _, newValue in
                                     onMiddlePickupChange(newValue)
                                 }
                                 .padding(.vertical, 12)
@@ -449,7 +449,7 @@ struct RouteInformationView: View {
                     
                     HStack {
                         TextField("Enter dropoff location", text: $dropoffLocation)
-                            .onChange(of: dropoffLocation) { newValue in
+                            .onChange(of: dropoffLocation) { _, newValue in
                                 onDropoffChange(newValue)
                             }
                             .padding(.vertical, 12)
@@ -1495,7 +1495,7 @@ struct LocationInputField: View {
             TextField(placeholder, text: $text)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .onChange(of: text, perform: onChange)
-            
+             
             if !text.isEmpty {
                 Button(action: onClear) {
                     Image(systemName: "xmark.circle.fill")

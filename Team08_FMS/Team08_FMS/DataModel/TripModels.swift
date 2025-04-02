@@ -9,7 +9,7 @@ enum TripStatus: String, Codable {
     case assigned = "assigned"
 }
 
-// Trip Model - Unified to handle both main trips and pickup points
+// Trip Model - Only for main trips
 class Trip: Identifiable, Equatable {
     var id: UUID
     var destination: String
@@ -28,22 +28,9 @@ class Trip: Identifiable, Equatable {
     let startingPoint: String
     let pickup: String?
     var driverId: UUID?
-    var additionalPickups: [UUID]
-    
-    // Pickup point specific properties
-    var isPickupPoint: Bool = false
-    var parentTripId: UUID?
-    var sequence: Int = 0
-    var completed: Bool = false
-    var estimatedArrivalTime: Date?
-    var latitude: Double = 0
-    var longitude: Double = 0
     
     // Computed property for display purposes
     var displayName: String {
-        if isPickupPoint {
-            return destination
-        }
         return pickup ?? "Trip-\(id.uuidString.prefix(8))"
     }
     
@@ -76,24 +63,6 @@ class Trip: Identifiable, Equatable {
         return Trip(from: emptySupabaseTrip, vehicle: emptyVehicle)
     }
     
-    // Create a pickup point
-    static func createPickupPoint(id: UUID, parentTripId: UUID, location: String, address: String, 
-                                 latitude: Double, longitude: Double, sequence: Int, 
-                                 completed: Bool, estimatedArrivalTime: Date? = nil) -> Trip {
-        let trip = Trip.empty
-        trip.isPickupPoint = true
-        trip.id = id
-        trip.parentTripId = parentTripId
-        trip.destination = location
-        trip.address = address
-        trip.latitude = latitude
-        trip.longitude = longitude
-        trip.sequence = sequence
-        trip.completed = completed
-        trip.estimatedArrivalTime = estimatedArrivalTime
-        return trip
-    }
-    
     static func == (lhs: Trip, rhs: Trip) -> Bool {
         return lhs.id == rhs.id
     }
@@ -111,7 +80,6 @@ class Trip: Identifiable, Equatable {
         self.endTime = supabaseTrip.end_time
         self.pickup = supabaseTrip.pickup
         self.driverId = supabaseTrip.driver_id
-        self.additionalPickups = []
         
         // Set distance using estimated_distance if available
         if let estimatedDistance = supabaseTrip.estimated_distance {
@@ -155,45 +123,65 @@ class Trip: Identifiable, Equatable {
             longitude: supabaseTrip.end_longitude ?? 0
         )
         self.startingPoint = supabaseTrip.pickup ?? "N/A"
-        
-        // Parse additional pickups from notes if they exist
-        if let notes = supabaseTrip.notes, notes.contains("Additional Pickups:") {
-            let pickupsSection = notes.components(separatedBy: "Additional Pickups:").last
-            if let pickupLines = pickupsSection?.components(separatedBy: "\n").filter({ !$0.isEmpty }) {
-                var sequence = 1
-                for line in pickupLines {
-                    if line.contains("|") {
-                        let components = line.components(separatedBy: "|")
-                        if components.count >= 4 {
-                            let location = components[0].trimmingCharacters(in: .whitespaces)
-                            let address = components[1].trimmingCharacters(in: .whitespaces)
-                            let latStr = components[2].trimmingCharacters(in: .whitespaces)
-                            let lngStr = components[3].trimmingCharacters(in: .whitespaces)
-                            
-                            if let lat = Double(latStr), let lng = Double(lngStr) {
-                                let pickup = Trip.createPickupPoint(
-                                    id: UUID(),
-                                    parentTripId: self.id,
-                                    location: location,
-                                    address: address,
-                                    latitude: lat,
-                                    longitude: lng,
-                                    sequence: sequence,
-                                    completed: false
-                                )
-                                self.additionalPickups.append(pickup.id)
-                                sequence += 1
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    }
+}
+
+// Separate PickupPoint structure
+struct PickupPoint: Identifiable, Equatable, Codable {
+    var id: UUID
+    var parentTripId: UUID
+    var location: String
+    var address: String
+    var latitude: Double
+    var longitude: Double
+    var sequence: Int
+    var completed: Bool
+    var estimatedArrivalTime: Date?
+    
+    static func == (lhs: PickupPoint, rhs: PickupPoint) -> Bool {
+        return lhs.id == rhs.id
+    }
+    
+    // Create an empty pickup point
+    static var empty: PickupPoint {
+        return PickupPoint(
+            id: UUID(),
+            parentTripId: UUID(),
+            location: "",
+            address: "",
+            latitude: 0,
+            longitude: 0,
+            sequence: 0,
+            completed: false,
+            estimatedArrivalTime: nil
+        )
+    }
+    
+    // Create a pickup point with specified values
+    static func create(id: UUID = UUID(), parentTripId: UUID, location: String, address: String, 
+                     latitude: Double, longitude: Double, sequence: Int, 
+                     completed: Bool, estimatedArrivalTime: Date? = nil) -> PickupPoint {
+        return PickupPoint(
+            id: id,
+            parentTripId: parentTripId,
+            location: location,
+            address: address,
+            latitude: latitude,
+            longitude: longitude,
+            sequence: sequence,
+            completed: completed,
+            estimatedArrivalTime: estimatedArrivalTime
+        )
+    }
+    
+    // Convert to a CLLocationCoordinate2D for map display
+    var coordinate: CLLocationCoordinate2D {
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 }
 
 // Delivery Details Model
-struct DeliveryDetails: Identifiable, Equatable {
+struct DeliveryDetails: Identifiable {
     let id: UUID
     let location: String
     let date: String
@@ -201,26 +189,6 @@ struct DeliveryDetails: Identifiable, Equatable {
     let driver: String
     let vehicle: String
     let notes: String
-    
-    init(id: UUID = UUID(), location: String, date: String, status: String, driver: String, vehicle: String, notes: String) {
-        self.id = id
-        self.location = location
-        self.date = date
-        self.status = status
-        self.driver = driver
-        self.vehicle = vehicle
-        self.notes = notes
-    }
-    
-    static func == (lhs: DeliveryDetails, rhs: DeliveryDetails) -> Bool {
-        return lhs.id == rhs.id &&
-               lhs.location == rhs.location &&
-               lhs.date == rhs.date &&
-               lhs.status == rhs.status &&
-               lhs.driver == rhs.driver &&
-               lhs.vehicle == rhs.vehicle &&
-               lhs.notes == rhs.notes
-    }
 }
 
 // Supabase Trip Model

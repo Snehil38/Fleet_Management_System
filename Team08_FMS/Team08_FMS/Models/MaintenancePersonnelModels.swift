@@ -254,7 +254,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
     
     func fetchExpenses(for requestID: UUID) async throws -> [Expense] {
         // Call the Supabase data controller to fetch expenses for the given service request ID.
-        let expenses = try await SupabaseDataController.shared.fetchExpenses()
+        let expenses = try await SupabaseDataController.shared.fetchExpenses(for: requestID)
         return expenses
     }
 }

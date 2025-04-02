@@ -7,6 +7,7 @@ struct TripDetailView: View {
     @State private var showingDeleteAlert = false
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var supabaseDataController = SupabaseDataController.shared
+    @StateObject private var pickupPointsController = PickupPointsController.shared
     var trip: Trip
     
     private let dateFormatter: DateFormatter = {
@@ -131,145 +132,146 @@ struct TripDetailView: View {
 
     var body: some View {
         NavigationView {
-            List {
-                // Trip Information Section with driver assignment
-                Section(header: Text("TRIP INFORMATION")) {
-                    if isEditing {
-                        // Editable Trip ID (non-editable)
-                        HStack {
-                            Text("Trip ID")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(trip.id.uuidString)
-                        }
-                        
-                        // Editable Destination
-                        VStack(alignment: .leading, spacing: 4) {
-                            TextField("Destination", text: $editedDestination)
-                                .onChange(of: editedDestination) { newValue in 
-                                    destinationEdited = true
-                                    
-                                    // If destination was previously selected and user is editing
-                                    if destinationSelected && !newValue.isEmpty {
-                                        if newValue != editedDestination {
-                                            destinationSelected = false
-                                        }
-                                    }
-                                    
-                                    // Only show search results if not already selected and query has 3+ chars
-                                    if !destinationSelected && newValue.count > 2 {
-                                        searchCompleter.queryFragment = newValue
-                                        activeTextField = .destination
-                                    } else {
-                                        searchResults = []
-                                    }
-                                }
-                            if destinationEdited && !isDestinationValid {
-                                Text("Destination cannot be empty")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        
-                        // Editable Address
-                        VStack(alignment: .leading, spacing: 4) {
-                            TextField("Address", text: $editedAddress)
-                                .onChange(of: editedAddress) { newValue in 
-                                    addressEdited = true
-                                    
-                                    // If address was previously selected and user is editing
-                                    if addressSelected && !newValue.isEmpty {
-                                        if newValue != editedAddress {
-                                            addressSelected = false
-                                        }
-                                    }
-                                    
-                                    // Only show search results if not already selected and query has 3+ chars
-                                    if !addressSelected && newValue.count > 2 {
-                                        searchCompleter.queryFragment = newValue
-                                        activeTextField = .address
-                                    } else {
-                                        searchResults = []
-                                    }
-                                }
-                            if addressEdited && !isAddressValid {
-                                Text("Address cannot be empty")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        
-                        // Search Results if any - only show when appropriate based on selection state
-                        if !searchResults.isEmpty && activeTextField != nil && 
-                           ((activeTextField == .destination && !destinationSelected) || 
-                            (activeTextField == .address && !addressSelected)) {
-                            FleetTripsLocationSearchResults(results: searchResults) { result in
-                                if activeTextField == .destination {
-                                    destinationSelected = true
-                                    searchForLocation(result.title, isDestination: true)
-                                } else {
-                                    addressSelected = true
-                                    searchForLocation(result.title, isDestination: false)
-                                }
-                            }
-                        }
-                        
-                        // Non-editable distance
-                        if !calculatedDistance.isEmpty {
+            ZStack {
+                List {
+                    // Trip Information Section with driver assignment
+                    Section(header: Text("TRIP INFORMATION")) {
+                        if isEditing {
+                            // Editable Trip ID (non-editable)
                             HStack {
-                                Text("Distance")
+                                Text("Trip ID")
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text(calculatedDistance)
-                                    .foregroundColor(calculatedDistance != trip.distance ? .blue : .primary)
+                                Text(trip.id.uuidString)
                             }
-                        }
-                        
-                        // Driver assignment
-                        HStack {
-                            Text("Driver")
-                                .foregroundColor(.secondary)
-                            Spacer()
                             
+                            // Editable Destination
+                            VStack(alignment: .leading, spacing: 4) {
+                                TextField("Destination", text: $editedDestination)
+                                    .onChange(of: editedDestination) { _, newValue in 
+                                        destinationEdited = true
+                                        
+                                        // If destination was previously selected and user is editing
+                                        if destinationSelected && !newValue.isEmpty {
+                                            if newValue != editedDestination {
+                                                destinationSelected = false
+                                            }
+                                        }
+                                        
+                                        // Only show search results if not already selected and query has 3+ chars
+                                        if !destinationSelected && newValue.count > 2 {
+                                            searchCompleter.queryFragment = newValue
+                                            activeTextField = .destination
+                                        } else {
+                                            searchResults = []
+                                        }
+                                    }
+                                if destinationEdited && !isDestinationValid {
+                                    Text("Destination cannot be empty")
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                }
+                            }
+                            
+                            // Editable Address
+                            VStack(alignment: .leading, spacing: 4) {
+                                TextField("Address", text: $editedAddress)
+                                    .onChange(of: editedAddress) { _, newValue in
+                                        addressEdited = true
+                                        
+                                        // If address was previously selected and user is editing
+                                        if addressSelected && !newValue.isEmpty {
+                                            if newValue != editedAddress {
+                                                addressSelected = false
+                                            }
+                                        }
+                                        
+                                        // Only show search results if not already selected and query has 3+ chars
+                                        if !addressSelected && newValue.count > 2 {
+                                            searchCompleter.queryFragment = newValue
+                                            activeTextField = .address
+                                        } else {
+                                            searchResults = []
+                                        }
+                                    }
+                                if addressEdited && !isAddressValid {
+                                    Text("Address cannot be empty")
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                }
+                            }
+                            
+                            // Search Results if any - only show when appropriate based on selection state
+                            if !searchResults.isEmpty && activeTextField != nil && 
+                               ((activeTextField == .destination && !destinationSelected) || 
+                                (activeTextField == .address && !addressSelected)) {
+                                FleetTripsLocationSearchResults(results: searchResults) { result in
+                                    if activeTextField == .destination {
+                                        destinationSelected = true
+                                        searchForLocation(result.title, isDestination: true)
+                                    } else {
+                                        addressSelected = true
+                                        searchForLocation(result.title, isDestination: false)
+                                    }
+                                }
+                            }
+                            
+                            // Non-editable distance
+                            if !calculatedDistance.isEmpty {
+                                HStack {
+                                    Text("Distance")
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text(calculatedDistance)
+                                        .foregroundColor(calculatedDistance != trip.distance ? .blue : .primary)
+                                }
+                            }
+                            
+                            // Driver assignment
+                            HStack {
+                                Text("Driver")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                
+                                if let driverId = trip.driverId,
+                                   let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+                                    Text(driver.name)
+                                } else {
+                                    Text("Unassigned")
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        } else {
+                            FleetTripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
+                            FleetTripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
+                            FleetTripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
+                            if !trip.distance.isEmpty {
+                                FleetTripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
+                            }
+                            
+                            // Driver information
                             if let driverId = trip.driverId,
                                let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
-                                Text(driver.name)
+                                FleetTripDetailRow(icon: "person.fill", title: "Driver", value: driver.name)
                             } else {
-                                Text("Unassigned")
-                                    .foregroundColor(.secondary)
+                                FleetTripDetailRow(icon: "person.fill", title: "Driver", value: "Unassigned")
                             }
                         }
-                    } else {
-                        FleetTripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
-                        FleetTripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
-                        FleetTripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
-                        if !trip.distance.isEmpty {
-                            FleetTripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
-                        }
-                        
-                        // Driver information
-                        if let driverId = trip.driverId,
-                           let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
-                            FleetTripDetailRow(icon: "person.fill", title: "Driver", value: driver.name)
-                        } else {
-                            FleetTripDetailRow(icon: "person.fill", title: "Driver", value: "Unassigned")
-                        }
                     }
-                }
-                
-                // Vehicle Information Section
-                Section(header: Text("VEHICLE INFORMATION")) {
-                    FleetTripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.bodyType.rawValue)
-                    FleetTripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
-                }
-                
-                // Additional Pickup Points
-                if !trip.additionalPickups.isEmpty {
-                    Section(header: Text("ADDITIONAL PICKUP POINTS")) {
-                        ForEach(trip.additionalPickups, id: \.self) { pickupId in
-                            if let pickup = tripController.allTrips.first(where: { $0.id == pickupId }) {
+                    
+                    // Vehicle Information Section
+                    Section(header: Text("VEHICLE INFORMATION")) {
+                        FleetTripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.bodyType.rawValue)
+                        FleetTripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
+                    }
+                    
+                    // Additional Pickup Points
+                    let pickupPoints = pickupPointsController.getPickupPointsForTrip(tripId: trip.id)
+                    if !pickupPoints.isEmpty {
+                        Section(header: Text("ADDITIONAL PICKUP POINTS")) {
+                            ForEach(pickupPoints, id: \.id) { pickup in
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(pickup.destination)
+                                    Text(pickup.location)
                                         .font(.headline)
                                     
                                     Text(pickup.address)
@@ -286,7 +288,7 @@ struct TripDetailView: View {
                                 .swipeActions(edge: .trailing) {
                                     if !pickup.completed {
                                         Button {
-                                            markPickupCompleted(pickup)
+                                            markPickupCompleted(pickup.id)
                                         } label: {
                                             Label("Complete", systemImage: "checkmark.circle")
                                         }
@@ -294,219 +296,207 @@ struct TripDetailView: View {
                                     }
                                     
                                     Button(role: .destructive) {
-                                        deletePickup(pickup)
+                                        deletePickup(pickup.id)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
                                 }
                             }
-                        }
-                        
-                        Button {
-                            showingAddPickupSheet = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.blue)
-                                Text("Add Pickup Point")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                } else {
-                    Section {
-                        Button {
-                            showingAddPickupSheet = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundColor(.blue)
-                                Text("Add Pickup Point")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    } header: {
-                        Text("ADDITIONAL PICKUP POINTS")
-                    } footer: {
-                        Text("You can add intermediate stops for this trip")
-                            .font(.caption)
-                    }
-                }
-                
-                // Delivery Status Section
-                Section(header: Text("DELIVERY STATUS")) {
-                    FleetTripDetailRow(icon: statusIcon, title: "Status", value: statusText)
-                    FleetTripDetailRow(
-                        icon: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "clock.badge.checkmark.fill",
-                        title: "Pre-Trip Inspection",
-                        value: trip.hasCompletedPreTrip ? "Completed" : "Required"
-                    )
-                    FleetTripDetailRow(
-                        icon: trip.hasCompletedPostTrip ? "checkmark.circle.fill" : "checkmark.shield.fill",
-                        title: "Post-Trip Inspection",
-                        value: trip.hasCompletedPostTrip ? "Completed" : "Required"
-                    )
-                }
-                
-                // Notes Section
-                Section(header: Text("NOTES")) {
-                    if isEditing {
-                        TextEditor(text: $editedNotes)
-                            .frame(minHeight: 100)
-                            .onChange(of: editedNotes) { notesEdited = true }
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let notes = trip.notes {
-                                Text("Trip Details")
-                                    .font(.headline)
-                                    .padding(.bottom, 4)
-                                
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Trip: \(trip.id.uuidString)")
-                                    Text("From: \(trip.address)")
-                                    Text("To: \(trip.destination)")
-                                    
-                                    if !trip.distance.isEmpty {
-                                        Text("Distance: \(trip.distance)")
-                                    }
-                                    
-                                    // Display driver information if available
-                                    if let driverId = trip.driverId,
-                                       let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
-                                        Text("Driver: \(driver.name)")
-                                    } else {
-                                        Text("Driver: Unassigned")
-                                    }
-                                    
-                                    let (fuelCostString, fuelCostValue) = calculateFuelCost(from: trip.distance)
-                                    Text("Estimated Fuel Cost: \(fuelCostString)")
-                                    Text("Total Revenue: \(calculateTotalRevenue(distance: trip.distance, fuelCost: fuelCostValue))")
+                            
+                            Button {
+                                showingAddPickupSheet = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Add Pickup Point")
+                                        .foregroundColor(.blue)
                                 }
-                                .foregroundColor(.primary)
                             }
                         }
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .padding(.vertical, 8)
-                    }
-                }
-                
-                // Add Assign Driver Button for unassigned trips only
-                if trip.status == .pending && trip.driverId == nil {
-                    Section {
-                        Button(action: {
-                            showingAssignSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "person.badge.plus")
-                                    .foregroundColor(.blue)
-                                Text("Assign Driver")
-                                    .foregroundColor(.blue)
+                    } else {
+                        Section {
+                            Button {
+                                showingAddPickupSheet = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Add Pickup Point")
+                                        .foregroundColor(.blue)
+                                }
                             }
-                            .frame(maxWidth: .infinity)
+                        } header: {
+                            Text("ADDITIONAL PICKUP POINTS")
+                        } footer: {
+                            Text("You can add intermediate stops for this trip")
+                                .font(.caption)
+                        }
+                    }
+                    
+                    // Delivery Status Section
+                    Section(header: Text("DELIVERY STATUS")) {
+                        FleetTripDetailRow(icon: statusIcon, title: "Status", value: statusText)
+                        FleetTripDetailRow(
+                            icon: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "clock.badge.checkmark.fill",
+                            title: "Pre-Trip Inspection",
+                            value: trip.hasCompletedPreTrip ? "Completed" : "Required"
+                        )
+                        FleetTripDetailRow(
+                            icon: trip.hasCompletedPostTrip ? "checkmark.circle.fill" : "checkmark.shield.fill",
+                            title: "Post-Trip Inspection",
+                            value: trip.hasCompletedPostTrip ? "Completed" : "Required"
+                        )
+                    }
+                    
+                    // Notes Section
+                    Section(header: Text("NOTES")) {
+                        if isEditing {
+                            TextEditor(text: $editedNotes)
+                                .frame(minHeight: 100)
+                                .onChange(of: editedNotes) { notesEdited = true }
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if let notes = trip.notes {
+                                    Text("Trip Details")
+                                        .font(.headline)
+                                        .padding(.bottom, 4)
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Trip: \(trip.id.uuidString)")
+                                        Text("From: \(trip.address)")
+                                        Text("To: \(trip.destination)")
+                                        
+                                        if !trip.distance.isEmpty {
+                                            Text("Distance: \(trip.distance)")
+                                        }
+                                        
+                                        // Display driver information if available
+                                        if let driverId = trip.driverId,
+                                           let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+                                            Text("Driver: \(driver.name)")
+                                        } else {
+                                            Text("Driver: Unassigned")
+                                        }
+                                        
+                                        let (fuelCostString, fuelCostValue) = calculateFuelCost(from: trip.distance)
+                                        Text("Estimated Fuel Cost: \(fuelCostString)")
+                                        Text("Total Revenue: \(calculateTotalRevenue(distance: trip.distance, fuelCost: fuelCostValue))")
+                                    }
+                                    .foregroundColor(.primary)
+                                }
+                            }
+                            .font(.body)
+                            .foregroundColor(.primary)
                             .padding(.vertical, 8)
                         }
                     }
-                }
-                
-                // Delete section for upcoming trips
-                if trip.status == .pending || trip.status == .assigned {
-                    Section {
-                        Button(role: .destructive) {
-                            showingDeleteAlert = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "trash")
-                                Text("Delete Trip")
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-            }
-            .listStyle(InsetGroupedListStyle())
-            .navigationTitle("Trip Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                initializeEditingFields()
-                setupSearchCompleter()
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                
-                if trip.status == .pending || trip.status == .assigned {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(isEditing ? "Save" : "Edit") {
-                            if isEditing {
-                                if isFormValid {
-                                    saveChanges()
+                    
+                    // Add Assign Driver Button for unassigned trips only
+                    if trip.status == .pending && trip.driverId == nil {
+                        Section {
+                            Button(action: {
+                                showingAssignSheet = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "person.badge.plus")
+                                        .foregroundColor(.blue)
+                                    Text("Assign Driver")
+                                        .foregroundColor(.blue)
                                 }
-                            } else {
-                                initializeEditingFields()
-                                isEditing.toggle()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
                             }
                         }
-                        .disabled(isEditing && !isFormValid)
+                    }
+                    
+                    // Delete section for upcoming trips
+                    if trip.status == .pending || trip.status == .assigned {
+                        Section {
+                            Button(role: .destructive) {
+                                showingDeleteAlert = true
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "trash")
+                                    Text("Delete Trip")
+                                    Spacer()
+                                }
+                            }
+                        }
                     }
                 }
-            }
-            .alert("Delete Trip", isPresented: $showingDeleteAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    deleteTrip()
+                .listStyle(InsetGroupedListStyle())
+                .navigationTitle("Trip Details")
+                .navigationBarTitleDisplayMode(.inline)
+                .onAppear {
+                    initializeEditingFields()
+                    setupSearchCompleter()
+                    // Load pickup points on appear
+                    Task {
+                        try? await pickupPointsController.fetchAllPickupPoints()
+                    }
                 }
-            } message: {
-                Text("Are you sure you want to delete this trip? This action cannot be undone.")
-            }
-            .alert("Changes Saved", isPresented: $showingSaveSuccess) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Trip details have been updated successfully.")
-            }
-            .sheet(isPresented: $showingAssignSheet) {
-                AssignDriverView(trip: trip)
-            }
-            .sheet(isPresented: $showingAddPickupSheet) {
-                AddPickupPointView(tripId: trip.id) { newPickup in
-                    addPickupPoint(newPickup: newPickup)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                    }
+                    
+                    if trip.status == .pending || trip.status == .assigned {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button(isEditing ? "Save" : "Edit") {
+                                if isEditing {
+                                    if isFormValid {
+                                        saveChanges()
+                                    }
+                                } else {
+                                    initializeEditingFields()
+                                    isEditing.toggle()
+                                }
+                            }
+                            .disabled(isEditing && !isFormValid)
+                        }
+                    }
+                }
+                .alert("Delete Trip", isPresented: $showingDeleteAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) {
+                        deleteTrip()
+                    }
+                } message: {
+                    Text("Are you sure you want to delete this trip? This action cannot be undone.")
+                }
+                .alert("Changes Saved", isPresented: $showingSaveSuccess) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("Trip details have been updated successfully.")
+                }
+                .sheet(isPresented: $showingAssignSheet) {
+                    AssignDriverView(trip: trip)
+                }
+                .sheet(isPresented: $showingAddPickupSheet) {
+                    AddPickupPointView(tripId: trip.id) { _ in
+                        // The PickupPointsController now fully handles the relationship
+                    }
+                }
+                
+                if loading {
+                    LoadingView(message: "Processing...")
                 }
             }
         }
     }
     
-    private func markPickupCompleted(_ pickup: Trip) {
+    private func markPickupCompleted(_ pickupId: UUID) {
         loading = true
         
         Task {
             do {
-                try await supabaseDataController.markPickupPointCompleted(pickupPointId: pickup.id)
-                // Refresh pickup points
-                if let updatedPickups = try? await supabaseDataController.getPickupPointsForTrip(tripId: trip.id) {
-                    DispatchQueue.main.async {
-                        // Update the trip's additionalPickups with the new data
-                        withAnimation {
-                            trip.additionalPickups = updatedPickups.map { $0.id }
-                        }
-                        loading = false
-                    }
-                } else {
-                    // If we couldn't get updated pickups, just mark it locally
-                    DispatchQueue.main.async {
-                        if let index = trip.additionalPickups.firstIndex(of: pickup.id) {
-                            withAnimation {
-                                // Update the pickup in allTrips
-                                if let pickupIndex = tripController.allTrips.firstIndex(where: { $0.id == pickup.id }) {
-                                    tripController.allTrips[pickupIndex].completed = true
-                                }
-                            }
-                        }
-                        loading = false
-                    }
+                try await pickupPointsController.markPickupPointCompleted(pickupId)
+                DispatchQueue.main.async {
+                    loading = false
                 }
             } catch {
                 print("Error marking pickup as completed: \(error)")
@@ -517,50 +507,18 @@ struct TripDetailView: View {
         }
     }
     
-    private func deletePickup(_ pickup: Trip) {
+    private func deletePickup(_ pickupId: UUID) {
         loading = true
         
         Task {
             do {
-                try await supabaseDataController.deletePickupPoint(pickupPointId: pickup.id)
-                // Remove it from our local array
+                try await pickupPointsController.deletePickupPoint(pickupId)
                 DispatchQueue.main.async {
-                    withAnimation {
-                        trip.additionalPickups.removeAll { $0 == pickup.id }
-                    }
                     loading = false
                 }
             } catch {
                 print("Error deleting pickup: \(error)")
                 DispatchQueue.main.async {
-                    loading = false
-                }
-            }
-        }
-    }
-    
-    private func addPickupPoint(newPickup: Trip) {
-        loading = true
-        
-        Task {
-            do {
-                try await supabaseDataController.addPickupPointToTrip(
-                    tripId: trip.id,
-                    location: newPickup.destination,
-                    address: newPickup.address,
-                    latitude: newPickup.latitude,
-                    longitude: newPickup.longitude
-                )
-                
-                let updatedPickups = try await supabaseDataController.getPickupPointsForTrip(tripId: trip.id)
-                await MainActor.run {
-                    trip.additionalPickups = updatedPickups.map { $0.id }
-                    loading = false
-                }
-            } catch {
-                print("Error adding pickup point to database: \(error)")
-                await MainActor.run {
-                    trip.additionalPickups.append(newPickup.id)
                     loading = false
                 }
             }
@@ -649,7 +607,7 @@ struct TripDetailView: View {
                     destination: editedDestination,
                     address: editedAddress,
                     notes: editedNotes,
-                    driverId: selectedDriverId
+                    driverId: selectedDriverId!
                 )
                 
                 if let updatedTrip = updatedTrip {
@@ -769,4 +727,174 @@ struct FleetTripsLocationSearchResults: View {
         .frame(maxHeight: 200)
         .padding(.top, 4)
     }
-} 
+}
+
+struct AddPickupPointView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var pickupPointsController = PickupPointsController.shared
+
+    let tripId: UUID
+    let onAdd: (UUID) -> Void // Callback for UI feedback only
+
+    @State private var location = ""
+    @State private var address = ""
+    @State private var showingSearchResults = false
+    @State private var searchResults: [MKLocalSearchCompletion] = []
+    @State private var coordinate: CLLocationCoordinate2D?
+    @State private var isLoading = false
+
+    @State private var searchCompleter = MKLocalSearchCompleter()
+    @StateObject private var searchCompleterDelegate = AddPickupCompleterDelegate()
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("PICKUP DETAILS")) {
+                    TextField("Location Name", text: $location)
+                        .onChange(of: location) {_, newValue in
+                            updateSearchResults(for: newValue)
+                        }
+
+                    if showingSearchResults {
+                        List(searchResults, id: \.self) { result in
+                            Button(action: {
+                                searchForLocation(result.title)
+                                location = result.title
+                                showingSearchResults = false
+                            }) {
+                                VStack(alignment: .leading) {
+                                    Text(result.title)
+                                        .font(.headline)
+                                    Text(result.subtitle)
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                        }
+                        .frame(height: min(300, CGFloat(searchResults.count * 60)))
+                    }
+
+                    TextField("Address", text: $address)
+                        .disabled(true)
+                }
+
+                if isLoading {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView("Adding pickup point...")
+                            Spacer()
+                        }
+                    }
+                } else {
+                    Section {
+                        Button(action: addPickupPoint) {
+                            HStack {
+                                Spacer()
+                                Text("Add Pickup Point")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                        }
+                        .disabled(location.isEmpty || address.isEmpty || coordinate == nil)
+                    }
+                }
+            }
+            .navigationTitle("Add Pickup Point")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            setupSearchCompleter()
+        }
+    }
+
+    private func setupSearchCompleter() {
+        searchCompleter.resultTypes = .address
+        searchCompleter.delegate = searchCompleterDelegate
+        searchCompleterDelegate.onUpdate = { results in
+            self.searchResults = results
+            self.showingSearchResults = !results.isEmpty
+        }
+    }
+
+    private func updateSearchResults(for query: String) {
+        if query.count > 2 {
+            searchCompleter.queryFragment = query
+        } else {
+            showingSearchResults = false
+        }
+    }
+
+    private func searchForLocation(_ query: String) {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            guard let response = response, error == nil else {
+                print("Error searching for location: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+
+            if let firstItem = response.mapItems.first {
+                let addressComponents = [
+                    firstItem.placemark.thoroughfare,
+                    firstItem.placemark.locality,
+                    firstItem.placemark.administrativeArea,
+                    firstItem.placemark.postalCode,
+                    firstItem.placemark.country
+                ].compactMap { $0 }.joined(separator: ", ")
+
+                address = addressComponents
+                coordinate = firstItem.placemark.coordinate
+            }
+        }
+    }
+
+    private func addPickupPoint() {
+        guard let coordinate = coordinate else { return }
+
+        isLoading = true
+
+        Task {
+            do {
+                let newPickupId = try await pickupPointsController.addPickupPoint(
+                    tripId: tripId,
+                    location: location,
+                    address: address,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+
+                await MainActor.run {
+                    onAdd(newPickupId)
+                    isLoading = false
+                    dismiss()
+                }
+            } catch {
+                print("Error adding pickup point: \(error)")
+                await MainActor.run {
+                    isLoading = false
+                }
+            }
+        }
+    }
+}
+
+class AddPickupCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate, ObservableObject {
+    var onUpdate: (([MKLocalSearchCompletion]) -> Void)?
+
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        onUpdate?(completer.results)
+    }
+
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        print("Search completer failed: \(error.localizedDescription)")
+    }
+}
