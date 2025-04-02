@@ -196,4 +196,36 @@ struct ServiceHistory: Identifiable, Codable {
     let completionDate: Date
     let notes: String
     let safetyChecks: [SafetyCheck]
-} 
+}
+
+enum InspectionType: String, Codable {
+    case preTrip = "Pre-Trip"
+    case postTrip = "Post-Trip"
+}
+
+struct InspectionIssue: Identifiable, Codable {
+    let id: UUID
+    let description: String
+    let severity: IssueSeverity
+}
+
+enum IssueSeverity: String, Codable {
+    case low = "Low"
+    case medium = "Medium"
+    case high = "High"
+    case critical = "Critical"
+}
+
+struct InspectionRequest: Identifiable, Codable {
+    let id: UUID
+    let vehicleId: UUID
+    let vehicleName: String
+    let driverId: UUID
+    let driverName: String
+    let type: InspectionType
+    let description: String
+    let date: Date
+    var status: ServiceRequestStatus
+    let issues: [InspectionIssue]
+    var notes: String
+}
