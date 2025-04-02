@@ -137,60 +137,6 @@ class Trip: Identifiable, Equatable {
     }
 }
 
-// Separate PickupPoint structure
-struct PickupPoint: Identifiable, Equatable, Codable {
-    var id: UUID
-    var parentTripId: UUID
-    var location: String
-    var address: String
-    var latitude: Double
-    var longitude: Double
-    var sequence: Int
-    var completed: Bool
-    var estimatedArrivalTime: Date?
-    
-    static func == (lhs: PickupPoint, rhs: PickupPoint) -> Bool {
-        return lhs.id == rhs.id
-    }
-    
-    // Create an empty pickup point
-    static var empty: PickupPoint {
-        return PickupPoint(
-            id: UUID(),
-            parentTripId: UUID(),
-            location: "",
-            address: "",
-            latitude: 0,
-            longitude: 0,
-            sequence: 0,
-            completed: false,
-            estimatedArrivalTime: nil
-        )
-    }
-    
-    // Create a pickup point with specified values
-    static func create(id: UUID = UUID(), parentTripId: UUID, location: String, address: String, 
-                     latitude: Double, longitude: Double, sequence: Int, 
-                     completed: Bool, estimatedArrivalTime: Date? = nil) -> PickupPoint {
-        return PickupPoint(
-            id: id,
-            parentTripId: parentTripId,
-            location: location,
-            address: address,
-            latitude: latitude,
-            longitude: longitude,
-            sequence: sequence,
-            completed: completed,
-            estimatedArrivalTime: estimatedArrivalTime
-        )
-    }
-    
-    // Convert to a CLLocationCoordinate2D for map display
-    var coordinate: CLLocationCoordinate2D {
-        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-    }
-}
-
 // Delivery Details Model
 struct DeliveryDetails: Identifiable {
     let id: UUID
