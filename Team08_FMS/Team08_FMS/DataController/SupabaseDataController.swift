@@ -1622,5 +1622,235 @@ class SupabaseDataController: ObservableObject {
 //        return Trip(from: supabaseTrip, vehicle: data.vehicles)
 //    }
 
+    // MARK: - Service History
+        
+    func fetchServiceHistory() async throws -> [MaintenancePersonnelServiceHistory] {
+        print("Fetching MaintenancePersonnelServiceHistory...")
 
+        // Fetch raw data from Supabase
+        let response = try await supabase
+            .from("maintenancepersonnelservicehistory")
+            .select()
+            .execute()
+
+        // Ensure response data exists
+        let jsonData = response.data
+
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+
+        // Configure JSONDecoder with date decoding strategy
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+        // Convert JSON dictionary into `MaintenancePersonnelServiceHistory` array
+        let history: [MaintenancePersonnelServiceHistory] = try decoder.decode([MaintenancePersonnelServiceHistory].self, from: jsonData)
+
+//        print("Decoded Maintenance Personnel Service History: \(history)")
+        return history
+    }
+        
+    func insertServiceHistory(history: MaintenancePersonnelServiceHistory) async throws {
+        print("Inserting MaintenancePersonnelServiceHistory: \(history)")
+        try await supabase
+            .from("maintenancepersonnelservicehistory")
+            .insert(history)
+            .execute()
+        print("Insert complete for MaintenancePersonnelServiceHistory")
+    }
+
+    // MARK: - Routine Schedule
+
+    func fetchRoutineSchedule() async throws -> [MaintenancePersonnelRoutineSchedule] {
+        print("Fetching MaintenancePersonnelRoutineSchedule...")
+
+        let response = try await supabase
+            .from("maintenancepersonnelroutineschedule")
+            .select()
+            .execute()
+
+        // Ensure response data exists
+        let jsonData = response.data
+
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Ensure this matches Supabase timestamp format
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0) // Optional: Adjust as needed
+
+        // Configure JSONDecoder with custom date formatter
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+        // Decode JSON into the struct
+        let personnelRoutineSchedule = try decoder.decode([MaintenancePersonnelRoutineSchedule].self, from: jsonData)
+
+//        print("Decoded Maintenance Personnel Routine Schedule: \(personnelRoutineSchedule)")
+        return personnelRoutineSchedule
+    }
+    
+    func insertRoutineSchedule(schedule: MaintenancePersonnelRoutineSchedule) async throws {
+        print("Inserting MaintenancePersonnelRoutineSchedule: \(schedule)")
+        try await supabase
+            .from("maintenancepersonnelroutineschedule")
+            .insert(schedule)
+            .execute()
+        print("Insert complete for MaintenancePersonnelRoutineSchedule")
+    }
+    
+    func deleteRoutineSchedule(schedule: MaintenancePersonnelRoutineSchedule) async throws {
+        print("Deleting MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
+        try await supabase
+            .from("maintenancepersonnelroutineschedule")
+            .delete()
+            .eq("id", value: schedule.id.uuidString)
+            .execute()
+        print("Deletion complete for MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
+    }
+
+    // MARK: - Service Request
+
+    func fetchServiceRequests() async throws -> [MaintenanceServiceRequest] {
+        print("Fetching MaintenanceServiceRequest...")
+
+        let requestResponse = try await supabase
+            .from("maintenanceservicerequest")
+            .select()
+            .execute()
+
+        let jsonData = requestResponse.data
+
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+        // Configure JSONDecoder
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+        // Convert JSON dictionaries into `MaintenanceServiceRequest` objects
+        let serviceRequests: [MaintenanceServiceRequest] = try decoder.decode([MaintenanceServiceRequest].self, from: jsonData)
+
+//        print("Decoded MaintenanceServiceRequest: \(serviceRequests)")
+        return serviceRequests
+    }
+
+    func insertServiceRequest(request: MaintenanceServiceRequest) async throws {
+        print("Inserting MaintenanceServiceRequest: \(request)")
+        try await supabase
+            .from("maintenanceservicerequest")
+            .insert(request)
+            .execute()
+        print("Insert complete for MaintenanceServiceRequest")
+    }
+
+    // MARK: - Safety Check
+
+    func fetchSafetyChecks(requestId: UUID) async throws -> [SafetyCheck] {
+//        print("Fetching SafetyChecks for requestId: \(requestId)")
+        let response = try await supabase
+            .from("safetycheck")
+            .select()
+            .eq("requestID", value: requestId)
+            .execute()
+        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
+//        print("Decoded SafetyChecks for requestId \(requestId): \(safetyChecks)")
+        return safetyChecks
+    }
+    
+    func fetchSafetyChecks(historyId: UUID) async throws -> [SafetyCheck] {
+//        print("Fetching SafetyChecks for requestId: \(historyId)")
+        let response = try await supabase
+            .from("safetycheck")
+            .select()
+            .eq("historyID", value: historyId)
+            .execute()
+        let safetyChecks = try JSONDecoder().decode([SafetyCheck].self, from: response.data)
+//        print("Decoded SafetyChecks for requestId \(historyId): \(safetyChecks)")
+        return safetyChecks
+    }
+    
+    func insertSafetyCheck(check: SafetyCheck) async throws {
+//        print("Inserting SafetyCheck: \(check)")
+        try await supabase
+            .from("safetycheck")
+            .insert(check)
+            .execute()
+        print("Insert complete for SafetyCheck")
+    }
+
+    // MARK: - Expense
+
+    func fetchExpenses(for requestId: UUID) async throws -> [Expense] {
+//        print("Fetching Expenses for requestId: \(requestId.uuidString)")
+        let response = try await supabase
+            .from("expense")
+            .select()
+            .eq("requestID", value: requestId.uuidString)
+            .execute()
+        
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        // Configure JSONDecoder
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+        
+        // Decode JSON into Expense objects
+        let expenses = try decoder.decode([Expense].self, from: response.data)
+//        print("Decoded Expenses for requestId \(requestId.uuidString): \(expenses)")
+        return expenses
+    }
+    
+    func insertExpense(expense: Expense) async throws {
+        print("Inserting Expense: \(expense)")
+        try await supabase
+            .from("expense")
+            .insert(expense)
+            .execute()
+        print("Insert complete for Expense")
+    }
+    
+    func updateServiceRequestStatus(serviceRequestId: UUID, newStatus: ServiceRequestStatus) async throws -> Bool {
+        let payload: [String: String] = ["status": newStatus.rawValue]
+        
+        // Perform the update on the Supabase table
+        let response = try await supabase
+            .from("maintenanceservicerequest")  // The table you are updating
+            .update(payload)  // Update the status column
+            .eq("id", value: serviceRequestId)  // Assuming `id` is the primary key
+            .execute()
+        
+        // Check if the response was successful
+        if response.status == 200 {
+            return true
+        } else {
+            throw NSError(domain: "SupabaseError", code: response.status, userInfo: [NSLocalizedDescriptionKey: "Failed to update service request status."])
+        }
+    }
+    
+    func fetchAllExpense() async throws -> [Expense] {
+        // Fetch expenses from Supabase filtered by requestID
+        let response = try await supabase
+            .from("expense")
+            .select()
+            .execute()
+        
+        // Configure DateFormatter for timestamp decoding
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        // Configure JSONDecoder with the custom date decoding strategy
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+        
+        // Decode JSON into an array of Expense objects
+        let expenses = try decoder.decode([Expense].self, from: response.data)
+        
+        return expenses
+    }
 }

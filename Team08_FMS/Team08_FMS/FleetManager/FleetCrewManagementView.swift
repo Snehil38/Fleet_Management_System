@@ -172,6 +172,8 @@ struct CrewCardView: View {
     private var recipientId: UUID? {
         if let driver = currentCrew as? Driver {
             return driver.userID
+        } else if let maintenance = currentCrew as? MaintenancePersonnel {
+            return maintenance.userID
         }
         return nil
     }
@@ -209,28 +211,26 @@ struct CrewCardView: View {
                     Spacer()
                     
                     // Chat Button with Badge
-                    if currentCrew is Driver {
-                        Button(action: {
-                            showingMessageSheet = true
-                        }) {
-                            Image(systemName: "message.fill")
-                                .foregroundColor(.blue)
-                                .overlay(
-                                    Group {
-                                        if unreadMessageCount > 0 {
-                                            Text("\(unreadMessageCount)")
-                                                .font(.caption2)
-                                                .foregroundColor(.white)
-                                                .padding(4)
-                                                .background(Color.red)
-                                                .clipShape(Circle())
-                                                .offset(x: 10, y: -10)
-                                        }
+                    Button(action: {
+                        showingMessageSheet = true
+                    }) {
+                        Image(systemName: "message.fill")
+                            .foregroundColor(.blue)
+                            .overlay(
+                                Group {
+                                    if unreadMessageCount > 0 {
+                                        Text("\(unreadMessageCount)")
+                                            .font(.caption2)
+                                            .foregroundColor(.white)
+                                            .padding(4)
+                                            .background(Color.red)
+                                            .clipShape(Circle())
+                                            .offset(x: 10, y: -10)
                                     }
-                                )
-                        }
-                        .padding(.horizontal, 8)
+                                }
+                            )
                     }
+                    .padding(.horizontal, 8)
                     
                     Text(AppDataController.shared.getStatusString(status: currentCrew.status))
                         .font(.subheadline)
@@ -278,7 +278,7 @@ struct CrewCardView: View {
                 Label("Delete Crew Member", systemImage: "trash")
             }
             
-            if let driver = currentCrew as? Driver {
+            if currentCrew is Driver {
                 if !isInTrip {  // Only show status change options if not in a trip
                     if currentCrew.status == .available {
                         Button {
@@ -360,7 +360,11 @@ struct CrewCardView: View {
         .sheet(isPresented: $showingMessageSheet) {
             if let id = recipientId {
                 NavigationView {
-                    ChatView(recipientType: .driver, recipientId: id, recipientName: currentCrew.name)
+                    ChatView(
+                        recipientType: currentCrew is Driver ? .driver : .maintenance,
+                        recipientId: id,
+                        recipientName: currentCrew.name
+                    )
                 }
             }
         }

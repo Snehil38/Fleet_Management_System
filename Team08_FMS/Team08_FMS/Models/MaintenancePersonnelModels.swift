@@ -1,7 +1,7 @@
 import Foundation
 
 // Local data models for maintenance personnel
-struct MaintenancePersonnelServiceHistory: Identifiable {
+struct MaintenancePersonnelServiceHistory: Identifiable, Codable {
     let id: UUID
     let vehicleId: UUID
     let vehicleName: String
@@ -10,10 +10,9 @@ struct MaintenancePersonnelServiceHistory: Identifiable {
     let date: Date
     let completionDate: Date
     let notes: String
-    let safetyChecks: [SafetyCheck]
 }
 
-struct MaintenancePersonnelRoutineSchedule: Identifiable {
+struct MaintenancePersonnelRoutineSchedule: Identifiable, Codable {
     let id: UUID
     let vehicleId: UUID
     let vehicleName: String
@@ -24,188 +23,241 @@ struct MaintenancePersonnelRoutineSchedule: Identifiable {
     let notes: String
 }
 
-// Local data store
 class MaintenancePersonnelDataStore: ObservableObject {
     @Published var serviceRequests: [MaintenanceServiceRequest] = []
     @Published var serviceHistory: [MaintenancePersonnelServiceHistory] = []
     @Published var routineSchedules: [MaintenancePersonnelRoutineSchedule] = []
-    @Published var inspectionRequests: [InspectionRequest] = []
+    @Published var inspectionRequests: [InspectionRequest] = []  // Assuming these remain local or handled separately
+    @Published var totalExpenses: Double = 0
     
     init() {
-        // Initialize with sample data
-        loadSampleData()
+        // Load data from Supabase when the data store is created
+        Task {
+            await loadData()
+            await calculateExpenses()
+        }
     }
     
-    private func loadSampleData() {
-        // Sample service requests
-        serviceRequests = [
-            MaintenanceServiceRequest(
-                vehicleId: UUID(),
-                vehicleName: "Truck 001",
-                serviceType: .routine,
-                description: "Regular maintenance check",
-                priority: .medium,
-                date: Date(),
-                dueDate: Date().addingTimeInterval(86400 * 7),
-                status: .pending,
-                notes: "Regular maintenance required",
-                issueType: nil
-            ),
-            MaintenanceServiceRequest(
-                vehicleId: UUID(),
-                vehicleName: "Van 002",
-                serviceType: .repair,
-                description: "Brake system check",
-                priority: .high,
-                date: Date(),
-                dueDate: Date().addingTimeInterval(86400 * 2),
-                status: .inProgress,
-                notes: "Urgent brake system inspection needed",
-                issueType: "Brake System"
+    // MARK: - Data Loading
+    
+    func calculateExpenses() async {
+        do {
+            let expenses = try await SupabaseDataController.shared.fetchAllExpense()
+            print("Fetched expenses: \(expenses)")
+            print("Expense count: \(expenses.count)")
+            
+            // Log each expense's amount
+            expenses.forEach { expense in
+                print("Expense amount: \(expense.amount)")
+            }
+            
+            let total = expenses.reduce(0.0) { partialResult, expense in
+                partialResult + expense.amount
+            }
+            
+            print("Calculated total: \(total)")
+            
+            await MainActor.run {
+                self.totalExpenses = total
+            }
+            
+        } catch {
+            print("Cannot fetch total expenses: \(error.localizedDescription)")
+        }
+    }
+
+    
+    func loadData() async {
+        do {
+            // Fetch data from Supabase via the shared data controller
+            let fetchedServiceHistory = try await SupabaseDataController.shared.fetchServiceHistory()
+            let fetchedRoutineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
+            let fetchedServiceRequests = try await SupabaseDataController.shared.fetchServiceRequests()
+
+            await MainActor.run {
+                self.serviceHistory = fetchedServiceHistory
+                self.routineSchedules = fetchedRoutineSchedules
+                self.serviceRequests = fetchedServiceRequests
+            }
+        } catch {
+            print("Error loading data: \(error)")
+        }
+    }
+    
+    // MARK: - Service History Methods
+    
+    func addToServiceHistory(from request: MaintenanceServiceRequest) async {
+        do {
+            // Generate a new ID for the history record.
+            let newHistoryID = UUID()
+            
+            // Fetch any safety checks that were added for this service request.
+            let safetyChecksFromRequest = try await fetchSafetyChecks(requestID: request.id)
+            var safetyCheckIDs: [UUID] = []
+            
+            // Update each safety check with the new historyID and update them in Supabase.
+            for var check in safetyChecksFromRequest {
+                check.historyID = newHistoryID
+                try await SupabaseDataController.shared.insertSafetyCheck(check: check)
+                safetyCheckIDs.append(check.id)
+            }
+            
+            // Create the new history record including the safety check IDs.
+            let newHistory = MaintenancePersonnelServiceHistory(
+                id: newHistoryID,
+                vehicleId: request.vehicleId,
+                vehicleName: request.vehicleName,
+                serviceType: request.serviceType,
+                description: request.description,
+                date: request.date,
+                completionDate: Date(),  // set to now
+                notes: request.notes
             )
-        ]
-        
-        // Sample inspection requests
-        inspectionRequests = [
-            InspectionRequest(
-                id: UUID(),
-                vehicleId: UUID(),
-                vehicleName: "Truck 003",
-                driverId: UUID(),
-                driverName: "John Doe",
-                type: .preTrip,
-                description: "Pre-trip inspection required",
-                date: Date(),
-                status: .pending,
-                issues: [
-                    InspectionIssue(
-                        id: UUID(),
-                        description: "Low tire pressure",
-                        severity: .medium
-                    ),
-                    InspectionIssue(
-                        id: UUID(),
-                        description: "Check engine light on",
-                        severity: .high
-                    )
-                ],
-                notes: "Driver reported multiple issues"
-            ),
-            InspectionRequest(
-                id: UUID(),
-                vehicleId: UUID(),
-                vehicleName: "Van 004",
-                driverId: UUID(),
-                driverName: "Jane Smith",
-                type: .postTrip,
-                description: "Post-trip inspection completed",
-                date: Date(),
-                status: .pending,
-                issues: [
-                    InspectionIssue(
-                        id: UUID(),
-                        description: "Brake noise",
-                        severity: .high
-                    )
-                ],
-                notes: "Driver reported brake issues"
-            )
-        ]
-        
-        // Sample service history
-        serviceHistory = [
-            MaintenancePersonnelServiceHistory(
-                id: UUID(),
-                vehicleId: UUID(),
-                vehicleName: "Truck 003",
-                serviceType: .routine,
-                description: "Oil change and inspection",
-                date: Date().addingTimeInterval(-86400 * 30),
-                completionDate: Date().addingTimeInterval(-86400 * 29),
-                notes: "Completed successfully",
-                safetyChecks: []
-            )
-        ]
-        
-        // Sample routine schedules
-        routineSchedules = [
-            MaintenancePersonnelRoutineSchedule(
-                id: UUID(),
-                vehicleId: UUID(),
-                vehicleName: "Truck 001",
-                serviceType: .routine,
-                interval: 30,
-                lastServiceDate: Date().addingTimeInterval(-86400 * 15),
-                nextServiceDate: Date().addingTimeInterval(86400 * 15),
-                notes: "Monthly maintenance"
-            )
-        ]
+            
+            // Insert the new service history record.
+            try await SupabaseDataController.shared.insertServiceHistory(history: newHistory)
+            // Refresh the local service history data after insertion.
+            let history = try await SupabaseDataController.shared.fetchServiceHistory()
+            await MainActor.run {
+                self.serviceHistory = history
+            }
+        } catch {
+            print("Error adding service history: \(error)")
+        }
+    }
+    
+    func addServiceHistory(_ history: MaintenancePersonnelServiceHistory) async {
+        do {
+            try await SupabaseDataController.shared.insertServiceHistory(history: history)
+            serviceHistory = try await SupabaseDataController.shared.fetchServiceHistory()
+        } catch {
+            print("Error inserting service history: \(error)")
+        }
+    }
+    
+    // MARK: - Routine Schedule Methods
+    
+    func addRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) async {
+        do {
+            try await SupabaseDataController.shared.insertRoutineSchedule(schedule: schedule)
+            routineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
+        } catch {
+            print("Error inserting routine schedule: \(error)")
+        }
+    }
+    
+    func updateRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) async {
+        do {
+            try await SupabaseDataController.shared.insertRoutineSchedule(schedule: schedule)
+            routineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
+        } catch {
+            print("Error updating routine schedule: \(error)")
+        }
+    }
+    
+    func deleteRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) async {
+        do {
+            try await SupabaseDataController.shared.deleteRoutineSchedule(schedule: schedule)
+            routineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
+        } catch {
+            print("Error deleting routine schedule: \(error)")
+        }
     }
     
     // MARK: - Service Request Methods
-    func updateServiceRequestStatus(_ request: MaintenanceServiceRequest, newStatus: ServiceRequestStatus) {
+    
+    func addServiceRequest(_ request: MaintenanceServiceRequest) async {
+        do {
+            try await SupabaseDataController.shared.insertServiceRequest(request: request)
+            serviceRequests = try await SupabaseDataController.shared.fetchServiceRequests()
+        } catch {
+            print("Error inserting service request: \(error)")
+        }
+    }
+    
+    func updateServiceRequestStatus(_ request: MaintenanceServiceRequest, newStatus: ServiceRequestStatus) async {
         if let index = serviceRequests.firstIndex(where: { $0.id == request.id }) {
             var updatedRequest = request
             updatedRequest.status = newStatus
             
+            // Handle specific status changes (e.g., start date for "In Progress" and completion date for "Completed")
             switch newStatus {
             case .inProgress:
                 updatedRequest.startDate = Date()
             case .completed:
+                await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: request.vehicleId)
                 updatedRequest.completionDate = Date()
             default:
                 break
             }
             
-            serviceRequests[index] = updatedRequest
+            do {
+                let updateSuccess = try await SupabaseDataController.shared.updateServiceRequestStatus(
+                    serviceRequestId: updatedRequest.id,
+                    newStatus: newStatus
+                )
+                
+                if updateSuccess {
+                    // Capture a copy of updatedRequest using a capture list.
+                    await MainActor.run { [safeUpdatedRequest = updatedRequest] in
+                        serviceRequests[index] = safeUpdatedRequest
+                        print("Service request status updated successfully.")
+                    }
+                } else {
+                    print("Failed to update service request status in Supabase.")
+                }
+            } catch {
+                print("Error updating service request status: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Expense Methods
+    
+    func addExpense(to request: MaintenanceServiceRequest, expense: Expense) async {
+        do {
+            try await SupabaseDataController.shared.insertExpense(expense: expense)
+            let updatedRequests = try await SupabaseDataController.shared.fetchServiceRequests()
+            await MainActor.run {
+                serviceRequests = updatedRequests
+            }
+        } catch {
+            print("Error inserting expense: \(error)")
         }
     }
     
-    func addExpense(to request: MaintenanceServiceRequest, expense: Expense) {
-        if let index = serviceRequests.firstIndex(where: { $0.id == request.id }) {
-            var updatedRequest = request
-            updatedRequest.expenses.append(expense)
-            updatedRequest.totalCost = updatedRequest.expenses.reduce(0) { $0 + $1.amount }
-            serviceRequests[index] = updatedRequest
+    // MARK: - Safety Check Methods
+    
+    func updateSafetyChecks(for request: MaintenanceServiceRequest, checks: [SafetyCheck]) async {
+        do {
+            // Insert (or update) all provided safety checks.
+            // In a complete implementation you might also handle deletions.
+            for check in checks {
+                try await SupabaseDataController.shared.insertSafetyCheck(check: check)
+            }
+            serviceRequests = try await SupabaseDataController.shared.fetchServiceRequests()
+        } catch {
+            print("Error updating safety checks: \(error)")
         }
     }
     
-    func updateSafetyChecks(for request: MaintenanceServiceRequest, checks: [SafetyCheck]) {
-        if let index = serviceRequests.firstIndex(where: { $0.id == request.id }) {
-            var updatedRequest = request
-            updatedRequest.safetyChecks = checks
-            serviceRequests[index] = updatedRequest
-        }
+    // MARK: - Fetch Safety Checks
+        
+    func fetchSafetyChecks(requestID: UUID) async throws -> [SafetyCheck] {
+        // This method should call your SupabaseDataController method to fetch safety checks by requestID.
+        let checks = try await SupabaseDataController.shared.fetchSafetyChecks(requestId: requestID)
+        return checks
     }
     
-    // MARK: - Service History Methods
-    func addToServiceHistory(_ request: MaintenanceServiceRequest) {
-        let history = MaintenancePersonnelServiceHistory(
-            id: UUID(),
-            vehicleId: request.vehicleId,
-            vehicleName: request.vehicleName,
-            serviceType: request.serviceType,
-            description: request.description,
-            date: request.date,
-            completionDate: Date(),
-            notes: request.notes,
-            safetyChecks: request.safetyChecks
-        )
-        serviceHistory.append(history)
+    func fetchSafetyChecks(historyID: UUID) async throws -> [SafetyCheck] {
+        // This method should call your SupabaseDataController method to fetch safety checks by requestID.
+        let checks = try await SupabaseDataController.shared.fetchSafetyChecks(historyId: historyID)
+        return checks
     }
     
-    // MARK: - Routine Schedule Methods
-    func addRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) {
-        routineSchedules.append(schedule)
+    func fetchExpenses(for requestID: UUID) async throws -> [Expense] {
+        // Call the Supabase data controller to fetch expenses for the given service request ID.
+        let expenses = try await SupabaseDataController.shared.fetchExpenses(for: requestID)
+        return expenses
     }
-    
-    func updateRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) {
-        if let index = routineSchedules.firstIndex(where: { $0.id == schedule.id }) {
-            routineSchedules[index] = schedule
-        }
-    }
-    
-    func deleteRoutineSchedule(_ schedule: MaintenancePersonnelRoutineSchedule) {
-        routineSchedules.removeAll { $0.id == schedule.id }
-    }
-} 
+}

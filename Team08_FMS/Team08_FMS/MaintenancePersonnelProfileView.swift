@@ -7,6 +7,8 @@ struct MaintenancePersonnelProfileView: View {
     @State private var pendingStatus: Status?
     @State private var showAlert = false
     @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingLogoutAlert = false
 
     var body: some View {
         NavigationView {
@@ -32,7 +34,13 @@ struct MaintenancePersonnelProfileView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { backButton }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
             .alert(isPresented: $showingStatusChangeAlert) {
                 if pendingStatus == .available {
                     return Alert(
@@ -63,18 +71,16 @@ struct MaintenancePersonnelProfileView: View {
                     )
                 }
             }
-//            .alert(isPresented: $showAlert) {
-//                Alert(
-//                    title: Text("Alert"),
-//                    message: Text("Are you sure you want to log out?"),
-//                    primaryButton: .destructive(Text("Yes")) {
-//                        Task {
-//                            SupabaseDataController.shared.signOut()
-//                        }
-//                    },
-//                    secondaryButton: .cancel()
-//                )
-//            }
+            .alert("Logout", isPresented: $showingLogoutAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Logout", role: .destructive) {
+                    Task {
+                        SupabaseDataController.shared.signOut()
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to logout?")
+            }
             .task { await loadPersonnelData() }
         }
     }
@@ -95,10 +101,6 @@ struct MaintenancePersonnelProfileView: View {
             Text(personnel.name)
                 .font(.title2)
                 .fontWeight(.semibold)
-            
-            Text(personnel.email)
-                .font(.subheadline)
-                .foregroundColor(.gray)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -111,10 +113,10 @@ struct MaintenancePersonnelProfileView: View {
         VStack(spacing: 8) {
             HStack {
                 Text("Status")
-                    .font(.system(.headline, design: .default))
+                    .font(.headline)
                 Spacer()
                 Text(AppDataController.shared.getStatusString(status: personnel.status))
-                    .font(.system(.subheadline, design: .default))
+                    .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(personnel.status.color)
                 
@@ -126,13 +128,13 @@ struct MaintenancePersonnelProfileView: View {
             
             if personnel.status == .offDuty {
                 Text("Your status will automatically change back to Available tomorrow.")
-                    .font(.system(.caption, design: .default))
+                    .font(.caption)
                     .foregroundColor(.gray)
                     .italic()
             }
             else if personnel.status == .busy {
-                Text("You cannot change status while you have a In-Progress Maintenance.")
-                    .font(.system(.caption, design: .default))
+                Text("You cannot change status while you have an In-Progress Maintenance.")
+                    .font(.caption)
                     .foregroundColor(.gray)
                     .italic()
             }
@@ -147,7 +149,7 @@ struct MaintenancePersonnelProfileView: View {
     private func contactInformation(for personnel: MaintenancePersonnel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("CONTACT INFORMATION")
-                .font(.system(.caption, design: .default))
+                .font(.caption)
                 .foregroundColor(.gray)
                 .padding(.horizontal)
             
@@ -165,14 +167,13 @@ struct MaintenancePersonnelProfileView: View {
     private func experienceDetails(for personnel: MaintenancePersonnel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("EXPERIENCE & DETAILS")
-                .font(.system(.caption, design: .default))
+                .font(.caption)
                 .foregroundColor(.gray)
                 .padding(.horizontal)
             
             VStack(spacing: 0) {
                 infoRow(title: "Experience", value: "\(personnel.yearsOfExperience) Years")
                 Divider()
-//                infoRow(title: "Specialty", value: "\(personnel.specialty.rawValue)")
             }
             .background(Color(.systemBackground))
             .cornerRadius(20)
@@ -200,9 +201,7 @@ struct MaintenancePersonnelProfileView: View {
     
     private var logoutButton: some View {
         Button {
-            Task {
-                supabaseDataController.signOut()
-            }
+            showingLogoutAlert = true
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
@@ -219,16 +218,6 @@ struct MaintenancePersonnelProfileView: View {
         .padding(.top, 20)
         .padding(.horizontal)
     }
-    
-    private var backButton: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button("Back") {
-                presentationMode.wrappedValue.dismiss()
-            }
-        }
-    }
-    
-    // MARK: - Helper Functions
     
     private func infoRow(title: String, value: String) -> some View {
         HStack {
@@ -260,41 +249,6 @@ struct MaintenancePersonnelProfileView: View {
         showingStatusChangeAlert = true
     }
     
-    // MARK: - Alert Computed Property
-    
-    private var statusChangeAlert: Alert {
-        if pendingStatus == .available {
-            return Alert(
-                title: Text("Confirm Status Change"),
-                message: Text("Your status will be updated to Available."),
-                dismissButton: .default(Text("OK"), action: {
-                    Task {
-                        if let userID = supabaseDataController.userID {
-                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
-                            self.personnel?.status = .available
-                        }
-                    }
-                })
-            )
-        } else {
-            return Alert(
-                title: Text("Confirm Status Change"),
-                message: Text("Are you sure you want to set your status to Off Duty?"),
-                primaryButton: .cancel(Text("Cancel")),
-                secondaryButton: .default(Text("Confirm"), action: {
-                    Task {
-                        if let userID = await supabaseDataController.getUserID() {
-                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, userID: userID, id: nil)
-                            self.personnel?.status = .offDuty
-                        }
-                    }
-                })
-            )
-        }
-    }
-    
-    // MARK: - Data Loading
-    
     private func loadPersonnelData() async {
         if let userID = await supabaseDataController.getUserID() {
             do {
@@ -307,3 +261,4 @@ struct MaintenancePersonnelProfileView: View {
         }
     }
 }
+
