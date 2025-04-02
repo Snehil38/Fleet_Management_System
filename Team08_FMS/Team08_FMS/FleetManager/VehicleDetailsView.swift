@@ -271,7 +271,7 @@ private struct OdometerSection: View {
                         priority: .medium,
                         date: Date(),
                         dueDate: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date(),
-                        status: .assigned,
+                        status: .pending,
                         notes: "Maintenance scheduled; verify fluid levels and tire pressure.",
                         issueType: "Routine"
                     )
@@ -1145,21 +1145,21 @@ struct VehicleSaveView: View {
                 }
 
                 // Documents Section remains unchanged.
-                DocumentsSection(
-                    pollutionCertificate: $pollutionCertificate,
-                    rc: $rc,
-                    insurance: $insurance,
-                    pollutionExpiry: $pollutionExpiry,
-                    insuranceExpiry: $insuranceExpiry,
-                    showingPollutionPicker: $showingPollutionPicker,
-                    showingRCPicker: $showingRCPicker,
-                    showingInsurancePicker: $showingInsurancePicker,
-                    showingDeliveryReceipt: $showingDeliveryReceipt,
-                    pdfData: $pdfData,
-                    pdfError: $pdfError,
-                    showingPDFError: $showingPDFError,
-                    currentTrip: nil
-                )
+//                DocumentsSection(
+//                    pollutionCertificate: $pollutionCertificate,
+//                    rc: $rc,
+//                    insurance: $insurance,
+//                    pollutionExpiry: $pollutionExpiry,
+//                    insuranceExpiry: $insuranceExpiry,
+//                    showingPollutionPicker: $showingPollutionPicker,
+//                    showingRCPicker: $showingRCPicker,
+//                    showingInsurancePicker: $showingInsurancePicker,
+//                    showingDeliveryReceipt: $showingDeliveryReceipt,
+//                    pdfData: $pdfData,
+//                    pdfError: $pdfError,
+//                    showingPDFError: $showingPDFError,
+//                    currentTrip: nil
+//                )
             }
             .navigationTitle("Add Vehicle")
             .navigationBarTitleDisplayMode(.inline)
