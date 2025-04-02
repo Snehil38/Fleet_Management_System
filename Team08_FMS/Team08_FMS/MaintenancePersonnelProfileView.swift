@@ -202,6 +202,7 @@ struct MaintenancePersonnelProfileView: View {
     private var logoutButton: some View {
         Button {
             showingLogoutAlert = true
+            supabaseDataController.signOut()
         } label: {
             HStack {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
