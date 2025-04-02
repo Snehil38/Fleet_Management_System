@@ -172,7 +172,10 @@ struct TripsView: View {
                         end_longitude: 0,
                         pickup: "Unknown Address",
                         estimated_distance: 0,
-                        estimated_time: nil
+                        estimated_time: nil,
+                        middle_pickup: nil,
+                        middle_pickup_latitude: nil,
+                        middle_pickup_longitude: nil
                     )
                     
                     return Trip(from: supabaseTrip, vehicle: vehicle)
@@ -235,6 +238,12 @@ struct TripsView: View {
         )
         
         // Create a SupabaseTrip with the delivery information
+        let formattedTime = estimatedTime.map { time -> String in
+            let hours = Int(time)
+            let minutes = Int((time - Double(hours)) * 60)
+            return "\(hours)h \(minutes)m"
+        } ?? "N/A"
+
         let supabaseTrip = SupabaseTrip(
             id: delivery.id,
             destination: delivery.location,
@@ -250,7 +259,7 @@ struct TripsView: View {
                    Trip: \(tripName)
                    Cargo Type: \(cargoType)
                    Estimated Distance: \(distance)
-                   Estimated Time: \(estimatedTime.map { "\(Int($0))h \(Int(($0 - Double(Int($0))) * 60))m" } ?? "N/A")
+                   Estimated Time: \(formattedTime)
                    From: \(startingPoint)
                    \(deliveryNotes)
                    """,
@@ -263,7 +272,10 @@ struct TripsView: View {
             end_longitude: 0,
             pickup: startingPoint.isEmpty ? delivery.location : startingPoint,
             estimated_distance: estimatedDistance,
-            estimated_time: estimatedTime
+            estimated_time: estimatedTime,
+            middle_pickup: nil,
+            middle_pickup_latitude: nil,
+            middle_pickup_longitude: nil
         )
         
         return Trip(from: supabaseTrip, vehicle: vehicle)

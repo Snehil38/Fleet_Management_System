@@ -28,6 +28,8 @@ class Trip: Identifiable, Equatable {
     let startingPoint: String
     let pickup: String?
     var driverId: UUID?
+    let middlePickup: String?
+    let middlePickupCoordinate: CLLocationCoordinate2D?
     
     // Computed property for display purposes
     var displayName: String {
@@ -58,7 +60,10 @@ class Trip: Identifiable, Equatable {
             end_longitude: 0,
             pickup: "",
             estimated_distance: 0,
-            estimated_time: 0
+            estimated_time: 0,
+            middle_pickup: nil,
+            middle_pickup_latitude: nil,
+            middle_pickup_longitude: nil
         )
         return Trip(from: emptySupabaseTrip, vehicle: emptyVehicle)
     }
@@ -80,6 +85,23 @@ class Trip: Identifiable, Equatable {
         self.endTime = supabaseTrip.end_time
         self.pickup = supabaseTrip.pickup
         self.driverId = supabaseTrip.driver_id
+        self.middlePickup = supabaseTrip.middle_pickup
+        
+        // Set coordinates from the trip data
+        self.sourceCoordinate = CLLocationCoordinate2D(
+            latitude: supabaseTrip.start_latitude ?? 0,
+            longitude: supabaseTrip.start_longitude ?? 0
+        )
+        self.destinationCoordinate = CLLocationCoordinate2D(
+            latitude: supabaseTrip.end_latitude ?? 0,
+            longitude: supabaseTrip.end_longitude ?? 0
+        )
+        self.middlePickupCoordinate = supabaseTrip.middle_pickup_latitude != nil && supabaseTrip.middle_pickup_longitude != nil ?
+            CLLocationCoordinate2D(
+                latitude: supabaseTrip.middle_pickup_latitude!,
+                longitude: supabaseTrip.middle_pickup_longitude!
+            ) : nil
+        self.startingPoint = supabaseTrip.pickup ?? "N/A"
         
         // Set distance using estimated_distance if available
         if let estimatedDistance = supabaseTrip.estimated_distance {
@@ -112,17 +134,6 @@ class Trip: Identifiable, Equatable {
         } else {
             self.eta = "N/A"
         }
-        
-        // Set coordinates from the trip data
-        self.sourceCoordinate = CLLocationCoordinate2D(
-            latitude: supabaseTrip.start_latitude ?? 0,
-            longitude: supabaseTrip.start_longitude ?? 0
-        )
-        self.destinationCoordinate = CLLocationCoordinate2D(
-            latitude: supabaseTrip.end_latitude ?? 0,
-            longitude: supabaseTrip.end_longitude ?? 0
-        )
-        self.startingPoint = supabaseTrip.pickup ?? "N/A"
     }
 }
 
@@ -214,6 +225,9 @@ struct SupabaseTrip: Codable, Identifiable {
     let pickup: String?
     let estimated_distance: Double?
     let estimated_time: Double?
+    let middle_pickup: String?
+    let middle_pickup_latitude: Double?
+    let middle_pickup_longitude: Double?
 }
 
 extension TimeInterval {

@@ -81,7 +81,10 @@ struct FleetTripsView: View {
                 end_longitude: 0,
                 pickup: delivery.location,
                 estimated_distance: nil,
-                estimated_time: nil
+                estimated_time: nil,
+                middle_pickup: nil,
+                middle_pickup_latitude: nil,
+                middle_pickup_longitude: nil
             )
             
             return Trip(from: supabaseTrip, vehicle: vehicle)

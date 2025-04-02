@@ -1257,7 +1257,7 @@ class SupabaseDataController: ObservableObject {
     
     // MARK: - Trip Management
     
-    struct TripPayload: Codable {
+    struct TripPayload: Encodable {
         let destination: String
         let vehicle_id: UUID
         let driver_id: UUID?
@@ -1272,9 +1272,12 @@ class SupabaseDataController: ObservableObject {
         let estimated_distance: Double?
         let estimated_time: Double?
         let estimated_cost: Double?
+        let middle_pickup: String?
+        let middle_pickup_latitude: Double?
+        let middle_pickup_longitude: Double?
     }
     
-    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?, distance: Double? = nil, time: Double? = nil, cost: Double? = nil) async throws -> Bool {
+    func createTrip(name: String, destination: String, vehicleId: UUID, driverId: UUID?, startTime: Date?, endTime: Date?, startLat: Double?, startLong: Double?, endLat: Double?, endLong: Double?, notes: String?, distance: Double? = nil, time: Double? = nil, cost: Double? = nil, middlePickup: String? = nil, middlePickupLat: Double? = nil, middlePickupLong: Double? = nil) async throws -> Bool {
         let payload = TripPayload(
             destination: destination,
             vehicle_id: vehicleId,
@@ -1289,7 +1292,10 @@ class SupabaseDataController: ObservableObject {
             pickup: name,
             estimated_distance: distance,
             estimated_time: time,
-            estimated_cost: cost
+            estimated_cost: cost,
+            middle_pickup: middlePickup,
+            middle_pickup_latitude: middlePickupLat,
+            middle_pickup_longitude: middlePickupLong
         )
         
         do {

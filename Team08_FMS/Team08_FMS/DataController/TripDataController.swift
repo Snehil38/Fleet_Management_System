@@ -548,6 +548,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let pickup: String?
                 let estimated_distance: Double?
                 let estimated_time: Double?
+                let middle_pickup: String?
+                let middle_pickup_latitude: Double?
+                let middle_pickup_longitude: Double?
                 let vehicles: Vehicle
             }
 
@@ -575,6 +578,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     pickup,
                     estimated_distance,
                     estimated_time,
+                    middle_pickup,
+                    middle_pickup_latitude,
+                    middle_pickup_longitude,
                     vehicles (
                         id,
                         name,
@@ -628,7 +634,10 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     end_longitude: data.end_longitude,
                     pickup: data.pickup,
                     estimated_distance: data.estimated_distance,
-                    estimated_time: data.estimated_time
+                    estimated_time: data.estimated_time,
+                    middle_pickup: data.middle_pickup,
+                    middle_pickup_latitude: data.middle_pickup_latitude,
+                    middle_pickup_longitude: data.middle_pickup_longitude
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }

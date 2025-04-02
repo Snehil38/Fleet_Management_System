@@ -1150,8 +1150,8 @@ struct AddTripView: View {
             var tripNotes = "Cargo Type: \(cargoType)\nEstimated Distance: \(String(format: "%.1f", distance)) km\nEstimated Fuel Cost: $\(String(format: "%.2f", fuelCost))"
             
             // Add middle pickup point information if applicable
-            if showMiddlePickup && !middlePickupLocation.isEmpty, let middleCoord = middlePickupCoordinate {
-                tripNotes += "\n\nAdditional Pickups:\n\(middlePickupLocation) | \(middlePickupLocation) | \(middleCoord.latitude) | \(middleCoord.longitude)"
+            if showMiddlePickup && !middlePickupLocation.isEmpty {
+                tripNotes += "\n\nMiddle Pickup Point: \(middlePickupLocation)"
             }
             
             do {
@@ -1169,7 +1169,10 @@ struct AddTripView: View {
                     notes: tripNotes,
                     distance: distance,
                     time: estimatedHours,
-                    cost: fuelCost
+                    cost: fuelCost,
+                    middlePickup: showMiddlePickup ? middlePickupLocation : nil,
+                    middlePickupLat: middlePickupCoordinate?.latitude,
+                    middlePickupLong: middlePickupCoordinate?.longitude
                 )
                 
                 if success {
