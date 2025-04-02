@@ -495,6 +495,17 @@ struct VehicleDetailView: View {
             LabeledContent(label: "Body Type", value: vehicle.bodyType.rawValue)
             LabeledContent(label: "Body Subtype", value: vehicle.bodySubtype)
             LabeledContent(label: "MSRP", value: "$\(String(format: "%.2f", vehicle.msrp))")
+            
+            // Add odometer reading
+            let totalDistance = TripDataController.shared.allTrips
+                .filter { $0.vehicleDetails.id == vehicle.id && $0.status == .delivered }
+                .reduce(0.0) { sum, trip in
+                    if let estimatedDistance = Double(trip.distance.replacingOccurrences(of: " km", with: "")) {
+                        return sum + estimatedDistance
+                    }
+                    return sum
+                }
+            LabeledContent(label: "Odometer", value: String(format: "%.1f km", totalDistance))
         }
     }
     
