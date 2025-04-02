@@ -47,11 +47,13 @@ struct NotificationBannerView: View {
         .gesture(
             TapGesture()
                 .onEnded { _ in
+                    print("🔔 Banner tapped")
                     onTap()
                     dismiss()
                 }
         )
         .onAppear {
+            print("🔔 NotificationBannerView appeared")
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 offset = 0
             }
@@ -59,6 +61,7 @@ struct NotificationBannerView: View {
             // Auto dismiss after 5 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 if shouldShow {
+                    print("🔔 Auto-dismissing banner")
                     dismiss()
                 }
             }
@@ -66,6 +69,7 @@ struct NotificationBannerView: View {
     }
     
     private func dismiss() {
+        print("🔔 Dismissing banner")
         shouldShow = false
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             offset = -120
@@ -110,6 +114,38 @@ struct NotificationBannerView: View {
     }
 }
 
+private struct BannerContainer: View {
+    @ObservedObject var viewModel: NotificationsViewModel
+    @Binding var showingNotifications: Bool
+    
+    var body: some View {
+        GeometryReader { geometry in
+            if viewModel.showBanner, let notification = viewModel.currentBannerNotification {
+                VStack {
+                    NotificationBannerView(
+                        notification: notification,
+                        onTap: {
+                            print("🔔 Banner tapped, showing notifications")
+                            showingNotifications = true
+                        },
+                        onDismiss: {
+                            print("🔔 Banner dismissed")
+                            viewModel.dismissBanner()
+                        }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, geometry.safeAreaInsets.top + 8)
+                    
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: viewModel.showBanner)
+        .zIndex(999)
+    }
+}
+
 struct NotificationBannerModifier: ViewModifier {
     @ObservedObject var viewModel: NotificationsViewModel
     @Binding var showingNotifications: Bool
@@ -118,27 +154,11 @@ struct NotificationBannerModifier: ViewModifier {
         ZStack(alignment: .top) {
             content
             
-            if viewModel.showBanner, let notification = viewModel.currentBannerNotification {
-                NotificationBannerView(
-                    notification: notification,
-                    onTap: {
-                        showingNotifications = true
-                    },
-                    onDismiss: {
-                        viewModel.dismissBanner()
-                    }
-                )
-                .padding([.horizontal], 16)
-                .padding([.top], getSafeAreaInsets().top)
-                .transition(AnyTransition.move(edge: .top).combined(with: .opacity))
-                .zIndex(1)
-            }
+            BannerContainer(
+                viewModel: viewModel,
+                showingNotifications: $showingNotifications
+            )
         }
-    }
-    
-    private func getSafeAreaInsets() -> UIEdgeInsets {
-        guard let window = UIApplication.shared.windows.first else { return .zero }
-        return window.safeAreaInsets
     }
 }
 

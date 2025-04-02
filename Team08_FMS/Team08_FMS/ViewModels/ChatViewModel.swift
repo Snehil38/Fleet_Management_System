@@ -16,7 +16,7 @@ private struct MessagePayload: Encodable {
     let attachment_type: String?
 }
 
-private struct NotificationPayload: Encodable {
+struct ChatNotificationPayload: Codable {
     let message: String
     let type: String
     let created_at: String
@@ -253,7 +253,7 @@ final class ChatViewModel: ObservableObject {
     }
     
     private func createNotification(message: String, type: String) async throws {
-        let notification = NotificationPayload(
+        let notification = ChatNotificationPayload(
             message: message,
             type: type,
             created_at: ISO8601DateFormatter().string(from: Date()),
