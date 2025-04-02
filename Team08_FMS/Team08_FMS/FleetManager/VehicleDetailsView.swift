@@ -214,6 +214,71 @@ struct PDFViewer: UIViewRepresentable {
     }
 }
 
+// MARK: - Odometer Section
+private struct OdometerSection: View {
+    let vehicle: Vehicle
+    @State private var showingServiceAlert = false
+    
+    var totalDistance: Double {
+        TripDataController.shared.allTrips
+            .filter { $0.vehicleDetails.id == vehicle.id && $0.status == .delivered }
+            .reduce(0.0) { sum, trip in
+                if let estimatedDistance = Double(trip.distance.replacingOccurrences(of: " km", with: "")) {
+                    return sum + estimatedDistance
+                }
+                return sum
+            }
+    }
+    
+    var needsMaintenance: Bool {
+        return totalDistance >= 10000
+    }
+    
+    var body: some View {
+        Section("Odometer Information") {
+            HStack {
+                Text("Total Distance:")
+                Spacer()
+                Text(String(format: "%.1f km", totalDistance))
+            }
+            
+            if needsMaintenance {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text("Maintenance Required")
+                        .foregroundColor(.orange)
+                    Spacer()
+                    Button("Schedule Service") {
+                        showingServiceAlert = true
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+        }
+        .onAppear {
+            // Check maintenance status when view appears
+            if needsMaintenance {
+                showingServiceAlert = true
+            }
+        }
+        .onChange(of: totalDistance) { _, newValue in
+            if newValue >= 10000 {
+                showingServiceAlert = true
+            }
+        }
+        .alert("Service Required", isPresented: $showingServiceAlert) {
+            Button("Schedule Service", role: .destructive) {
+                // Here you would typically navigate to service scheduling
+                // For now we just dismiss the alert
+            }
+            Button("Remind Later", role: .cancel) { }
+        } message: {
+            Text("This vehicle has covered \(String(format: "%.1f", totalDistance)) km and requires maintenance service. Please schedule a service check as soon as possible.")
+        }
+    }
+}
+
 // MARK: - Main View
 struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
@@ -355,13 +420,11 @@ struct VehicleDetailView: View {
                 // Basic Information Section with inline errors.
                 basicInformationSection
                 vehicleDetailsSection
-                
-                // Documents Section
-//                documentSection
             } else {
                 // View mode sections
                 readOnlyBasicInfoSection
                 readOnlyVehicleDetailsSection
+                OdometerSection(vehicle: vehicle)
                 serviceRequestDetailsSection
             }
         }
