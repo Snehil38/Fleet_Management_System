@@ -2,10 +2,12 @@ import SwiftUI
 import CoreLocation
 import UIKit
 import PDFKit
+import Combine
 
 struct TripsView: View {
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
+    @StateObject private var languageManager = LanguageManager.shared
     @State private var selectedFilter: TripFilter = .upcoming
     @State private var showingError = false
     
@@ -16,9 +18,9 @@ struct TripsView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Filter Picker
-            Picker("Filter", selection: $selectedFilter) {
-                Text("Upcoming (\(tripController.upcomingTrips.count))").tag(TripFilter.upcoming)
-                Text("Delivered (\(tripController.recentDeliveries.count))").tag(TripFilter.delivered)
+            Picker("Filter".localized, selection: $selectedFilter) {
+                Text("Upcoming (\(tripController.upcomingTrips.count))".localized).tag(TripFilter.upcoming)
+                Text("Delivered (\(tripController.recentDeliveries.count))".localized).tag(TripFilter.delivered)
             }
             .pickerStyle(.segmented)
             .padding()
@@ -29,7 +31,7 @@ struct TripsView: View {
                     ProgressView()
                         .scaleEffect(1.5)
                         .padding()
-                    Text("Loading trips...")
+                    Text("Loading trips...".localized)
                         .foregroundColor(.gray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -49,31 +51,35 @@ struct TripsView: View {
                 }
             }
         }
-        .navigationTitle("Trips")
-        .alert("Error", isPresented: $showingError) {
-            Button("OK") {
+        .navigationTitle("Trips".localized)
+        .alert("Error".localized, isPresented: $showingError) {
+            Button("OK".localized) {
                 showingError = false
             }
         } message: {
             if let error = tripController.error {
                 switch error {
                 case .fetchError(let message):
-                    Text(message)
+                    Text(message.localized)
                 case .decodingError(let message):
-                    Text(message)
+                    Text(message.localized)
                 case .vehicleError(let message):
-                    Text(message)
+                    Text(message.localized)
                 case .updateError(let message):
-                    Text(message)
+                    Text(message.localized)
                 case .locationError(let message):
-                    Text(message)
+                    Text(message.localized)
                 }
             } else {
-                Text("An unexpected error occurred.")
+                Text("An unexpected error occurred.".localized)
             }
         }
         .onChange(of: tripController.error) { error, _ in
             showingError = error != nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .languageDidChange)) { _ in
+            // Refresh UI when language changes
+            languageManager.objectWillChange.send()
         }
     }
     
@@ -84,10 +90,10 @@ struct TripsView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
             
-            Text(emptyStateTitle)
+            Text(emptyStateTitle.localized)
                 .font(.headline)
             
-            Text(emptyStateMessage)
+            Text(emptyStateMessage.localized)
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -293,6 +299,7 @@ struct TripsView: View {
 struct TripCard: View {
     let trip: Trip
     @StateObject private var tripController = TripDataController.shared
+    @StateObject private var languageManager = LanguageManager.shared
     @State private var showingDetails = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
@@ -300,7 +307,7 @@ struct TripCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(statusText)
+                Text(statusText.localized)
                     .font(.subheadline)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -335,7 +342,7 @@ struct TripCard: View {
                         Image(systemName: "shippingbox")
                             .foregroundColor(.orange)
                             .font(.system(size: 14))
-                        Text("Cargo Type:")
+                        Text("Cargo Type:".localized)
                             .foregroundColor(.gray)
                         Text(cargoType)
                     }
@@ -348,7 +355,7 @@ struct TripCard: View {
                         Image(systemName: "arrow.left.and.right")
                             .foregroundColor(.blue)
                             .font(.system(size: 14))
-                        Text("Distance:")
+                        Text("Distance:".localized)
                             .foregroundColor(.gray)
                         Text(trip.distance)
                     }
@@ -361,7 +368,7 @@ struct TripCard: View {
                         Image(systemName: "location.fill")
                             .foregroundColor(.red)
                             .font(.system(size: 14))
-                        Text("Pickup:")
+                        Text("Pickup:".localized)
                             .foregroundColor(.gray)
                         Text(pickup)
                     }
@@ -379,12 +386,12 @@ struct TripCard: View {
                             do {
                                 try await tripController.startTrip(trip: trip)
                             } catch {
-                                alertMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip."
+                                alertMessage = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip.".localized
                                 showingAlert = true
                             }
                         }
                     }) {
-                        Text("Start Trip")
+                        Text("Start Trip".localized)
                             .font(.system(.subheadline, weight: .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
@@ -405,8 +412,8 @@ struct TripCard: View {
         .sheet(isPresented: $showingDetails) {
             TripDetailsView(trip: trip)
         }
-        .alert("Active Trip in Progress", isPresented: $showingAlert) {
-            Button("OK", role: .cancel) { }
+        .alert("Active Trip in Progress".localized, isPresented: $showingAlert) {
+            Button("OK".localized, role: .cancel) { }
         } message: {
             Text(alertMessage)
         }
@@ -443,6 +450,7 @@ struct TripDetailsView: View {
     @Environment(\.presentationMode) var presentationMode
     let trip: Trip
     @StateObject private var chatViewModel: ChatViewModel
+    @StateObject private var languageManager = LanguageManager.shared
     @State private var isGeneratingPDF = false
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -459,42 +467,42 @@ struct TripDetailsView: View {
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Trip Information")) {
-                    TripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
-                    TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
-                    TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
+                Section(header: Text("Trip Information".localized)) {
+                    TripDetailRow(icon: "number", title: "Trip ID".localized, value: trip.id.uuidString)
+                    TripDetailRow(icon: "mappin.circle.fill", title: "Destination".localized, value: trip.destination)
+                    TripDetailRow(icon: "location.fill", title: "Address".localized, value: trip.address)
                     if !trip.eta.isEmpty {
-                        TripDetailRow(icon: "clock.fill", title: "ETA", value: trip.eta)
+                        TripDetailRow(icon: "clock.fill", title: "ETA".localized, value: trip.eta)
                     }
                     if !trip.distance.isEmpty {
-                        TripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
+                        TripDetailRow(icon: "arrow.left.and.right", title: "Distance".localized, value: trip.distance)
                     }
                 }
                 
-                Section(header: Text("Vehicle Information")) {
-                    TripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.bodyType.rawValue)
-                    TripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
+                Section(header: Text("Vehicle Information".localized)) {
+                    TripDetailRow(icon: "car.fill", title: "Vehicle Type".localized, value: trip.vehicleDetails.bodyType.rawValue.localized)
+                    TripDetailRow(icon: "number", title: "License Plate".localized, value: trip.vehicleDetails.licensePlate)
                     if trip.vehicleDetails.make != "Unknown" {
-                        TripDetailRow(icon: "car.2.fill", title: "Make & Model", value: "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model)")
+                        TripDetailRow(icon: "car.2.fill", title: "Make & Model".localized, value: "\(trip.vehicleDetails.make) \(trip.vehicleDetails.model)")
                     }
                 }
                 
                 // Delivery status section for completed trips
                 if trip.status == .delivered {
-                    Section(header: Text("Delivery Status")) {
-                        TripDetailRow(icon: "checkmark.circle.fill", title: "Status", value: "Completed")
-                        TripDetailRow(icon: "clock.badge.checkmark.fill", title: "Pre-Trip Inspection", value: "Completed")
-                        TripDetailRow(icon: "checkmark.shield.fill", title: "Post-Trip Inspection", value: "Completed")
+                    Section(header: Text("Delivery Status".localized)) {
+                        TripDetailRow(icon: "checkmark.circle.fill", title: "Status".localized, value: "Completed".localized)
+                        TripDetailRow(icon: "clock.badge.checkmark.fill", title: "Pre-Trip Inspection".localized, value: "Completed".localized)
+                        TripDetailRow(icon: "checkmark.shield.fill", title: "Post-Trip Inspection".localized, value: "Completed".localized)
                     }
                     
-                    Section(header: Text("PROOF OF DELIVERY")) {
+                    Section(header: Text("PROOF OF DELIVERY".localized)) {
                         Button(action: {
                             generateDeliveryReceipt()
                         }) {
                             HStack {
                                 Image(systemName: "doc.text.fill")
                                     .foregroundColor(.blue)
-                                Text("Delivery Receipt")
+                                Text("Delivery Receipt".localized)
                                     .foregroundColor(.blue)
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -508,7 +516,7 @@ struct TripDetailsView: View {
                             HStack {
                                 Image(systemName: "bubble.left.and.bubble.right.fill")
                                     .foregroundColor(.blue)
-                                Text("Chat History")
+                                Text("Chat History".localized)
                                     .foregroundColor(.blue)
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -518,20 +526,20 @@ struct TripDetailsView: View {
                     }
                 } else {
                     // Status section for non-completed trips
-                    Section(header: Text("Status")) {
-                        TripDetailRow(icon: statusIcon, title: "Current Status", value: statusText)
+                    Section(header: Text("Status".localized)) {
+                        TripDetailRow(icon: statusIcon, title: "Current Status".localized, value: statusText.localized)
                         
                         if trip.status == .inProgress {
                             TripDetailRow(
                                 icon: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "circle",
-                                title: "Pre-Trip Inspection",
-                                value: trip.hasCompletedPreTrip ? "Completed" : "Required"
+                                title: "Pre-Trip Inspection".localized,
+                                value: trip.hasCompletedPreTrip ? "Completed".localized : "Required".localized
                             )
                             
                             TripDetailRow(
                                 icon: trip.hasCompletedPostTrip ? "checkmark.circle.fill" : "circle",
-                                title: "Post-Trip Inspection",
-                                value: trip.hasCompletedPostTrip ? "Completed" : "Required"
+                                title: "Post-Trip Inspection".localized,
+                                value: trip.hasCompletedPostTrip ? "Completed".localized : "Required".localized
                             )
                         }
                     }
@@ -539,7 +547,7 @@ struct TripDetailsView: View {
                 
                 // Trip notes section
                 if let notes = trip.notes, !notes.isEmpty {
-                    Section(header: Text("Notes")) {
+                    Section(header: Text("Notes".localized)) {
                         Text(notes)
                             .font(.body)
                             .foregroundColor(.primary)
@@ -548,17 +556,17 @@ struct TripDetailsView: View {
                 }
             }
             .listStyle(InsetGroupedListStyle())
-            .navigationTitle("Trip Details")
+            .navigationTitle("Trip Details".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button("Done".localized) {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
             }
-            .alert("Error", isPresented: $showingError) {
-                Button("OK") {
+            .alert("Error".localized, isPresented: $showingError) {
+                Button("OK".localized) {
                     showingError = false
                 }
             } message: {
@@ -573,6 +581,10 @@ struct TripDetailsView: View {
                 if let data = receiptData {
                     TripDeliveryReceiptViewer(data: data)
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .languageDidChange)) { _ in
+                // Refresh UI when language changes
+                languageManager.objectWillChange.send()
             }
             .task {
                 // Get fleet manager ID and load chat messages
@@ -966,17 +978,18 @@ struct ShareSheet: UIViewControllerRepresentable {
 // Add TripDeliveryReceiptViewer after ShareSheet
 struct TripDeliveryReceiptViewer: View {
     @Environment(\.presentationMode) var presentationMode
+    @StateObject private var languageManager = LanguageManager.shared
     let data: Data
     @State private var showShareSheet = false
     
     var body: some View {
         NavigationView {
             PDFKitView(data: data)
-                .navigationTitle("Delivery Receipt")
+                .navigationTitle("Delivery Receipt".localized)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Done") {
+                        Button("Done".localized) {
                             presentationMode.wrappedValue.dismiss()
                         }
                     }
@@ -991,6 +1004,10 @@ struct TripDeliveryReceiptViewer: View {
                 }
                 .sheet(isPresented: $showShareSheet) {
                     ShareSheet(activityItems: [data])
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .languageDidChange)) { _ in
+                    // Refresh UI when language changes
+                    languageManager.objectWillChange.send()
                 }
         }
     }

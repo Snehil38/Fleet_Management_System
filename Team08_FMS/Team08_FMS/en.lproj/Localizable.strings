@@ -11,11 +11,16 @@
 "Settings" = "Settings";
 "Profile" = "Profile";
 "Logout" = "Logout";
+"OK" = "OK";
+"Filter" = "Filter";
+"Home" = "Home";
+"Loading trips..." = "Loading trips...";
 
 /* Language Settings */
 "Language" = "Language";
 "Choose Language" = "Choose Language";
 "The app will use the selected language for all text elements." = "The app will use the selected language for all text elements.";
+"App Settings" = "App Settings";
 
 /* Login and Authentication */
 "Login" = "Login";
@@ -39,6 +44,26 @@
 "Statistics" = "Statistics";
 "Reports" = "Reports";
 
+/* Driver Profile */
+"Driver Profile" = "Driver Profile";
+"Personal Information" = "Personal Information";
+"Employment Information" = "Employment Information";
+"Performance Metrics" = "Performance Metrics";
+"Performance data would be displayed here." = "Performance data would be displayed here.";
+"Delete Driver" = "Delete Driver";
+"Are you sure you want to delete this driver?" = "Are you sure you want to delete this driver?";
+"Confirmation" = "Confirmation";
+"Driver information updated successfully." = "Driver information updated successfully.";
+"Phone number must be numeric." = "Phone number must be numeric.";
+"Experience must be a number." = "Experience must be a number.";
+"Salary must be a number." = "Salary must be a number.";
+"Name" = "Name";
+"Status:" = "Status:";
+"Driver License" = "Driver License";
+"Years of Experience" = "Years of Experience";
+"EXP" = "EXP";
+"NAME" = "NAME";
+
 /* Trips */
 "Current" = "Current";
 "Upcoming" = "Upcoming";
@@ -55,6 +80,37 @@
 "Unassigned" = "Unassigned";
 "Assign Driver" = "Assign Driver";
 "Trip ID" = "Trip ID";
+"Upcoming (%@)" = "Upcoming (%@)";
+"Delivered (%@)" = "Delivered (%@)";
+"No Upcoming Trips" = "No Upcoming Trips";
+"No Completed Deliveries" = "No Completed Deliveries";
+"You don't have any upcoming trips scheduled." = "You don't have any upcoming trips scheduled.";
+"You haven't completed any deliveries yet." = "You haven't completed any deliveries yet.";
+"Cargo Type:" = "Cargo Type:";
+"Distance:" = "Distance:";
+"Pickup:" = "Pickup:";
+"You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip." = "You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip.";
+"Start Trip" = "Start Trip";
+"Active Trip in Progress" = "Active Trip in Progress";
+"Recent Deliveries" = "Recent Deliveries";
+
+/* Trip Details */
+"Trip Information" = "Trip Information";
+"Vehicle Information" = "Vehicle Information";
+"Vehicle Type" = "Vehicle Type";
+"License Plate" = "License Plate";
+"Make & Model" = "Make & Model";
+"ETA" = "ETA";
+"Current Status" = "Current Status";
+"Pre-Trip Inspection" = "Pre-Trip Inspection";
+"Post-Trip Inspection" = "Post-Trip Inspection";
+"Required" = "Required";
+"Delivery Status" = "Delivery Status";
+"Notes" = "Notes";
+"PROOF OF DELIVERY" = "PROOF OF DELIVERY";
+"Delivery Receipt" = "Delivery Receipt";
+"Chat History" = "Chat History";
+"An unexpected error occurred." = "An unexpected error occurred.";
 
 /* Vehicles */
 "Vehicle Details" = "Vehicle Details";
@@ -70,8 +126,13 @@
 "Available" = "Available";
 "In Use" = "In Use";
 "Under Maintenance" = "Under Maintenance";
+"Cargo" = "Cargo";
+"Box Truck" = "Box Truck";
+"Van" = "Van";
+"Truck" = "Truck";
+"Trailer" = "Trailer";
 
-/* Driver */
+/* Driver Statuses */
 "Driver Details" = "Driver Details";
 "License" = "License";
 "Experience" = "Experience";
@@ -81,8 +142,9 @@
 "Years" = "Years";
 "Driver Status" = "Driver Status";
 "Available" = "Available";
-"On Trip" = "On Trip";
+"Busy" = "Busy";
 "Off Duty" = "Off Duty";
+"On Trip" = "On Trip";
 
 /* Maintenance */
 "Maintenance Records" = "Maintenance Records";

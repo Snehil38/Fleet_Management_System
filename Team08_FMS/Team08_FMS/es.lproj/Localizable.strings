@@ -11,11 +11,16 @@
 "Settings" = "Configuración";
 "Profile" = "Perfil";
 "Logout" = "Cerrar Sesión";
+"OK" = "Aceptar";
+"Filter" = "Filtrar";
+"Home" = "Inicio";
+"Loading trips..." = "Cargando viajes...";
 
 /* Language Settings */
 "Language" = "Idioma";
 "Choose Language" = "Elegir Idioma";
 "The app will use the selected language for all text elements." = "La aplicación usará el idioma seleccionado para todos los elementos de texto.";
+"App Settings" = "Configuración de la App";
 
 /* Login and Authentication */
 "Login" = "Iniciar Sesión";
@@ -39,6 +44,26 @@
 "Statistics" = "Estadísticas";
 "Reports" = "Informes";
 
+/* Driver Profile */
+"Driver Profile" = "Perfil del Conductor";
+"Personal Information" = "Información Personal";
+"Employment Information" = "Información Laboral";
+"Performance Metrics" = "Métricas de Rendimiento";
+"Performance data would be displayed here." = "Los datos de rendimiento se mostrarían aquí.";
+"Delete Driver" = "Eliminar Conductor";
+"Are you sure you want to delete this driver?" = "¿Está seguro que desea eliminar este conductor?";
+"Confirmation" = "Confirmación";
+"Driver information updated successfully." = "Información del conductor actualizada con éxito.";
+"Phone number must be numeric." = "El número de teléfono debe ser numérico.";
+"Experience must be a number." = "La experiencia debe ser un número.";
+"Salary must be a number." = "El salario debe ser un número.";
+"Name" = "Nombre";
+"Status:" = "Estado:";
+"Driver License" = "Licencia de Conducir";
+"Years of Experience" = "Años de Experiencia";
+"EXP" = "EXP";
+"NAME" = "NOMBRE";
+
 /* Trips */
 "Current" = "Actuales";
 "Upcoming" = "Próximos";
@@ -55,6 +80,37 @@
 "Unassigned" = "Sin Asignar";
 "Assign Driver" = "Asignar Conductor";
 "Trip ID" = "ID del Viaje";
+"Upcoming (%@)" = "Próximos (%@)";
+"Delivered (%@)" = "Entregados (%@)";
+"No Upcoming Trips" = "No Hay Viajes Próximos";
+"No Completed Deliveries" = "No Hay Entregas Completadas";
+"You don't have any upcoming trips scheduled." = "No tienes viajes próximos programados.";
+"You haven't completed any deliveries yet." = "Aún no has completado ninguna entrega.";
+"Cargo Type:" = "Tipo de Carga:";
+"Distance:" = "Distancia:";
+"Pickup:" = "Recogida:";
+"You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip." = "Tienes un viaje activo en progreso. Por favor completa el viaje actual antes de comenzar uno nuevo. Este viaje se activará automáticamente después de completar el viaje actual.";
+"Start Trip" = "Iniciar Viaje";
+"Active Trip in Progress" = "Viaje Activo en Progreso";
+"Recent Deliveries" = "Entregas Recientes";
+
+/* Trip Details */
+"Trip Information" = "Información del Viaje";
+"Vehicle Information" = "Información del Vehículo";
+"Vehicle Type" = "Tipo de Vehículo";
+"License Plate" = "Matrícula";
+"Make & Model" = "Marca y Modelo";
+"ETA" = "Tiempo de Llegada";
+"Current Status" = "Estado Actual";
+"Pre-Trip Inspection" = "Inspección Pre-Viaje";
+"Post-Trip Inspection" = "Inspección Post-Viaje";
+"Required" = "Requerido";
+"Delivery Status" = "Estado de Entrega";
+"Notes" = "Notas";
+"PROOF OF DELIVERY" = "COMPROBANTE DE ENTREGA";
+"Delivery Receipt" = "Recibo de Entrega";
+"Chat History" = "Historial de Chat";
+"An unexpected error occurred." = "Ha ocurrido un error inesperado.";
 
 /* Vehicles */
 "Vehicle Details" = "Detalles del Vehículo";
@@ -70,8 +126,13 @@
 "Available" = "Disponible";
 "In Use" = "En Uso";
 "Under Maintenance" = "En Mantenimiento";
+"Cargo" = "Carga";
+"Box Truck" = "Camión de Caja";
+"Van" = "Furgoneta";
+"Truck" = "Camión";
+"Trailer" = "Remolque";
 
-/* Driver */
+/* Driver Statuses */
 "Driver Details" = "Detalles del Conductor";
 "License" = "Licencia";
 "Experience" = "Experiencia";
@@ -81,8 +142,9 @@
 "Years" = "Años";
 "Driver Status" = "Estado del Conductor";
 "Available" = "Disponible";
-"On Trip" = "En Viaje";
+"Busy" = "Ocupado";
 "Off Duty" = "Fuera de Servicio";
+"On Trip" = "En Viaje";
 
 /* Maintenance */
 "Maintenance Records" = "Registros de Mantenimiento";

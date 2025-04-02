@@ -2,10 +2,13 @@ import SwiftUI
 import MapKit
 import AVFoundation
 import CoreLocation
+import Combine
 
 struct DriverTabView: View {
+    
     @StateObject private var availabilityManager = DriverAvailabilityManager.shared
     @StateObject private var tripController = TripDataController.shared
+    @StateObject private var languageManager = LanguageManager.shared
     let driverId: UUID
 
     init(driverId: UUID) {
@@ -29,8 +32,6 @@ struct DriverTabView: View {
     
     // Route Information
     @State private var availableRoutes: [RouteOption] = [
-//        RouteOption(id: "1", name: "Route 1", eta: "25 mins", distance: "8.5 km", isRecommended: true),
-//        RouteOption(id: "2", name: "Route 2", eta: "32 mins", distance: "7.8 km", isRecommended: false),
         RouteOption(id: "3", name: "Route 3", eta: "1h 21m", distance: "53 km", isRecommended: false)
     ]
     @State private var selectedRouteId: String = "1"
@@ -39,7 +40,7 @@ struct DriverTabView: View {
         TabView(selection: $selectedTab) {
             mainContentView
                 .tabItem {
-                    Label("Home", systemImage: "house.fill")
+                    Label("Home".localized, systemImage: "house.fill")
                 }
                 .tag(0)
             
@@ -47,7 +48,7 @@ struct DriverTabView: View {
                 TripsView()
             }
             .tabItem {
-                Label("Trips", systemImage: "car.fill")
+                Label("Trips".localized, systemImage: "car.fill")
             }
             .tag(1)
         }
@@ -58,6 +59,11 @@ struct DriverTabView: View {
             tripController.setDriverId(driverId)
             await tripController.refreshTrips()
             TripDataController.shared.startMonitoringRegions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .languageDidChange)) { _ in
+            // Refresh UI when language changes by forcing a redraw
+            // Create a state variable to track language changes
+            languageManager.objectWillChange.send()
         }
     }
     
@@ -78,7 +84,7 @@ struct DriverTabView: View {
                             ProgressView()
                                 .scaleEffect(1.5)
                                 .padding()
-                            Text("Loading trips...")
+                            Text("Loading trips...".localized)
                                 .foregroundColor(.gray)
                         }
                     } else {
@@ -100,7 +106,7 @@ struct DriverTabView: View {
                                     // Upcoming Trips Section
                                     VStack(alignment: .leading, spacing: 20) {
                                         HStack {
-                                            Text("Upcoming Trips")
+                                            Text("Upcoming Trips".localized)
                                                 .font(.system(size: 24, weight: .bold))
                                             
                                             if !tripController.upcomingTrips.isEmpty {
@@ -144,7 +150,7 @@ struct DriverTabView: View {
                                 // Recent Deliveries Section
                                 VStack(alignment: .leading, spacing: 20) {
                                     HStack {
-                                        Text("Recent Deliveries")
+                                        Text("Recent Deliveries".localized)
                                             .font(.system(size: 24, weight: .bold))
                                         
                                         if !tripController.recentDeliveries.isEmpty {
@@ -204,7 +210,7 @@ struct DriverTabView: View {
                         }
                     }
                 }
-                .navigationTitle("Home")
+                .navigationTitle("Home".localized)
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItemGroup(placement: .navigationBarTrailing) {

@@ -1,5 +1,5 @@
 /* Common UI Elements */
-"Done" = "पूर्ण";
+"Done" = "हो गया";
 "Cancel" = "रद्द करें";
 "Save" = "सहेजें";
 "Edit" = "संपादित करें";
@@ -7,37 +7,62 @@
 "Back" = "वापस";
 "Next" = "अगला";
 "Previous" = "पिछला";
-"Search" = "खोज";
+"Search" = "खोजें";
 "Settings" = "सेटिंग्स";
 "Profile" = "प्रोफ़ाइल";
 "Logout" = "लॉगआउट";
+"OK" = "ठीक है";
+"Filter" = "फ़िल्टर";
+"Home" = "होम";
+"Loading trips..." = "यात्राएँ लोड हो रही हैं...";
 
 /* Language Settings */
 "Language" = "भाषा";
 "Choose Language" = "भाषा चुनें";
 "The app will use the selected language for all text elements." = "ऐप सभी टेक्स्ट तत्वों के लिए चयनित भाषा का उपयोग करेगा।";
+"App Settings" = "ऐप सेटिंग्स";
 
 /* Login and Authentication */
 "Login" = "लॉगिन";
 "Email" = "ईमेल";
 "Password" = "पासवर्ड";
 "Forgot Password" = "पासवर्ड भूल गए";
-"Sign In" = "साइन इन";
-"Sign Out" = "साइन आउट";
+"Sign In" = "साइन इन करें";
+"Sign Out" = "साइन आउट करें";
 "Select Your Role" = "अपनी भूमिका चुनें";
-"Fleet Manager" = "फ्लीट मैनेजर";
-"Driver" = "ड्राइवर";
+"Fleet Manager" = "फ्लीट प्रबंधक";
+"Driver" = "चालक";
 "Maintenance Personnel" = "रखरखाव कर्मी";
 
 /* Dashboard and Navigation */
 "Dashboard" = "डैशबोर्ड";
-"Trips" = "यात्राएं";
+"Trips" = "यात्राएँ";
 "Vehicles" = "वाहन";
-"Crew" = "क्रू";
+"Crew" = "कर्मचारी";
 "Maintenance" = "रखरखाव";
-"Notifications" = "सूचनाएं";
-"Statistics" = "आंकड़े";
+"Notifications" = "सूचनाएँ";
+"Statistics" = "आँकड़े";
 "Reports" = "रिपोर्ट";
+
+/* Driver Profile */
+"Driver Profile" = "चालक प्रोफ़ाइल";
+"Personal Information" = "व्यक्तिगत जानकारी";
+"Employment Information" = "रोजगार जानकारी";
+"Performance Metrics" = "प्रदर्शन मेट्रिक्स";
+"Performance data would be displayed here." = "प्रदर्शन डेटा यहां प्रदर्शित किया जाएगा।";
+"Delete Driver" = "चालक हटाएँ";
+"Are you sure you want to delete this driver?" = "क्या आप वाकई इस चालक को हटाना चाहते हैं?";
+"Confirmation" = "पुष्टिकरण";
+"Driver information updated successfully." = "चालक जानकारी सफलतापूर्वक अपडेट की गई।";
+"Phone number must be numeric." = "फोन नंबर संख्यात्मक होना चाहिए।";
+"Experience must be a number." = "अनुभव एक संख्या होनी चाहिए।";
+"Salary must be a number." = "वेतन एक संख्या होनी चाहिए।";
+"Name" = "नाम";
+"Status:" = "स्थिति:";
+"Driver License" = "ड्राइविंग लाइसेंस";
+"Years of Experience" = "अनुभव के वर्ष";
+"EXP" = "समाप्ति";
+"NAME" = "नाम";
 
 /* Trips */
 "Current" = "वर्तमान";
@@ -48,18 +73,49 @@
 "Distance" = "दूरी";
 "Duration" = "अवधि";
 "Status" = "स्थिति";
-"Pending" = "अपूर्ण";
-"In Progress" = "प्रगति में";
-"Delivered" = "पहुंचाया गया";
+"Pending" = "लंबित";
+"In Progress" = "प्रगति पर";
+"Delivered" = "वितरित";
 "Assigned" = "असाइन किया गया";
 "Unassigned" = "असाइन नहीं किया गया";
-"Assign Driver" = "ड्राइवर असाइन करें";
+"Assign Driver" = "चालक असाइन करें";
 "Trip ID" = "यात्रा आईडी";
+"Upcoming (%@)" = "आगामी (%@)";
+"Delivered (%@)" = "वितरित (%@)";
+"No Upcoming Trips" = "कोई आगामी यात्रा नहीं";
+"No Completed Deliveries" = "कोई पूर्ण वितरण नहीं";
+"You don't have any upcoming trips scheduled." = "आपके पास कोई आगामी यात्रा निर्धारित नहीं है।";
+"You haven't completed any deliveries yet." = "आपने अभी तक कोई वितरण पूरा नहीं किया है।";
+"Cargo Type:" = "कार्गो प्रकार:";
+"Distance:" = "दूरी:";
+"Pickup:" = "पिकअप:";
+"You have an active trip in progress. Please complete the current trip before starting a new one. This trip will be automatically activated after completing the current trip." = "आपकी एक सक्रिय यात्रा प्रगति पर है। कृपया एक नई यात्रा शुरू करने से पहले वर्तमान यात्रा पूरी करें। यह यात्रा वर्तमान यात्रा पूरी होने के बाद स्वचालित रूप से सक्रिय हो जाएगी।";
+"Start Trip" = "यात्रा शुरू करें";
+"Active Trip in Progress" = "सक्रिय यात्रा प्रगति पर";
+"Recent Deliveries" = "हाल के वितरण";
+
+/* Trip Details */
+"Trip Information" = "यात्रा जानकारी";
+"Vehicle Information" = "वाहन जानकारी";
+"Vehicle Type" = "वाहन प्रकार";
+"License Plate" = "लाइसेंस प्लेट";
+"Make & Model" = "मेक और मॉडल";
+"ETA" = "अनुमानित आगमन समय";
+"Current Status" = "वर्तमान स्थिति";
+"Pre-Trip Inspection" = "यात्रा-पूर्व निरीक्षण";
+"Post-Trip Inspection" = "यात्रा-पश्चात निरीक्षण";
+"Required" = "आवश्यक";
+"Delivery Status" = "वितरण स्थिति";
+"Notes" = "नोट्स";
+"PROOF OF DELIVERY" = "वितरण का प्रमाण";
+"Delivery Receipt" = "वितरण रसीद";
+"Chat History" = "चैट इतिहास";
+"An unexpected error occurred." = "एक अप्रत्याशित त्रुटि हुई।";
 
 /* Vehicles */
 "Vehicle Details" = "वाहन विवरण";
 "License Plate" = "लाइसेंस प्लेट";
-"Make" = "निर्माता";
+"Make" = "मेक";
 "Model" = "मॉडल";
 "Year" = "वर्ष";
 "VIN" = "वीआईएन";
@@ -70,37 +126,43 @@
 "Available" = "उपलब्ध";
 "In Use" = "उपयोग में";
 "Under Maintenance" = "रखरखाव के अधीन";
+"Cargo" = "कार्गो";
+"Box Truck" = "बॉक्स ट्रक";
+"Van" = "वैन";
+"Truck" = "ट्रक";
+"Trailer" = "ट्रेलर";
 
-/* Driver */
-"Driver Details" = "ड्राइवर विवरण";
+/* Driver Statuses */
+"Driver Details" = "चालक विवरण";
 "License" = "लाइसेंस";
 "Experience" = "अनुभव";
 "Phone" = "फोन";
 "Address" = "पता";
 "Salary" = "वेतन";
 "Years" = "वर्ष";
-"Driver Status" = "ड्राइवर स्थिति";
+"Driver Status" = "चालक स्थिति";
 "Available" = "उपलब्ध";
-"On Trip" = "यात्रा पर";
+"Busy" = "व्यस्त";
 "Off Duty" = "ड्यूटी से बाहर";
+"On Trip" = "यात्रा पर";
 
 /* Maintenance */
 "Maintenance Records" = "रखरखाव रिकॉर्ड";
-"Scheduled" = "निर्धारित";
+"Scheduled" = "अनुसूचित";
 "Completed" = "पूर्ण";
-"Overdue" = "विलंबित";
+"Overdue" = "अतिदेय";
 "Service Type" = "सेवा प्रकार";
 "Service Date" = "सेवा तिथि";
 "Notes" = "नोट्स";
 "Report Issue" = "समस्या रिपोर्ट करें";
-"Schedule Maintenance" = "रखरखाव शेड्यूल करें";
+"Schedule Maintenance" = "रखरखाव अनुसूचित करें";
 
 /* SOS Button */
 "SOS" = "एसओएस";
-"Emergency" = "आपातकालीन";
+"Emergency" = "आपातकाल";
 "Contact" = "संपर्क";
 "Select Contact" = "संपर्क चुनें";
-"Fleet Manager" = "फ्लीट मैनेजर";
+"Fleet Manager" = "फ्लीट प्रबंधक";
 "Maintenance" = "रखरखाव";
 "Call" = "कॉल";
 "Message" = "संदेश";
@@ -123,6 +185,6 @@
 "Information updated successfully" = "जानकारी सफलतापूर्वक अपडेट की गई";
 "Changes saved" = "परिवर्तन सहेजे गए";
 "Are you sure?" = "क्या आप निश्चित हैं?";
-"This action cannot be undone" = "यह क्रिया पूर्ववत नहीं की जा सकती";
-"Yes" = "हां";
+"This action cannot be undone" = "यह क्रिया वापस नहीं ली जा सकती";
+"Yes" = "हाँ";
 "No" = "नहीं"; 

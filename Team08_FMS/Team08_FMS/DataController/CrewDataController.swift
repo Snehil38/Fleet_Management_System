@@ -1,6 +1,6 @@
 import Foundation
 import SwiftUI
-
+import Combine
 // MARK: - CrewType Enum
 enum CrewType {
     case drivers

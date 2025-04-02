@@ -39,8 +39,8 @@ class LanguageManager: ObservableObject {
 }
 
 // String extension for easy localization
-extension String {
-    var localized: String {
-        return LanguageManager.shared.getLocalizedValue(for: self)
-    }
-}
+//extension String {
+//    var localized: String {
+//        return LanguageManager.shared.getLocalizedValue(for: self)
+//    }
+//}
