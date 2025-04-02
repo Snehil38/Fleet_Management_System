@@ -506,6 +506,9 @@ struct DriverTabView: View {
                     if !trip.hasCompletedPreTrip {
                         alertMessage = "Please complete pre-trip inspection before starting navigation"
                         showingAlert = true
+                    } else if trip.vehicleDetails.status == .underMaintenance {
+                        alertMessage = "Vehicle is under maintenance"
+                        showingAlert = true
                     } else {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingNavigation = true
@@ -548,6 +551,9 @@ struct DriverTabView: View {
                 Button(action: {
                     if !trip.hasCompletedPreTrip {
                         alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                        showingAlert = true
+                    } else if trip.vehicleDetails.status == .underMaintenance {
+                        alertMessage = "Vehicle is under maintenance"
                         showingAlert = true
                     } else {
                         Task {
