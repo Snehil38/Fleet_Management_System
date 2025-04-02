@@ -1176,6 +1176,8 @@ struct AddTripView: View {
                 )
                 
                 if success {
+                    await TripDataController.shared.refreshTrips()
+                    await TripDataController.shared.refreshAllTrips()
                     try await TripDataController.shared.fetchAllTrips()
                     showingSuccessAlert = true
                 } else {
