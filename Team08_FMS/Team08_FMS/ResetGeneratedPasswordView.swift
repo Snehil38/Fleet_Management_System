@@ -141,6 +141,7 @@ struct ForgotPasswordView: View {
     @State private var isLoading: Bool = false
     @State private var alertMessage: String = ""
     @State private var showingAlert: Bool = false
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationView {
@@ -249,6 +250,8 @@ struct ForgotPasswordView: View {
                             Task {
                                 let updated = await SupabaseDataController.shared.resetPassword(newPassword: newPassword)
                                 if updated {
+                                    SupabaseDataController.shared.signOut()
+                                    dismiss()
                                     alertMessage = "Password successfully reset."
                                 } else {
                                     alertMessage = "Error updating password."
