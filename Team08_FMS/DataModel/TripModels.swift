@@ -20,4 +20,19 @@ struct SupabaseTrip: Codable, Identifiable {
     let pickup: String?
     let estimated_distance: Double?
     let estimated_time: Double?
+    let estimated_cost: Double?
+    let middle_pickup: String?
+    let middle_pickup_latitude: Double?
+    let middle_pickup_longitude: Double?
+}
+
+// Delivery Details Model
+struct DeliveryDetails: Identifiable {
+    let id: UUID
+    let location: String
+    let date: String
+    let status: String
+    let driver: String
+    let vehicle: String
+    let notes: String
 } 

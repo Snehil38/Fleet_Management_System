@@ -47,6 +47,10 @@ func fetchTrips() async throws {
                 pickup,
                 estimated_distance,
                 estimated_time,
+                estimated_cost,
+                middle_pickup,
+                middle_pickup_latitude,
+                middle_pickup_longitude,
                 vehicles (
                     id,
                     name,
@@ -126,7 +130,11 @@ func fetchTrips() async throws {
                 end_longitude: data.end_longitude,
                 pickup: data.pickup,
                 estimated_distance: data.estimated_distance,
-                estimated_time: data.estimated_time
+                estimated_time: data.estimated_time,
+                estimated_cost: data.estimated_cost,
+                middle_pickup: data.middle_pickup,
+                middle_pickup_latitude: data.middle_pickup_latitude,
+                middle_pickup_longitude: data.middle_pickup_longitude
             )
             return Trip(from: supabaseTrip, vehicle: data.vehicles)
         }
@@ -160,6 +168,9 @@ func fetchTrips() async throws {
 
 @MainActor
 func fetchAllTrips() async throws {
+    isLoading = true
+    error = nil
+    
     do {
         let query = supabaseController.supabase
             .from("trips")
@@ -185,6 +196,10 @@ func fetchAllTrips() async throws {
                 pickup,
                 estimated_distance,
                 estimated_time,
+                estimated_cost,
+                middle_pickup,
+                middle_pickup_latitude,
+                middle_pickup_longitude,
                 vehicles (
                     id,
                     name,
@@ -237,7 +252,7 @@ func fetchAllTrips() async throws {
         let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
 
         // Convert joined data to Trip objects
-        let tripsWithVehicles = joinedData.map { data -> Trip in
+        let tripObjects = joinedData.map { data -> Trip in
             let supabaseTrip = SupabaseTrip(
                 id: data.id,
                 destination: data.destination,
@@ -259,18 +274,29 @@ func fetchAllTrips() async throws {
                 end_longitude: data.end_longitude,
                 pickup: data.pickup,
                 estimated_distance: data.estimated_distance,
-                estimated_time: data.estimated_time
+                estimated_time: data.estimated_time,
+                estimated_cost: data.estimated_cost,
+                middle_pickup: data.middle_pickup,
+                middle_pickup_latitude: data.middle_pickup_latitude,
+                middle_pickup_longitude: data.middle_pickup_longitude
             )
             return Trip(from: supabaseTrip, vehicle: data.vehicles)
         }
 
-        print("Successfully processed \(tripsWithVehicles.count) all trips")
-
-        // Update allTrips property
-        self.allTrips = tripsWithVehicles
+        // Update published properties
+        self.allTrips = tripObjects
+        
+        // Filter trips by status
+        self.upcomingTrips = tripObjects.filter { $0.status == .pending || $0.status == .assigned }
+        
+        if self.driverId != nil {
+            self.currentTrip = tripObjects.first(where: { $0.status == .inProgress })
+        }
+        
+        self.isLoading = false
     } catch {
-        print("Error fetching all trips: \(error)")
-        throw TripError.fetchError("Failed to fetch all trips: \(error.localizedDescription)")
+        self.error = .fetchError("Failed to fetch trips: \(error.localizedDescription)")
+        self.isLoading = false
     }
 }
 
@@ -379,7 +405,7 @@ struct JoinedTripData: Codable {
     let has_completed_pre_trip: Bool
     let has_completed_post_trip: Bool
     let vehicle_id: UUID
-    let driver_id: UUID
+    let driver_id: UUID?
     let secondary_driver_id: UUID?
     let start_time: Date?
     let end_time: Date?
@@ -394,6 +420,10 @@ struct JoinedTripData: Codable {
     let pickup: String?
     let estimated_distance: Double?
     let estimated_time: Double?
+    let estimated_cost: Double?
+    let middle_pickup: String?
+    let middle_pickup_latitude: Double?
+    let middle_pickup_longitude: Double?
     let vehicles: Vehicle
 }
 

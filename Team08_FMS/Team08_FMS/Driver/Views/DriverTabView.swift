@@ -74,153 +74,26 @@ struct DriverTabView: View {
             NavigationView {
                 ZStack {
                     if tripController.isLoading {
-                        VStack {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                                .padding()
-                            Text("Loading trips...")
-                                .foregroundColor(.gray)
-                        }
+                        loadingContentView
                     } else {
-                        ScrollView(.vertical, showsIndicators: false) {
-                            VStack(spacing: 24) {
-                                // Current Delivery Card
-                                if let currentTrip = tripController.currentTrip,
-                                   currentTrip.status == .inProgress && availabilityManager.isAvailable {
-                                    currentDeliveryCard(currentTrip)
-                                }
-                                
-                                // Only show upcoming trips and trip queue if available
-                                if availabilityManager.isAvailable {
-                                    // Trip Queue Section
-                                    if !tripQueue.isEmpty {
-                                        tripQueueSection
-                                    }
-
-                                    // Upcoming Trips Section
-                                    VStack(alignment: .leading, spacing: 20) {
-                                        HStack {
-                                            Text("Upcoming Trips")
-                                                .font(.system(.title2, design: .default).weight(.bold))
-                                            
-                                            if !tripController.upcomingTrips.isEmpty {
-                                                Text("\(tripController.upcomingTrips.count)")
-                                                    .font(.system(.headline, design: .default).weight(.semibold))
-                                                    .foregroundColor(.white)
-                                                    .padding(.horizontal, 10)
-                                                    .padding(.vertical, 4)
-                                                    .background(Color.blue)
-                                                    .cornerRadius(12)
-                                            }
-                                            
-                                            Spacer()
-                                        }
-                                        .padding(.horizontal)
-
-                                        if tripController.upcomingTrips.isEmpty {
-                                            emptyUpcomingTripsView
-                                        } else {
-                                            VStack(spacing: 0) {
-                                                ForEach(tripController.upcomingTrips) { trip in
-                                                    UpcomingTripRow(trip: trip)
-                                                        .environmentObject(tripController)
-                                                    if trip.id != tripController.upcomingTrips.last?.id {
-                                                        Divider()
-                                                            .padding(.horizontal)
-                                                    }
-                                                }
-                                            }
-                                            .background(Color(.systemBackground))
-                                            .cornerRadius(20)
-                                            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-                                            .padding(.horizontal)
-                                        }
-                                    }
-                                } else {
-                                    // Display message when driver is unavailable
-                                    unavailableDriverSection
-                                }
-
-                                // Recent Deliveries Section
-                                VStack(alignment: .leading, spacing: 20) {
-                                    HStack {
-                                        Text("Recent Deliveries")
-                                            .font(.system(size: 24, weight: .bold))
-                                        
-                                        if !tripController.recentDeliveries.isEmpty {
-                                            Text("\(tripController.recentDeliveries.count)")
-                                                .font(.system(size: 16, weight: .semibold))
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 4)
-                                                .background(Color.green)
-                                                .cornerRadius(12)
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal)
-                                    
-                                    if tripController.recentDeliveries.isEmpty {
-                                        emptyRecentDeliveriesView
-                                    } else {
-                                        VStack(spacing: 0) {
-                                            ForEach(tripController.recentDeliveries) { delivery in
-                                                Button {
-                                                    selectedDelivery = delivery
-                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                                        showingDeliveryDetails = true
-                                                    }
-                                                } label: {
-                                                    DeliveryRow(delivery: delivery)
-                                                }
-                                                .buttonStyle(PlainButtonStyle())
-
-                                                if delivery.id != tripController.recentDeliveries.last?.id {
-                                                    Divider()
-                                                        .padding(.horizontal)
-                                                }
-                                            }
-                                        }
-                                        .onChange(of: selectedDelivery) { _, newValue in
-                                            if newValue != nil {
-                                                showingDeliveryDetails = true
-                                            }
-                                        }
-                                        .background(Color(.systemBackground))
-                                        .cornerRadius(20)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-                                        .padding(.horizontal)
-                                    }
-                                }
-                                
-                                // Bottom padding for better scrolling experience
-                                Spacer().frame(height: 20)
-                            }
-                            .padding(.top, 8)
-                        }
-                        .refreshable {
-                            await tripController.refreshTrips()
-                        }
+                        tripContentView
                     }
                 }
                 .navigationTitle("Home")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
-                    ToolbarItemGroup(placement: .navigationBarTrailing) {
-                        HStack(spacing: 16) {
-                            Button(action: {
-                                showingProfileView = true
-                            }) {
-                                Image(systemName: "person.circle.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.blue)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.blue.opacity(0.2), lineWidth: 2)
-                                            .frame(width: 30, height: 30)
-                                    )
-                            }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: {
+                            showingProfileView = true
+                        }) {
+                            Image(systemName: "person.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.blue)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.blue.opacity(0.2), lineWidth: 2)
+                                        .frame(width: 30, height: 30)
+                                )
                         }
                     }
                 }
@@ -311,21 +184,152 @@ struct DriverTabView: View {
         }
     }
     
-    private var navigationOverlay: some View {
-        RealTimeNavigationView(
-            destination: tripController.currentTrip?.destinationCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            destinationName: tripController.currentTrip?.destination ?? "",
-            address: tripController.currentTrip?.address ?? "",
-            sourceCoordinate: tripController.currentTrip?.sourceCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
-            onDismiss: { 
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showingNavigation = false 
+    private var loadingContentView: some View {
+        VStack {
+            ProgressView()
+                .scaleEffect(1.5)
+                .padding()
+            Text("Loading trips...")
+                .foregroundColor(.gray)
+        }
+    }
+    
+    private var tripContentView: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 24) {
+                // Current Delivery Card
+                if let currentTrip = tripController.currentTrip,
+                   currentTrip.status == .inProgress && availabilityManager.isAvailable {
+                    currentDeliveryCard(currentTrip)
+                }
+                
+                // Only show upcoming trips and trip queue if available
+                if availabilityManager.isAvailable {
+                    // Trip Queue Section
+                    if !tripQueue.isEmpty {
+                        tripQueueSection
+                    }
+
+                    // Upcoming Trips Section
+                    upcomingTripsView
+                } else {
+                    // Display message when driver is unavailable
+                    unavailableDriverSection
+                }
+
+                // Recent Deliveries Section
+                recentDeliveriesView
+                
+                // Bottom padding for better scrolling experience
+                Spacer().frame(height: 20)
+            }
+            .padding(.top, 8)
+        }
+        .refreshable {
+            await tripController.refreshTrips()
+        }
+    }
+    
+    private var upcomingTripsView: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Upcoming Trips")
+                    .font(.system(size: 24, weight: .bold))
+                
+                if !tripController.upcomingTrips.isEmpty {
+                    Text("\(tripController.upcomingTrips.count)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+
+            if tripController.upcomingTrips.isEmpty {
+                emptyUpcomingTripsView
+            } else {
+                upcomingTripsList
+            }
+        }
+    }
+    
+    private var upcomingTripsList: some View {
+        VStack(spacing: 0) {
+            ForEach(tripController.upcomingTrips) { trip in
+                UpcomingTripRow(trip: trip)
+                    .environmentObject(tripController)
+                if trip.id != tripController.upcomingTrips.last?.id {
+                    Divider()
+                        .padding(.horizontal)
                 }
             }
-        )
-        .edgesIgnoringSafeArea(.all)
-        .transition(.move(edge: .bottom))
-        .zIndex(1)
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .padding(.horizontal)
+    }
+    
+    private var recentDeliveriesView: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Recent Deliveries")
+                    .font(.system(size: 24, weight: .bold))
+                
+                if !tripController.recentDeliveries.isEmpty {
+                    Text("\(tripController.recentDeliveries.count)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.green)
+                        .cornerRadius(12)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            if tripController.recentDeliveries.isEmpty {
+                emptyRecentDeliveriesView
+            } else {
+                recentDeliveriesList
+            }
+        }
+    }
+    
+    private var recentDeliveriesList: some View {
+        VStack(spacing: 0) {
+            ForEach(tripController.recentDeliveries) { delivery in
+                Button {
+                    selectedDelivery = delivery
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        showingDeliveryDetails = true
+                    }
+                } label: {
+                    DeliveryRow(delivery: delivery)
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                if delivery.id != tripController.recentDeliveries.last?.id {
+                    Divider()
+                        .padding(.horizontal)
+                }
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .padding(.horizontal)
+        .onChange(of: showingDeliveryDetails) { newValue in
+            // Use showingDeliveryDetails instead of selectedDelivery
+            // since DeliveryDetails might not conform to Equatable
+        }
     }
     
     private func currentDeliveryCard(_ trip: Trip) -> some View {
@@ -369,89 +373,12 @@ struct DriverTabView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            // Route Information
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: "map.fill")
-                        .foregroundColor(.blue)
-                    Text("Route Information")
-                        .font(.headline)
-                }
-                
-                ZStack {
-                    // Background with rounded corners
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemBackground))
-                    
-                    HStack(alignment: .top, spacing: 12) {
-                        // Left side: Line with dots
-                        ZStack {
-                            // Vertical line
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 2)
-                                .frame(height: 100)
-                            
-                            // Dots
-                            VStack(spacing: 0) {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 8, height: 8)
-                                
-                                Spacer()
-                                
-                                Rectangle()
-                                    .fill(Color.red)
-                                    .frame(width: 8, height: 8)
-                            }
-                            .frame(height: 100)
-                        }
-                        .padding(.top, 8)
-                        
-                        // Right side: Location details
-                        VStack(alignment: .leading, spacing: 16) {
-                            // Pickup Location
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Pickup")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.green)
-                                Text(trip.startingPoint)
-                                    .font(.system(size: 16, weight: .regular))
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(8)
-                            
-                            // Destination Location
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Destination")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.red)
-                                Text(trip.destination)
-                                    .font(.system(size: 16, weight: .regular))
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-                        Spacer()
-                    }
-                    .padding(16)
-                }
-            }
-            .padding(16)
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+            tripLocationsView(trip)
             
-            // Status Cards
+            // Status Cards - Integrated with route selection
             if !isCurrentTripDeclined {
                 HStack(spacing: 10) {
-                    // ETA Card
+                    // ETA Card - Updates based on selected route
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Circle()
@@ -462,10 +389,12 @@ struct DriverTabView: View {
                                         .font(.system(size: 14))
                                         .foregroundColor(.blue)
                                 )
+                            
                             Text("ETA")
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
                         }
+                        
                         Text(selectedRouteEta(trip))
                             .font(.system(size: 24, weight: .bold))
                     }
@@ -474,7 +403,7 @@ struct DriverTabView: View {
                     .background(Color.blue.opacity(0.1))
                     .cornerRadius(12)
                     
-                    // Distance Card
+                    // Distance Card - Updates based on selected route
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Circle()
@@ -485,10 +414,12 @@ struct DriverTabView: View {
                                         .font(.system(size: 14))
                                         .foregroundColor(.green)
                                 )
+                            
                             Text("Distance")
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
                         }
+                        
                         Text(selectedRouteDistance(trip))
                             .font(.system(size: 24, weight: .bold))
                     }
@@ -498,93 +429,7 @@ struct DriverTabView: View {
                     .cornerRadius(12)
                 }
             }
-            
-            // Action Buttons
-            HStack(spacing: 10) {
-                // Start Navigation Button
-                Button(action: {
-                    if !trip.hasCompletedPreTrip {
-                        alertMessage = "Please complete pre-trip inspection before starting navigation"
-                        showingAlert = true
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingNavigation = true
-                        }
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: "location.fill")
-                        Text("Start Navigation")
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .cornerRadius(10)
-                }
-                
-                // Pre-Trip Inspection Button
-                Button(action: {
-                    showingPreTripInspection = true
-                }) {
-                    HStack {
-                        Image(systemName: "checklist")
-                        Text("Pre-Trip\nInspection")
-                            .multilineTextAlignment(.center)
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                }
-            }
-            
-            // Mark Delivered and SOS Buttons
-            HStack(spacing: 10) {
-                // Mark Delivered Button
-                Button(action: {
-                    if !trip.hasCompletedPreTrip {
-                        alertMessage = "Please complete pre-trip inspection before marking as delivered"
-                        showingAlert = true
-                    } else {
-                        Task {
-                            await MainActor.run {
-                                markCurrentTripDelivered()
-                            }
-                        }
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Mark Delivered")
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.green)
-                    .cornerRadius(10)
-                }
-                
-                // SOS Button
-                Button(action: {
-                    showingSosModal = true
-                }) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                        Text("SOS")
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.red)
-                    .cornerRadius(10)
-                }
-            }
+            tripActionButtons(trip)
         }
     }
     
@@ -896,9 +741,9 @@ struct DriverTabView: View {
                 .font(.system(size: 40))
                 .foregroundColor(.gray)
             Text("No Upcoming Trips")
-                .font(.system(.headline, design: .default))
+                .font(.headline)
             Text("Check back later for new assignments")
-                .font(.system(.subheadline, design: .default))
+                .font(.subheadline)
                 .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity)
@@ -915,9 +760,9 @@ struct DriverTabView: View {
                 .font(.system(size: 40))
                 .foregroundColor(.gray)
             Text("No Recent Deliveries")
-                .font(.system(.headline, design: .default))
+                .font(.headline)
             Text("Completed deliveries will appear here")
-                .font(.system(.subheadline, design: .default))
+                .font(.subheadline)
                 .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity)
@@ -1027,6 +872,23 @@ struct DriverTabView: View {
                 }
             }
         }
+    }
+    
+    private var navigationOverlay: some View {
+        RealTimeNavigationView(
+            destination: tripController.currentTrip?.destinationCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            destinationName: tripController.currentTrip?.destination ?? "",
+            address: tripController.currentTrip?.address ?? "",
+            sourceCoordinate: tripController.currentTrip?.sourceCoordinate ?? CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            onDismiss: { 
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showingNavigation = false 
+                }
+            }
+        )
+        .edgesIgnoringSafeArea(.all)
+        .transition(.move(edge: .bottom))
+        .zIndex(1)
     }
 }
 
