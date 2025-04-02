@@ -10,7 +10,6 @@ struct MaintenancePersonnelServiceHistory: Identifiable, Codable {
     let date: Date
     let completionDate: Date
     let notes: String
-    let safetyChecks: [UUID]
 }
 
 struct MaintenancePersonnelRoutineSchedule: Identifiable, Codable {
@@ -112,8 +111,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
                 description: request.description,
                 date: request.date,
                 completionDate: Date(),  // set to now
-                notes: request.notes,
-                safetyChecks: safetyCheckIDs
+                notes: request.notes
             )
             
             // Insert the new service history record.
@@ -184,6 +182,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
             case .inProgress:
                 updatedRequest.startDate = Date()
             case .completed:
+                await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: request.vehicleId)
                 updatedRequest.completionDate = Date()
             default:
                 break

@@ -1737,7 +1737,7 @@ class SupabaseDataController: ObservableObject {
     }
 
     func insertServiceRequest(request: MaintenanceServiceRequest) async throws {
-//        print("Inserting MaintenanceServiceRequest: \(request)")
+        print("Inserting MaintenanceServiceRequest: \(request)")
         try await supabase
             .from("maintenanceservicerequest")
             .insert(request)
