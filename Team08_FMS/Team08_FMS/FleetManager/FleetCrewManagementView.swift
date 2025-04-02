@@ -400,9 +400,11 @@ struct CrewCardView: View {
     
     private func updateCrewStatus(_ newStatus: Status) async throws {
         if currentCrew is Driver {
-            try await dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
+            await SupabaseDataController.shared.updateDriverStatus(newStatus: newStatus, userID: nil, id: currentCrew.id)
+            CrewDataController.shared.update()
         } else {
-            dataManager.updateMaintenancePersonnelStatus(currentCrew.id, status: newStatus)
+            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: newStatus, userID: nil, id: currentCrew.id)
+            CrewDataController.shared.update()
         }
     }
     
