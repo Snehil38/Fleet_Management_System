@@ -154,8 +154,7 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Monthly Fuel Expenses",
                             amount: "$\(String(format: "%.2f", totalFuelCost))",
-                            trend: .negative
-                        )
+                            trend: .negative                        )
 
                         // Monthly Salary Expenses
                         FinancialCard(
@@ -167,7 +166,7 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Service Expenses",
                             amount: "$\(String(format: "%.2f", totalServiceExpenses))",
-                            trend: .negative
+                            trend:  .negative
                         )
                         
                         // Total Expenses
@@ -181,15 +180,14 @@ struct FleetManagerDashboardTabView: View {
                         FinancialCard(
                             title: "Trip Revenue",
                             amount: "$\(String(format: "%.2f", totalTripRevenue))",
-                            trend: .positive
+                            trend:  .positive
                         )
 
                         // Total Revenue
                         FinancialCard(
                             title: "Total Revenue",
                             amount: "$\(String(format: "%.2f", totalRevenue))",
-                            trend: .positive
-                        )
+                            trend: (totalRevenue > 0) ? .positive : .negative                        )
                     }
                     .padding(.horizontal)
                 }
