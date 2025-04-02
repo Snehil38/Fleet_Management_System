@@ -522,45 +522,98 @@ struct VehicleDetailView: View {
                     .foregroundColor(.secondary)
             } else {
                 ForEach(serviceRequests) { request in
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Service Type and Status
-                        HStack {
-                            Text(request.serviceType.rawValue)
-                                .font(.headline)
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Header with Service Type and Status
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(request.serviceType.rawValue)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                HStack(spacing: 8) {
+                                    Image(systemName: "calendar")
+                                        .foregroundColor(.blue)
+                                    Text("Due: \(request.dueDate.formatted(date: .abbreviated, time: .shortened))")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
                             Spacer()
+                            
                             Text(request.status.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(statusColor(for: request.status).opacity(0.2))
                                 .foregroundColor(statusColor(for: request.status))
-                                .font(.subheadline)
+                                .cornerRadius(8)
                         }
                         
-                        // Issue Type
+                        Divider()
+                            .padding(.vertical, 4)
+                        
+                        // Issue Details
                         if let issueType = request.issueType {
-                            Text("Issue Type: \(issueType)")
-                                .font(.subheadline)
-                        }
-                        
-                        // Due Date
-                        Text("Due: \(request.dueDate.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        // Total Cost if there are expenses
-                        if request.totalCost > 0 {
-                            HStack {
-                                Spacer()
-                                Text("Total Cost: $\(request.totalCost, specifier: "%.2f")")
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundColor(.orange)
+                                    Text("Issue Type:")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                                
+                                Text(issueType)
                                     .font(.subheadline)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.secondary)
+                                    .padding(.leading, 26)
                             }
                         }
                         
+                        // Notes Section
                         if !request.notes.isEmpty {
-                            Text("Notes: \(request.notes)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "note.text")
+                                        .foregroundColor(.blue)
+                                    Text("Notes:")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                                
+                                Text(request.notes)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.leading, 26)
+                            }
+                            .padding(.top, 4)
+                        }
+                        
+                        // Cost Section
+                        if request.totalCost > 0 {
+                            HStack(spacing: 8) {
+                                Image(systemName: "dollarsign.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Total Cost:")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                
+                                Text("$\(request.totalCost, specifier: "%.2f")")
+                                    .font(.subheadline)
+                                    .foregroundColor(.green)
+                                    .fontWeight(.semibold)
+                            }
+                            .padding(.top, 4)
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 8)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    .padding(.vertical, 4)
                     .onAppear {
                         // Fetch expenses for this request when it appears
                         Task {
@@ -576,10 +629,6 @@ struct VehicleDetailView: View {
                                 print("Error fetching expenses: \(error)")
                             }
                         }
-                    }
-                    
-                    if request.id != serviceRequests.last?.id {
-                        Divider()
                     }
                 }
             }
