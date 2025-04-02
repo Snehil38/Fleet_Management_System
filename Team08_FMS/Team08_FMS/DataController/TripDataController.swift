@@ -1062,6 +1062,20 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         
         return data
     }
+    
+    @MainActor
+    func updateTripDriver(tripId: UUID, driverId: UUID?) async throws {
+        do {
+            if let driverId = driverId {
+                try await supabaseController.updateTrip(id: tripId, driverId: driverId)
+            }
+            // Refresh trips to ensure UI is up-to-date
+            try await fetchAllTrips()
+        } catch {
+            print("Error updating trip driver: \(error)")
+            throw TripError.updateError("Failed to update trip driver: \(error.localizedDescription)")
+        }
+    }
 } 
 
 

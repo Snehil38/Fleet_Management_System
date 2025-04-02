@@ -1098,11 +1098,11 @@ struct AddTripView: View {
     }
     
     private func calculateCost(distance: Double) -> Double {
-        // Cost parameters
+            // Cost parameters
         let costPerKm = 5.0         // Additional cost per kilometer
-        let baseCost = 50.0         // Base cost for starting the trip
-        
-        // Fuel efficiency parameters
+            let baseCost = 50.0         // Base cost for starting the trip
+
+            // Fuel efficiency parameters
         let fuelConsumptionRate = 8.5   // Liters per 100 km
         let fuelPricePerLiter = 1.50    // Price per liter in dollars
         
@@ -1429,13 +1429,13 @@ struct MapView: UIViewRepresentable {
             }
             
             if let markerView = annotationView as? MKMarkerAnnotationView {
-                if annotation.title == "Pickup" {
+            if annotation.title == "Pickup" {
                     markerView.markerTintColor = .systemGreen
                     markerView.glyphImage = UIImage(systemName: "arrow.up.circle.fill")
                 } else if annotation.title == "Middle Pickup" {
                     markerView.markerTintColor = .systemOrange
                     markerView.glyphImage = UIImage(systemName: "plus.circle.fill")
-                } else {
+            } else {
                     markerView.markerTintColor = .systemRed
                     markerView.glyphImage = UIImage(systemName: "arrow.down.circle.fill")
                 }
@@ -1498,7 +1498,7 @@ struct LocationInputField: View {
             TextField(placeholder, text: $text)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .onChange(of: text, perform: onChange)
-             
+            
             if !text.isEmpty {
                 Button(action: onClear) {
                     Image(systemName: "xmark.circle.fill")
