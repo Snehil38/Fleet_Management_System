@@ -124,9 +124,13 @@ struct NavigationMapView: UIViewRepresentable {
                 return renderer
             } else if let circle = overlay as? MKCircle {
                 let renderer = MKCircleRenderer(circle: circle)
-                renderer.fillColor = UIColor.systemBlue.withAlphaComponent(0.1)
-                renderer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.7)
+                // Light green fill with very low opacity
+                renderer.fillColor = UIColor.systemGreen.withAlphaComponent(0.1)
+                // Dashed green border
+                renderer.strokeColor = UIColor.systemGreen
                 renderer.lineWidth = 2
+                // Create dashed pattern
+                renderer.lineDashPattern = [10, 10]
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)
