@@ -16,10 +16,12 @@ struct ChatBubbleView: View {
     
     var body: some View {
         HStack {
+            // If the message is from current user, place spacer on the left to push content right
             if message.isFromCurrentUser {
                 Spacer(minLength: 30)
                 messageContent(alignment: .trailing)
             } else {
+                // Otherwise, place the content on the left and spacer on the right
                 messageContent(alignment: .leading)
                 Spacer(minLength: 30)
             }
@@ -32,12 +34,9 @@ struct ChatBubbleView: View {
             withAnimation(ChatBubbleAnimation.messageAppearance) {
                 isAnimating = true
             }
-            
             // Get current user ID when view appears
             Task {
-                do {
-                    currentUserId = await supabaseController.getUserID()
-                }
+                currentUserId = await supabaseController.getUserID()
             }
         }
     }
@@ -82,10 +81,10 @@ struct ChatBubbleView: View {
     }
 }
 
-// Preview provider
+// Preview provider for testing layout
 struct ChatBubbleView_Previews: PreviewProvider {
     static var previews: some View {
-        VStack {
+        VStack(spacing: 10) {
             ChatBubbleView(message: ChatMessage(
                 id: UUID(),
                 fleet_manager_id: UUID(),
@@ -117,5 +116,6 @@ struct ChatBubbleView_Previews: PreviewProvider {
             ))
         }
         .padding()
+        .previewLayout(.sizeThatFits)
     }
-} 
+}
