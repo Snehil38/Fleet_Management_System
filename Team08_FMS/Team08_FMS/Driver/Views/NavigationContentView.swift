@@ -16,7 +16,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private let locationManager: CLLocationManager
     private let _destination: CLLocationCoordinate2D
-    private let _sourceCoordinate: CLLocationCoordinate2D?
+    let sourceCoordinate: CLLocationCoordinate2D?  // Changed from private to public
     private let vehicleType: VehicleType
     
     // Track both the last update time and the last location
@@ -60,7 +60,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     init(destination: CLLocationCoordinate2D, sourceCoordinate: CLLocationCoordinate2D? = nil, vehicleType: VehicleType = .truck(height: 4.5, weight: 40000, length: 16.5)) {
         self._destination = destination
-        self._sourceCoordinate = sourceCoordinate
+        self.sourceCoordinate = sourceCoordinate  // Updated to use the public property
         self.vehicleType = vehicleType
         self.locationManager = CLLocationManager()
         
@@ -148,7 +148,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
             } else {
                 // Use provided source coordinate if available, otherwise use current location
-                let sourceCoordinate = _sourceCoordinate ?? location.coordinate
+                let sourceCoordinate = self.sourceCoordinate ?? location.coordinate
                 request.source = MKMapItem(placemark: MKPlacemark(coordinate: sourceCoordinate))
             }
             
@@ -604,6 +604,7 @@ struct RealTimeNavigationView: View {
             // Navigation Map
             NavigationMapView(
                 destination: navigationManager.destination,
+                pickup: navigationManager.sourceCoordinate ?? navigationManager.userLocation ?? navigationManager.destination,  // Use source or current location as pickup
                 userLocation: $navigationManager.userLocation,
                 route: $navigationManager.route,
                 userHeading: $navigationManager.userHeading,
@@ -640,9 +641,15 @@ struct RealTimeNavigationView: View {
             VStack(spacing: 0) {
                 // Top banner
                 HStack(spacing: 16) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.white)
+                    Button(action: {
+                        navigationManager.stopNavigation()
+                        onDismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.leading, 8)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(destination)
@@ -659,7 +666,7 @@ struct RealTimeNavigationView: View {
                     
                     // ETA and Distance Info
                     VStack(alignment: .trailing) {
-                        Text("\(navigationManager.remainingTime.formattedDuration)")
+                        Text(formatTime(navigationManager.remainingTime))
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
@@ -817,6 +824,17 @@ struct RealTimeNavigationView: View {
                     showingAlternativeRoutes = false
                 }
             )
+        }
+    }
+    
+    private func formatTime(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval / 3600)
+        let minutes = Int((timeInterval.truncatingRemainder(dividingBy: 3600)) / 60)
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
         }
     }
 }

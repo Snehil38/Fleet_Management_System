@@ -3,6 +3,7 @@ import MapKit
 
 struct NavigationMapView: UIViewRepresentable {
     let destination: CLLocationCoordinate2D
+    let pickup: CLLocationCoordinate2D  // Add pickup coordinate
     @Binding var userLocation: CLLocationCoordinate2D?
     @Binding var route: MKRoute?
     @Binding var userHeading: Double
@@ -25,6 +26,7 @@ struct NavigationMapView: UIViewRepresentable {
         
         enum AnnotationType {
             case source
+            case pickup
             case destination
             case completed
         }
@@ -89,7 +91,20 @@ struct NavigationMapView: UIViewRepresentable {
         mapView.removeOverlays(mapView.overlays)
         mapView.removeAnnotations(mapView.annotations.filter { !($0 is MKUserLocation) })
         
-        // Add destination annotation
+        // Add pickup annotation and geofence
+        let pickupAnnotation = MapAnnotation(
+            coordinate: pickup,
+            title: "Pickup",
+            subtitle: "Pickup location",
+            type: .pickup
+        )
+        mapView.addAnnotation(pickupAnnotation)
+        
+        // Add pickup geofence circle
+        let pickupGeofence = MKCircle(center: pickup, radius: geofenceRadius)
+        mapView.addOverlay(pickupGeofence, level: .aboveRoads)
+        
+        // Add destination annotation and geofence
         let destinationAnnotation = MapAnnotation(
             coordinate: destination,
             title: "Destination",
@@ -98,9 +113,9 @@ struct NavigationMapView: UIViewRepresentable {
         )
         mapView.addAnnotation(destinationAnnotation)
         
-        // Add geofence circle for destination
-        let geofenceCircle = MKCircle(center: destination, radius: geofenceRadius)
-        mapView.addOverlay(geofenceCircle)
+        // Add destination geofence circle
+        let destinationGeofence = MKCircle(center: destination, radius: geofenceRadius)
+        mapView.addOverlay(destinationGeofence, level: .aboveRoads)
         
         // Add route overlay if available
         if let route = route {
@@ -238,6 +253,9 @@ struct NavigationMapView: UIViewRepresentable {
             case .completed:
                 annotationView?.markerTintColor = .systemGreen
                 annotationView?.glyphImage = UIImage(systemName: "checkmark.circle.fill")
+            case .pickup:
+                annotationView?.markerTintColor = .systemGreen
+                annotationView?.glyphImage = UIImage(systemName: "location.fill")
             }
             
             return annotationView
@@ -251,12 +269,20 @@ struct NavigationMapView: UIViewRepresentable {
                 return renderer
             } else if let circle = overlay as? MKCircle {
                 let renderer = MKCircleRenderer(circle: circle)
-                // Light green fill with higher opacity
-                renderer.fillColor = UIColor.systemGreen.withAlphaComponent(0.2)
-                // Dashed green border with full opacity
-                renderer.strokeColor = UIColor.systemGreen
+                
+                // Check if this is the pickup or destination geofence
+                if circle.coordinate.latitude == parent.pickup.latitude && 
+                   circle.coordinate.longitude == parent.pickup.longitude {
+                    // Pickup geofence (green)
+                    renderer.fillColor = UIColor.systemGreen.withAlphaComponent(0.2)
+                    renderer.strokeColor = UIColor.systemGreen
+                } else {
+                    // Destination geofence (red)
+                    renderer.fillColor = UIColor.systemRed.withAlphaComponent(0.2)
+                    renderer.strokeColor = UIColor.systemRed
+                }
+                
                 renderer.lineWidth = 4
-                // Create more prominent dashed pattern
                 renderer.lineDashPattern = [30, 20]
                 return renderer
             }
