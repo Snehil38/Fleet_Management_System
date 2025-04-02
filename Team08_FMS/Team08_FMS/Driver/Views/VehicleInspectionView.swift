@@ -202,7 +202,7 @@ struct VehicleInspectionView: View {
                             }
                         }
                     }
-                    onComplete(!hasIssues || !isPreTrip)
+                    onComplete(!hasIssues && isPreTrip)
                     presentationMode.wrappedValue.dismiss()
                 }
             } message: {
