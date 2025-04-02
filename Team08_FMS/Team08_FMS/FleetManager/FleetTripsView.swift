@@ -1168,7 +1168,9 @@ struct TripDetailView: View {
         Task {
             do {
                 SupabaseDataController.shared.deleteTrip(tripID: trip.id)
+                await tripController.refreshTrips()
                 await tripController.refreshAllTrips()
+                try await tripController.fetchAllTrips()
                 await MainActor.run {
                     dismiss()
                 }
