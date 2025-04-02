@@ -164,7 +164,7 @@ private struct VehicleCard: View {
                                 priority: .medium,
                                 date: Date(),
                                 dueDate: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date(),
-                                status: .assigned,
+                                status: .pending,
                                 notes: "Maintenance scheduled; verify fluid levels and tire pressure.",
                                 issueType: "Routine"
                             )
