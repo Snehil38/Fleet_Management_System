@@ -279,7 +279,7 @@ final class ChatViewModel: ObservableObject {
                     messageFleetManagerId = fleetManagerId
                     messageRecipientId = userId
                     messageRecipientType = RecipientType.driver.rawValue
-                } else if userRole == "maintenance" {
+                } else if userRole == "maintenance_personnel" {
                     // Maintenance sending to fleet manager
                     messageFleetManagerId = fleetManagerId
                     messageRecipientId = userId
