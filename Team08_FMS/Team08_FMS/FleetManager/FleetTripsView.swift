@@ -196,6 +196,10 @@ struct FleetTripsView: View {
             return "All Trips"
         }
     }
+    
+    private func refreshTrips() async {
+        await tripController.refreshAllTrips()
+    }
 }
 
 // Update EmptyTripsView to show different messages based on filter

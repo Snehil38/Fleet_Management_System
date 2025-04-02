@@ -445,57 +445,153 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     
     // Fetch all trips without driver filtering
     @MainActor
-    private func fetchAllTrips() async throws {
+    func fetchAllTrips() async throws {
         do {
-            let query = """
-            SELECT 
-                t.*,
-                v.*
-            FROM trips t
-            LEFT JOIN vehicles v ON t.vehicle_id = v.id
-            WHERE t.is_deleted = false
-            ORDER BY t.created_at DESC
-            """
+            // Define the JoinedTripData struct
+            struct JoinedTripData: Codable {
+                let id: UUID
+                let destination: String
+                let trip_status: String
+                let has_completed_pre_trip: Bool
+                let has_completed_post_trip: Bool
+                let vehicle_id: UUID
+                let driver_id: UUID?
+                let secondary_driver_id: UUID?
+                let start_time: Date?
+                let end_time: Date?
+                let notes: String?
+                let created_at: Date
+                let updated_at: Date?
+                let is_deleted: Bool
+                let start_latitude: Double?
+                let start_longitude: Double?
+                let end_latitude: Double?
+                let end_longitude: Double?
+                let pickup: String?
+                let estimated_distance: Double?
+                let estimated_time: Double?
+                let middle_pickup: String?
+                let middle_pickup_latitude: Double?
+                let middle_pickup_longitude: Double?
+                let vehicles: Vehicle
+            }
             
-            let response = try await supabaseController.databaseQuery(query)
+            // Create a decoder with custom date decoding strategy
             let decoder = JSONDecoder()
             let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-            decoder.dateDecodingStrategy = .formatted(dateFormatter)
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            // Custom date decoding strategy to handle multiple formats
+            decoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateString = try container.decode(String.self)
+                
+                // Try different date formats
+                let formats = [
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",     // Format with milliseconds and timezone
+                    "yyyy-MM-dd'T'HH:mm:ssZ",         // Format with timezone
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS",      // Format with milliseconds
+                    "yyyy-MM-dd'T'HH:mm:ss",          // Basic ISO format
+                    "yyyy-MM-dd HH:mm:ss",            // PostgreSQL timestamp format
+                    "yyyy-MM-dd"                       // Date only format
+                ]
+                
+                for format in formats {
+                    dateFormatter.dateFormat = format
+                    if let date = dateFormatter.date(from: dateString) {
+                        return date
+                    }
+                }
+                
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Cannot decode date string \(dateString)"
+                )
+            }
+            
+            // Use Supabase query builder
+            let query = supabaseController.supabase
+                .from("trips")
+                .select("""
+                    id,
+                    destination,
+                    trip_status,
+                    has_completed_pre_trip,
+                    has_completed_post_trip,
+                    vehicle_id,
+                    driver_id,
+                    secondary_driver_id,
+                    start_time,
+                    end_time,
+                    notes,
+                    created_at,
+                    updated_at,
+                    is_deleted,
+                    start_latitude,
+                    start_longitude,
+                    end_latitude,
+                    end_longitude,
+                    pickup,
+                    estimated_distance,
+                    estimated_time,
+                    middle_pickup,
+                    middle_pickup_latitude,
+                    middle_pickup_longitude,
+                    vehicles (
+                        id,
+                        name,
+                        year,
+                        make,
+                        model,
+                        vin,
+                        license_plate,
+                        vehicle_type,
+                        color,
+                        body_type,
+                        body_subtype,
+                        msrp,
+                        pollution_expiry,
+                        insurance_expiry,
+                        status
+                    )
+                """)
+                .eq("is_deleted", value: false)
+            
+            // Execute the query
+            let response = try await query.execute()
             
             let joinedData = try decoder.decode([JoinedTripData].self, from: response.data)
             
             // Convert joined data to Trip objects
             self.allTrips = joinedData.map { data in
-                let vehicle = data.vehicles
-                let trip = Trip(
+                let supabaseTrip = SupabaseTrip(
                     id: data.id,
                     destination: data.destination,
-                    status: TripStatus(rawValue: data.trip_status) ?? .pending,
-                    hasCompletedPreTrip: data.has_completed_pre_trip,
-                    hasCompletedPostTrip: data.has_completed_post_trip,
-                    vehicleId: data.vehicle_id,
-                    driverId: data.driver_id,
-                    secondaryDriverId: data.secondary_driver_id,
-                    startTime: data.start_time,
-                    endTime: data.end_time,
+                    trip_status: data.trip_status,
+                    has_completed_pre_trip: data.has_completed_pre_trip,
+                    has_completed_post_trip: data.has_completed_post_trip,
+                    vehicle_id: data.vehicle_id,
+                    driver_id: data.driver_id,
+                    secondary_driver_id: data.secondary_driver_id,
+                    start_time: data.start_time,
+                    end_time: data.end_time,
                     notes: data.notes,
-                    createdAt: data.created_at,
-                    updatedAt: data.updated_at ?? data.created_at,
-                    isDeleted: data.is_deleted,
-                    startLatitude: data.start_latitude,
-                    startLongitude: data.start_longitude,
-                    endLatitude: data.end_latitude,
-                    endLongitude: data.end_longitude,
+                    created_at: data.created_at,
+                    updated_at: data.updated_at,
+                    is_deleted: data.is_deleted,
+                    start_latitude: data.start_latitude,
+                    start_longitude: data.start_longitude,
+                    end_latitude: data.end_latitude,
+                    end_longitude: data.end_longitude,
                     pickup: data.pickup,
-                    estimatedDistance: data.estimated_distance,
-                    estimatedTime: data.estimated_time,
-                    vehicle: vehicle,
-                    address: data.pickup ?? "No address provided",
-                    eta: "",
-                    distance: String(format: "%.1f km", data.estimated_distance ?? 0.0)
+                    estimated_distance: data.estimated_distance,
+                    estimated_time: data.estimated_time,
+                    middle_pickup: data.middle_pickup,
+                    middle_pickup_latitude: data.middle_pickup_latitude,
+                    middle_pickup_longitude: data.middle_pickup_longitude
                 )
-                return trip
+                return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
             
             print("Fetched \(self.allTrips.count) trips")
