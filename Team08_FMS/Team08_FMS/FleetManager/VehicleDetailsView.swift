@@ -218,6 +218,7 @@ struct PDFViewer: UIViewRepresentable {
 struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var vehicleManager: VehicleManager
+    @StateObject private var maintenanceStore = MaintenancePersonnelDataStore()
     @State private var isEditing = false
     @State private var isSaving = false
     @State private var isLoadingDetails = false
@@ -361,6 +362,7 @@ struct VehicleDetailView: View {
                 // View mode sections
                 readOnlyBasicInfoSection
                 readOnlyVehicleDetailsSection
+                serviceRequestDetailsSection
             }
         }
         .navigationTitle("Vehicle Details")
@@ -506,6 +508,102 @@ struct VehicleDetailView: View {
                     return sum
                 }
             LabeledContent(label: "Odometer", value: String(format: "%.1f km", totalDistance))
+        }
+    }
+    
+    // Add Service Request Details Section
+    private var serviceRequestDetailsSection: some View {
+        @State var serviceRequests = maintenanceStore.serviceRequests
+            .filter { $0.vehicleId == vehicle.id }
+        
+        return Section("Service Request Details") {
+            if serviceRequests.isEmpty {
+                Text("No service requests found")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(serviceRequests) { request in
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Service Type and Status
+                        HStack {
+                            Text(request.serviceType.rawValue)
+                                .font(.headline)
+                            Spacer()
+                            Text(request.status.rawValue)
+                                .foregroundColor(statusColor(for: request.status))
+                                .font(.subheadline)
+                        }
+                        
+                        // Issue Type
+                        if let issueType = request.issueType {
+                            Text("Issue Type: \(issueType)")
+                                .font(.subheadline)
+                        }
+                        
+                        // Due Date
+                        Text("Due: \(request.dueDate.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        // Total Cost if there are expenses
+                        if request.totalCost > 0 {
+                            HStack {
+                                Spacer()
+                                Text("Total Cost: $\(request.totalCost, specifier: "%.2f")")
+                                    .font(.subheadline)
+                                    .foregroundColor(.green)
+                            }
+                        }
+                        
+                        if !request.notes.isEmpty {
+                            Text("Notes: \(request.notes)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .onAppear {
+                        // Fetch expenses for this request when it appears
+                        Task {
+                            do {
+                                let expenses = try await maintenanceStore.fetchExpenses(for: request.id)
+                                let totalCost = expenses.reduce(0.0) { $0 + $1.amount }
+                                if let index = maintenanceStore.serviceRequests.firstIndex(where: { $0.id == request.id }) {
+                                    await MainActor.run {
+                                        maintenanceStore.serviceRequests[index].totalCost = totalCost
+                                    }
+                                }
+                            } catch {
+                                print("Error fetching expenses: \(error)")
+                            }
+                        }
+                    }
+                    
+                    if request.id != serviceRequests.last?.id {
+                        Divider()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            // Refresh service requests when the section appears
+            Task {
+                await maintenanceStore.loadData()
+            }
+        }
+    }
+    
+    private func statusColor(for status: ServiceRequestStatus) -> Color {
+        switch status {
+        case .pending:
+            return .orange
+        case .assigned:
+            return .blue
+        case .inProgress:
+            return .green
+        case .completed:
+            return .gray
+        case .cancelled:
+            return .red
         }
     }
     
