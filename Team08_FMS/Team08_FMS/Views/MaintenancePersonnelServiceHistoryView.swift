@@ -54,7 +54,7 @@ struct MaintenancePersonnelServiceHistoryView: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(Color(.systemBackground))
+            .background(Color(.tertiarySystemBackground))
             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
             
             if filteredHistory.isEmpty {
@@ -260,6 +260,7 @@ struct MaintenanceVehicleHistoryInfoCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Vehicle Information")
                 .font(.headline)
+                .foregroundColor(.primary)
             
             Divider()
             
@@ -269,7 +270,7 @@ struct MaintenanceVehicleHistoryInfoCard: View {
             InfoRow(title: "Completion", value: history.completionDate.formatted(date: .abbreviated, time: .shortened), icon: "checkmark.circle.fill")
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -283,17 +284,19 @@ struct ServiceDetailsCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Service Details")
                 .font(.headline)
+                .foregroundColor(.primary)
             
             Divider()
             
             Text(history.description)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.primary)
             
             if !history.notes.isEmpty {
                 Text("Notes")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.primary)
                     .padding(.top, 4)
                 
                 Text(history.notes)
@@ -302,7 +305,7 @@ struct ServiceDetailsCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -316,19 +319,21 @@ struct SafetyChecksCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Safety Checks")
                 .font(.headline)
+                .foregroundColor(.primary)
             
             Divider()
             
             ForEach(checks) { check in
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: check.isChecked ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(check.isChecked ? .green : .gray)
+                        .foregroundColor(check.isChecked ? .green : .secondary)
                         .font(.title3)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(check.item)
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .foregroundColor(.primary)
                         
                         if !check.notes.isEmpty {
                             Text(check.notes)
@@ -344,7 +349,7 @@ struct SafetyChecksCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)

@@ -77,7 +77,7 @@ struct LoginView: View {
                 .autocapitalization(.none)
                 .keyboardType(.emailAddress)
                 .padding(10)
-                .background(Color.white)
+                .background(Color(.tertiarySystemBackground))
                 .cornerRadius(25)
                 .shadow(radius: 1)
                 .padding(.horizontal, 20)

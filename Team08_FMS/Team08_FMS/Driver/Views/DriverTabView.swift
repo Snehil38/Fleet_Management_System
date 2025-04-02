@@ -744,7 +744,7 @@ struct DriverTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(40)
-        .background(Color(.systemBackground))
+        .background(Color(.tertiarySystemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
@@ -763,7 +763,7 @@ struct DriverTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(40)
-        .background(Color(.systemBackground))
+        .background(Color(.tertiarySystemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
@@ -788,7 +788,7 @@ struct DriverTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.tertiarySystemBackground))
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
         .padding(.horizontal)

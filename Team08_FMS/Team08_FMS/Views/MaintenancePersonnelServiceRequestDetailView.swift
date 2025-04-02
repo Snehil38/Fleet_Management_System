@@ -193,6 +193,7 @@ struct ExpensesCard: View {
             HStack {
                 Text("Expenses")
                     .font(.headline)
+                    .foregroundColor(.primary)
                 Spacer()
                 Text("Total: $\(totalCost, specifier: "%.2f")")
                     .font(.subheadline)
@@ -212,7 +213,7 @@ struct ExpensesCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
@@ -326,6 +327,7 @@ struct MaintenanceVehicleRequestInfoCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Vehicle Information")
                 .font(.headline)
+                .foregroundColor(.primary)
             
             Divider()
             
@@ -335,7 +337,7 @@ struct MaintenanceVehicleRequestInfoCard: View {
             InfoRow(title: "Due Date", value: request.dueDate.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -371,17 +373,19 @@ struct MaintenanceServiceDetailsCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Service Details")
                 .font(.headline)
+                .foregroundColor(.primary)
             
             Divider()
             
             Text(request.description)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.primary)
             
             if let issueType = request.issueType {
                 Text("Issue Type")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.primary)
                     .padding(.top, 4)
                 
                 Text(issueType)
@@ -393,6 +397,7 @@ struct MaintenanceServiceDetailsCard: View {
                 Text("Notes")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.primary)
                     .padding(.top, 4)
                 
                 Text(request.notes)
@@ -401,7 +406,7 @@ struct MaintenanceServiceDetailsCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -415,19 +420,21 @@ struct MaintenanceSafetyChecksCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Safety Checks")
                 .font(.headline)
+                .foregroundColor(.primary)
             
             Divider()
             
             ForEach(checks) { check in
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: check.isChecked ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(check.isChecked ? .green : .gray)
+                        .foregroundColor(check.isChecked ? .green : .secondary)
                         .font(.title3)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(check.item)
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .foregroundColor(.primary)
                         
                         if !check.notes.isEmpty {
                             Text(check.notes)
@@ -443,7 +450,7 @@ struct MaintenanceSafetyChecksCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)

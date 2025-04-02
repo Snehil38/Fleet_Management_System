@@ -24,7 +24,7 @@ struct MaintenancePersonnelProfileView: View {
                             logoutButton
                         }
                         .padding()
-                        .background(Color(.systemGroupedBackground))
+                        .background(Color(.tertiarySystemBackground))
                     }
                 } else {
                     ProgressView("Loading...")
@@ -141,7 +141,7 @@ struct MaintenancePersonnelProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color(.tertiarySystemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -158,7 +158,7 @@ struct MaintenancePersonnelProfileView: View {
                 Divider()
                 infoRow(title: "Email", value: personnel.email)
             }
-            .background(Color(.systemBackground))
+            .background(Color(.tertiarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -175,7 +175,7 @@ struct MaintenancePersonnelProfileView: View {
                 infoRow(title: "Experience", value: "\(personnel.yearsOfExperience) Years")
                 Divider()
             }
-            .background(Color(.systemBackground))
+            .background(Color(.tertiarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -192,7 +192,7 @@ struct MaintenancePersonnelProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(.tertiarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)

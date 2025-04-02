@@ -448,6 +448,7 @@ struct StatusCard: View {
             Text("\(count)")
                 .font(.title)
                 .fontWeight(.bold)
+                .foregroundColor(.primary)
 
             Text(title)
                 .font(.caption)
@@ -455,7 +456,7 @@ struct StatusCard: View {
         }
         .padding()
         .frame(width: 110, height: 100)
-        .background(isSelected ? color.opacity(0.1) : Color(UIColor.systemBackground))
+        .background(isSelected ? color.opacity(0.1) : Color(.secondarySystemBackground))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)

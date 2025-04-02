@@ -189,6 +189,7 @@ struct MaintenanceVehicleInfoCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Vehicle Information")
                 .font(.headline)
+                .foregroundColor(.primary)
             
             Divider()
             
@@ -198,7 +199,7 @@ struct MaintenanceVehicleInfoCard: View {
             InfoRow(title: "Due Date", value: request.dueDate.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.tertiarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -239,13 +240,14 @@ struct SafetyCheckItem: View {
                     }
                 }) {
                     Image(systemName: check.isChecked ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(check.isChecked ? .green : .gray)
+                        .foregroundColor(check.isChecked ? .green : .secondary)
                         .font(.title2)
                 }
                 
                 Text(check.item)
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.primary)
             }
             
             if check.isChecked {
@@ -255,7 +257,7 @@ struct SafetyCheckItem: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.tertiarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
         .padding(.horizontal)
