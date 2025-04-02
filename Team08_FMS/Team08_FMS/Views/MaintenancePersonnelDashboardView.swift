@@ -5,6 +5,7 @@ struct MaintenancePersonnelDashboardView: View {
     @State private var selectedStatus: ServiceRequestStatus = .pending
     @State private var selectedPriority: ServiceRequestPriority?
     @State private var showingProfile = false
+    @State private var showingChat = false
     
     var body: some View {
         NavigationView {
@@ -77,14 +78,24 @@ struct MaintenancePersonnelDashboardView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingProfile = true }) {
-                        Image(systemName: "person.circle.fill")
-                            .font(.title2)
+                    HStack(spacing: 16) {
+                        Button(action: { showingChat = true }) {
+                            Image(systemName: "message.fill")
+                                .font(.title2)
+                        }
+                        
+                        Button(action: { showingProfile = true }) {
+                            Image(systemName: "person.circle.fill")
+                                .font(.title2)
+                        }
                     }
                 }
             }
             .sheet(isPresented: $showingProfile) {
                 MaintenancePersonnelProfileView()
+            }
+            .sheet(isPresented: $showingChat) {
+                MaintenancePersonnelChatView()
             }
         }
     }
