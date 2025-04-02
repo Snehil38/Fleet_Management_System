@@ -129,20 +129,18 @@ class ChatViewModel: ObservableObject {
             if userRole == "fleet_manager" {
                 // Fleet manager viewing messages: show messages where they are sender or recipient
                 query
-                    .eq("fleet_manager_id", value: currentUserId.uuidString)
-                    .eq("recipient_id", value: recipientId.uuidString)
                     .eq("recipient_type", value: recipientType.rawValue)
-                    .or("recipient_id.eq.\(currentUserId.uuidString),fleet_manager_id.eq.\(recipientId.uuidString)")
+                    .or("and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString)),and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString))")
             } else if userRole == "driver" {
                 // Driver viewing messages: show messages between them and fleet manager
                 query
                     .eq("recipient_type", value: RecipientType.driver.rawValue)
-                    .or("recipient_id.eq.\(currentUserId.uuidString),fleet_manager_id.eq.\(currentUserId.uuidString)")
+                    .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
             } else if userRole == "maintenance" {
                 // Maintenance viewing messages: show messages between them and fleet manager
                 query
                     .eq("recipient_type", value: RecipientType.maintenance.rawValue)
-                    .or("recipient_id.eq.\(currentUserId.uuidString),fleet_manager_id.eq.\(currentUserId.uuidString)")
+                    .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
             }
             
             // Add ordering and execute
@@ -190,7 +188,12 @@ class ChatViewModel: ObservableObject {
                 // Update isFromCurrentUser for each message
                 for index in fetchedMessages.indices {
                     var message = fetchedMessages[index]
-                    message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
+                    if userRole == "fleet_manager" {
+                        message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
+                    } else {
+                        // For driver and maintenance, message is from current user if they are the sender (recipient_id is not them)
+                        message.isFromCurrentUser = message.recipient_id.uuidString != currentUserId.uuidString
+                    }
                     fetchedMessages[index] = message
                     
                     // Mark as read if needed
