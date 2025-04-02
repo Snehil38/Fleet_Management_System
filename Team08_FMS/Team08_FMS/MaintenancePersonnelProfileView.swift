@@ -11,72 +11,78 @@ struct MaintenancePersonnelProfileView: View {
     @State private var showingLogoutAlert = false
 
     var body: some View {
-        Group {
-            if let personnel = personnel {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        profileHeader(for: personnel)
-                        statusToggle(for: personnel)
-                        contactInformation(for: personnel)
-                        experienceDetails(for: personnel)
-                        resetPasswordButton
-                        logoutButton
+        NavigationView {
+            Group {
+                if let personnel = personnel {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            profileHeader(for: personnel)
+                            statusToggle(for: personnel)
+                            contactInformation(for: personnel)
+                            experienceDetails(for: personnel)
+                            resetPasswordButton
+                            logoutButton
+                        }
+                        .padding()
+                        .background(Color(.systemGroupedBackground))
                     }
-                    .padding()
-                    .background(Color(.systemGroupedBackground))
+                } else {
+                    ProgressView("Loading...")
+                        .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                 }
-            } else {
-                ProgressView("Loading...")
-                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
             }
-        }
-        .background(Color(.systemGroupedBackground))
-//            .navigationBarHidden(true)
-        .navigationTitle("Profile")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarItems(leading: Button("Back") {
-            presentationMode.wrappedValue.dismiss()
-        })
-        .alert(isPresented: $showingStatusChangeAlert) {
-            if pendingStatus == .available {
-                return Alert(
-                    title: Text("Confirm Status Change"),
-                    message: Text("Your status will be updated to Available."),
-                    dismissButton: .default(Text("OK"), action: {
-                        Task {
-                            if let userID = await supabaseDataController.getUserID() {
-                                await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
-                                self.personnel?.status = .available
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Back") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+            .alert(isPresented: $showingStatusChangeAlert) {
+                if pendingStatus == .available {
+                    return Alert(
+                        title: Text("Confirm Status Change"),
+                        message: Text("Your status will be updated to Available."),
+                        dismissButton: .default(Text("OK"), action: {
+                            Task {
+                                if let userID = await supabaseDataController.getUserID() {
+                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
+                                    self.personnel?.status = .available
+                                }
                             }
-                        }
-                    })
-                )
-            } else {
-                return Alert(
-                    title: Text("Confirm Status Change"),
-                    message: Text("Are you sure you want to set your status to Off Duty?"),
-                    primaryButton: .cancel(Text("Cancel")),
-                    secondaryButton: .default(Text("Confirm"), action: {
-                        Task {
-                            if let userID = await supabaseDataController.getUserID() {
-                                await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, userID: userID, id: nil)
-                                self.personnel?.status = .offDuty
+                        })
+                    )
+                } else {
+                    return Alert(
+                        title: Text("Confirm Status Change"),
+                        message: Text("Are you sure you want to set your status to Off Duty?"),
+                        primaryButton: .cancel(Text("Cancel")),
+                        secondaryButton: .default(Text("Confirm"), action: {
+                            Task {
+                                if let userID = await supabaseDataController.getUserID() {
+                                    await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, userID: userID, id: nil)
+                                    self.personnel?.status = .offDuty
+                                }
                             }
-                        }
-                    })
-                )
+                        })
+                    )
+                }
             }
-        }
-        .alert("Logout", isPresented: $showingLogoutAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Logout", role: .destructive) {
-                dismiss()
+            .alert("Logout", isPresented: $showingLogoutAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Logout", role: .destructive) {
+                    Task {
+                        SupabaseDataController.shared.signOut()
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to logout?")
             }
-        } message: {
-            Text("Are you sure you want to logout?")
+            .task { await loadPersonnelData() }
         }
-        .task { await loadPersonnelData() }
-        
     }
     
     // MARK: - View Components
@@ -127,7 +133,7 @@ struct MaintenancePersonnelProfileView: View {
                     .italic()
             }
             else if personnel.status == .busy {
-                Text("You cannot change status while you have a In-Progress Maintenance.")
+                Text("You cannot change status while you have an In-Progress Maintenance.")
                     .font(.caption)
                     .foregroundColor(.gray)
                     .italic()
@@ -168,7 +174,6 @@ struct MaintenancePersonnelProfileView: View {
             VStack(spacing: 0) {
                 infoRow(title: "Experience", value: "\(personnel.yearsOfExperience) Years")
                 Divider()
-//                infoRow(title: "Specialty", value: "\(personnel.specialty.rawValue)")
             }
             .background(Color(.systemBackground))
             .cornerRadius(20)
@@ -214,16 +219,6 @@ struct MaintenancePersonnelProfileView: View {
         .padding(.horizontal)
     }
     
-    private var backButton: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button("Back") {
-                presentationMode.wrappedValue.dismiss()
-            }
-        }
-    }
-    
-    // MARK: - Helper Functions
-    
     private func infoRow(title: String, value: String) -> some View {
         HStack {
             Text(title)
@@ -254,41 +249,6 @@ struct MaintenancePersonnelProfileView: View {
         showingStatusChangeAlert = true
     }
     
-    // MARK: - Alert Computed Property
-    
-    private var statusChangeAlert: Alert {
-        if pendingStatus == .available {
-            return Alert(
-                title: Text("Confirm Status Change"),
-                message: Text("Your status will be updated to Available."),
-                dismissButton: .default(Text("OK"), action: {
-                    Task {
-                        if let userID = supabaseDataController.userID {
-                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
-                            self.personnel?.status = .available
-                        }
-                    }
-                })
-            )
-        } else {
-            return Alert(
-                title: Text("Confirm Status Change"),
-                message: Text("Are you sure you want to set your status to Off Duty?"),
-                primaryButton: .cancel(Text("Cancel")),
-                secondaryButton: .default(Text("Confirm"), action: {
-                    Task {
-                        if let userID = await supabaseDataController.getUserID() {
-                            await supabaseDataController.updateMaintenancePersonnelStatus(newStatus: .offDuty, userID: userID, id: nil)
-                            self.personnel?.status = .offDuty
-                        }
-                    }
-                })
-            )
-        }
-    }
-    
-    // MARK: - Data Loading
-    
     private func loadPersonnelData() async {
         if let userID = await supabaseDataController.getUserID() {
             do {
@@ -301,3 +261,4 @@ struct MaintenancePersonnelProfileView: View {
         }
     }
 }
+

@@ -784,7 +784,7 @@ struct TripDetailView: View {
                             .onChange(of: editedNotes) { _, _ in notesEdited = true }
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
-                            if let notes = trip.notes {
+                            if trip.notes != nil {
                                 Text("Trip Details")
                                     .font(.headline)
                                     .padding(.bottom, 4)
@@ -1141,7 +1141,7 @@ struct TripDetailView: View {
                         try await SupabaseDataController.shared.updateTrip(id: trip.id, status: "pending")
                         
                         // Reset driver ID to null using EncodableNull instead of NSNull
-                        let response = try await SupabaseDataController.shared.databaseFrom("trips")
+                        try await SupabaseDataController.shared.databaseFrom("trips")
                             .update(["driver_id": EncodableNull()])
                             .eq("id", value: trip.id)
                             .execute()

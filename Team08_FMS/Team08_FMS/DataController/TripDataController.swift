@@ -359,10 +359,10 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        // Handle location updates if needed
-    }
+//    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+//        guard let location = locations.last else { return }
+//        // Handle location updates if needed
+//    }
     
     func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
         print("DEBUG: Successfully started monitoring region: \(region.identifier)")
@@ -573,6 +573,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                           let endRange = notes[fuelRange.upperBound...].range(of: "\n") else {
                         return "N/A"
                     }
+                    print(endRange)
                     let dist = (Double(parsedDistance) ?? 0)*0.5
                     return "\(dist) $"
                 }
@@ -840,7 +841,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     
     private func formatDate(_ date: Date) -> String {
         let calendar = Calendar.current
-        let now = Date()
+//        let now = Date()
         
         if calendar.isDateInToday(date) {
             let formatter = DateFormatter()
@@ -972,7 +973,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         print("Starting trip \(trip.id)")
         
         // Check if there's already a trip in progress
-        if let currentTrip = self.currentTrip {
+        if self.currentTrip != nil {
             throw TripError.updateError("Cannot start a new trip while another trip is in progress")
         }
         

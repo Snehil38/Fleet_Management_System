@@ -131,8 +131,6 @@ struct MaintenanceServiceRequest: Identifiable, Codable, Equatable {
     var status: ServiceRequestStatus
     var notes: String
     let issueType: String?
-//    var safetyChecks: [UUID]
-//    var expenses: [UUID]
     var totalCost: Double
     var startDate: Date?
     var completionDate: Date?

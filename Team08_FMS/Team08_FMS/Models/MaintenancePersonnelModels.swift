@@ -10,7 +10,6 @@ struct MaintenancePersonnelServiceHistory: Identifiable, Codable {
     let date: Date
     let completionDate: Date
     let notes: String
-    let safetyChecks: [UUID]
 }
 
 struct MaintenancePersonnelRoutineSchedule: Identifiable, Codable {
@@ -29,15 +28,44 @@ class MaintenancePersonnelDataStore: ObservableObject {
     @Published var serviceHistory: [MaintenancePersonnelServiceHistory] = []
     @Published var routineSchedules: [MaintenancePersonnelRoutineSchedule] = []
     @Published var inspectionRequests: [InspectionRequest] = []  // Assuming these remain local or handled separately
+    @Published var totalExpenses: Double = 0
     
     init() {
         // Load data from Supabase when the data store is created
         Task {
             await loadData()
+            await calculateExpenses()
         }
     }
     
     // MARK: - Data Loading
+    
+    func calculateExpenses() async {
+        do {
+            let expenses = try await SupabaseDataController.shared.fetchAllExpense()
+            print("Fetched expenses: \(expenses)")
+            print("Expense count: \(expenses.count)")
+            
+            // Log each expense's amount
+            expenses.forEach { expense in
+                print("Expense amount: \(expense.amount)")
+            }
+            
+            let total = expenses.reduce(0.0) { partialResult, expense in
+                partialResult + expense.amount
+            }
+            
+            print("Calculated total: \(total)")
+            
+            await MainActor.run {
+                self.totalExpenses = total
+            }
+            
+        } catch {
+            print("Cannot fetch total expenses: \(error.localizedDescription)")
+        }
+    }
+
     
     func loadData() async {
         do {
@@ -83,8 +111,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
                 description: request.description,
                 date: request.date,
                 completionDate: Date(),  // set to now
-                notes: request.notes,
-                safetyChecks: safetyCheckIDs
+                notes: request.notes
             )
             
             // Insert the new service history record.
@@ -155,6 +182,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
             case .inProgress:
                 updatedRequest.startDate = Date()
             case .completed:
+                await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: request.vehicleId)
                 updatedRequest.completionDate = Date()
             default:
                 break
