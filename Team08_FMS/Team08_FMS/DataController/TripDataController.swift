@@ -691,7 +691,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let vehicles: Vehicle
             }
 
-            let query = supabaseController.supabase
+            var query = supabaseController.supabase
                 .from("trips")
                 .select("""
                     id,
@@ -737,9 +737,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
 
             // Add driver filter if driverId is set
             if let driverId = driverId {
-                query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
+                query = query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
             }
-
+            
             // Execute the query
             let response = try await query.execute()
             

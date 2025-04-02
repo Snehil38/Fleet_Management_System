@@ -16,7 +16,8 @@ private struct MessagePayload: Encodable {
     let attachment_type: String?
 }
 
-class ChatViewModel: ObservableObject {
+@MainActor
+final class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var isLoading = false
     @Published var error: Error?
@@ -121,24 +122,24 @@ class ChatViewModel: ObservableObject {
             let userRole = supabaseDataController.userRole
             
             // Build the query based on user role and recipient type
-            let query = supabaseDataController.supabase
+            var query = supabaseDataController.supabase
                 .from("chat_messages")
                 .select()
             
             // Add the appropriate filters based on user role
             if userRole == "fleet_manager" {
                 // Fleet manager viewing messages: show messages where they are sender or recipient
-                query
+                query = query
                     .eq("recipient_type", value: recipientType.rawValue)
                     .or("and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString)),and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString))")
             } else if userRole == "driver" {
                 // Driver viewing messages: show messages between them and fleet manager
-                query
+                query = query
                     .eq("recipient_type", value: RecipientType.driver.rawValue)
                     .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
             } else if userRole == "maintenance" {
                 // Maintenance viewing messages: show messages between them and fleet manager
-                query
+                query = query
                     .eq("recipient_type", value: RecipientType.maintenance.rawValue)
                     .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
             }
@@ -184,10 +185,11 @@ class ChatViewModel: ObservableObject {
             var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
             
             // Update messages on main thread
+            let messages = fetchedMessages
             await MainActor.run {
                 // Update isFromCurrentUser for each message
-                for index in fetchedMessages.indices {
-                    var message = fetchedMessages[index]
+                for index in messages.indices {
+                    var message = messages[index]
                     if userRole == "fleet_manager" {
                         message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
                     } else {
@@ -204,7 +206,7 @@ class ChatViewModel: ObservableObject {
                     }
                 }
                 
-                self.messages = fetchedMessages
+                self.messages = messages
                 self.isLoading = false
                 self.hasLoadedMessages = true
             }

@@ -99,7 +99,7 @@ struct ChatView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             case .driver:
-                if let tripId = data["tripId"] {
+                if data["tripId"] != nil {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Active Trip")
@@ -168,7 +168,7 @@ struct ChatView: View {
         VStack(spacing: 8) {
             // Trip details button (only for drivers)
             if recipientType == .driver,
-               let currentTrip = tripController.currentTrip {
+               tripController.currentTrip != nil {
                 Button(action: sendTripDetails) {
                     HStack {
                         Image(systemName: "car.fill")

@@ -1182,7 +1182,8 @@ struct MapView: UIViewRepresentable {
         mapView.pointOfInterestFilter = .includingAll
         mapView.showsBuildings = true
         mapView.showsTraffic = true
-        mapView.showsPointsOfInterest = true
+//        mapView.showsPointsOfInterest = true
+        mapView.pointOfInterestFilter = nil
         mapView.showsCompass = true
         mapView.showsScale = true
         
@@ -1320,7 +1321,9 @@ struct LocationInputField: View {
             
             TextField(placeholder, text: $text)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                .onChange(of: text, perform: onChange)
+                .onChange(of: text) { _, newValue in
+                    onChange(newValue)
+                }
             
             if !text.isEmpty {
                 Button(action: onClear) {
