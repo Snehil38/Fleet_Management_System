@@ -101,11 +101,11 @@ struct DriverTabView: View {
                                     VStack(alignment: .leading, spacing: 20) {
                                         HStack {
                                             Text("Upcoming Trips")
-                                                .font(.system(size: 24, weight: .bold))
+                                                .font(.system(.title2, design: .default).weight(.bold))
                                             
                                             if !tripController.upcomingTrips.isEmpty {
                                                 Text("\(tripController.upcomingTrips.count)")
-                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .font(.system(.headline, design: .default).weight(.semibold))
                                                     .foregroundColor(.white)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 4)
@@ -896,9 +896,9 @@ struct DriverTabView: View {
                 .font(.system(size: 40))
                 .foregroundColor(.gray)
             Text("No Upcoming Trips")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             Text("Check back later for new assignments")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity)
@@ -915,9 +915,9 @@ struct DriverTabView: View {
                 .font(.system(size: 40))
                 .foregroundColor(.gray)
             Text("No Recent Deliveries")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             Text("Completed deliveries will appear here")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity)

@@ -219,11 +219,11 @@ struct EmptyTripsView: View {
                 .foregroundColor(Color(.systemGray4))
             
             Text(emptyMessage)
-                .font(.headline)
+                .font(.system(.headline, design: .default))
                 .multilineTextAlignment(.center)
             
             Text("Add trips to manage your deliveries")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
         }
@@ -404,7 +404,7 @@ struct TripStatusBadge: View {
     
     var body: some View {
         Text(displayText)
-            .font(.subheadline)
+            .font(.system(.subheadline, design: .default))
             .fontWeight(.medium)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)

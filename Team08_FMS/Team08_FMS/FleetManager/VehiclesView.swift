@@ -32,11 +32,11 @@ private struct VehicleCard: View {
             // Header with vehicle name and status
             HStack {
                 Text(vehicle.name)
-                    .font(.headline)
+                    .font(.system(.headline, design: .default))
                     .foregroundColor(.primary)
                 Spacer()
                 Text(vehicle.status.rawValue.capitalized)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -393,9 +393,9 @@ struct VehiclesView: View {
                                 .font(.system(size: 40))
                                 .foregroundColor(.orange)
                             Text("Failed to load vehicles")
-                                .font(.headline)
+                                .font(.system(.headline, design: .default))
                             Text(vehicleManager.loadError ?? "Unknown error")
-                                .font(.subheadline)
+                                .font(.system(.subheadline, design: .default))
                                 .foregroundColor(.gray)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal)
@@ -468,7 +468,7 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .fontWeight(.medium)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -486,9 +486,9 @@ private struct MaintenanceEmptyStateView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.secondary)
             Text("No vehicles found")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             Text("Add a new vehicle or try different filters")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.secondary)
         }
         .padding()
