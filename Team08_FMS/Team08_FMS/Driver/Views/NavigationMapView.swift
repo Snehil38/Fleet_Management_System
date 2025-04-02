@@ -198,6 +198,7 @@ struct NavigationMapView: UIViewRepresentable {
         var lastRouteDeviation: Date?
         var completedPathCoordinates: [CLLocationCoordinate2D] = []
         var remainingPolyline: MKPolyline?
+        private let minimumUpdateInterval: TimeInterval = 15.0 // 15 seconds between updates
         
         init(_ parent: NavigationMapView) {
             self.parent = parent
@@ -210,18 +211,27 @@ struct NavigationMapView: UIViewRepresentable {
         }
         
         private func setupUpdateTimer() {
-            updateTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            // Set timer to fire every 15 seconds
+            updateTimer = Timer.scheduledTimer(withTimeInterval: minimumUpdateInterval, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 if !self.isUpdatingCamera, let pendingUpdate = self.pendingCameraUpdate {
                     self.isUpdatingCamera = true
-                    pendingUpdate()
-                    self.pendingCameraUpdate = nil
+                    DispatchQueue.main.async {
+                        pendingUpdate()
+                        self.pendingCameraUpdate = nil
+                        self.isUpdatingCamera = false
+                    }
                 }
             }
         }
         
         func queueCameraUpdate(_ update: @escaping () -> Void) {
-            pendingCameraUpdate = update
+            // Only queue update if enough time has passed
+            let now = Date()
+            if now.timeIntervalSince(lastUpdateTime) >= minimumUpdateInterval {
+                pendingCameraUpdate = update
+                lastUpdateTime = now
+            }
         }
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
@@ -435,22 +445,43 @@ struct NavigationMapView: UIViewRepresentable {
             }
         }
         
-        // Add map region change monitoring with stricter timing
+        // Update map region change monitoring
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             let now = Date()
-            // Increase minimum time between updates to 2 seconds
-            if now.timeIntervalSince(lastUpdateTime) < 2.0 {
-                return
+            // Only log updates that occur after minimum interval
+            if now.timeIntervalSince(lastUpdateTime) >= minimumUpdateInterval {
+                lastUpdateTime = now
+                updateCount += 1
+                
+                #if DEBUG
+                let span = mapView.region.span
+                print("Map Update #\(updateCount)")
+                print("New zoom levels - Latitude span: \(span.latitudeDelta), Longitude span: \(span.longitudeDelta)")
+                print("Center coordinate: \(mapView.region.center)")
+                print("Camera altitude: \(mapView.camera.altitude)")
+                print("-------------------")
+                #endif
             }
-            lastUpdateTime = now
+        }
+        
+        func updateUserLocation(_ mapView: MKMapView) {
+            guard parent.followsUserLocation,
+                  let userLocation = parent.userLocation,
+                  CLLocationCoordinate2DIsValid(userLocation) else { return }
             
-            updateCount += 1
-            let span = mapView.region.span
-            print("Map Update #\(updateCount)")
-            print("New zoom levels - Latitude span: \(span.latitudeDelta), Longitude span: \(span.longitudeDelta)")
-            print("Center coordinate: \(mapView.region.center)")
-            print("Camera altitude: \(mapView.camera.altitude)")
-            print("-------------------")
+            let now = Date()
+            // Only update user location if enough time has passed
+            if now.timeIntervalSince(lastUpdateTime) >= minimumUpdateInterval {
+                let region = MKCoordinateRegion(
+                    center: userLocation,
+                    latitudinalMeters: 1000,
+                    longitudinalMeters: 1000
+                )
+                DispatchQueue.main.async {
+                    mapView.setRegion(mapView.regionThatFits(region), animated: true)
+                    self.lastUpdateTime = now
+                }
+            }
         }
         
         // Add method to check for route deviation

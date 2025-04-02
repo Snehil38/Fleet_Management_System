@@ -382,6 +382,8 @@ struct VehiclesView: View {
     @State private var searchText = ""
     @State private var selectedStatus: VehicleStatus?
 
+    private let minimumUpdateInterval: TimeInterval = 15.0
+
     private func matchesSearch(_ vehicle: Vehicle) -> Bool {
         guard !searchText.isEmpty else { return true }
         let searchText = self.searchText.lowercased()
