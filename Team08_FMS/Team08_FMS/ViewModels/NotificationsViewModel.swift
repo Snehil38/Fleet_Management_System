@@ -128,6 +128,12 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
     }
     
     private func showNotification(_ notification: NotificationItem) async {
+        // Skip trip duration and estimated arrival notifications
+        if notification.message.contains("Trip duration exceeded") ||
+           notification.message.contains("Estimated arrival time reached") {
+            return
+        }
+        
         print("🔔 Preparing to show notification: \(notification.message)")
         
         // First check if notifications are authorized
@@ -173,9 +179,6 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
             }
             
             content.body = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        } else if notification.message.contains("Estimated arrival time reached") {
-            content.title = "Trip Update"
-            content.body = notification.message
         } else {
             // For regular messages
             content.title = "New Message"
