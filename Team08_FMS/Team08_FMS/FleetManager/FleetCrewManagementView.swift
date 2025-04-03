@@ -282,10 +282,10 @@ struct CrewCardView: View {
                 if !isInTrip {  // Only show status change options if not in a trip
                     if currentCrew.status == .available {
                         Button {
-                            Task {
+                            Task { [weak dataManager] in
                                 do {
                                     try await updateCrewStatus(.offDuty)
-                                    CrewDataController.shared.update()
+                                    dataManager?.update()
                                 } catch {
                                     print("Error updating crew status: \(error)")
                                 }
@@ -296,10 +296,10 @@ struct CrewCardView: View {
                     }
                     else if currentCrew.status == .offDuty {
                         Button {
-                            Task {
+                            Task { [weak dataManager] in
                                 do {
                                     try await updateCrewStatus(.available)
-                                    CrewDataController.shared.update()
+                                    dataManager?.update()
                                 } catch {
                                     print("Error updating crew status: \(error)")
                                 }
@@ -313,10 +313,10 @@ struct CrewCardView: View {
                 // For maintenance personnel, show status options as before
                 if currentCrew.status == .available {
                     Button {
-                        Task {
+                        Task { [weak dataManager] in
                             do {
                                 try await updateCrewStatus(.offDuty)
-                                CrewDataController.shared.update()
+                                dataManager?.update()
                             } catch {
                                 print("Error updating crew status: \(error)")
                             }
@@ -327,10 +327,10 @@ struct CrewCardView: View {
                 }
                 else if currentCrew.status == .offDuty {
                     Button {
-                        Task {
+                        Task { [weak dataManager] in
                             do {
                                 try await updateCrewStatus(.available)
-                                CrewDataController.shared.update()
+                                dataManager?.update()
                             } catch {
                                 print("Error updating crew status: \(error)")
                             }
@@ -369,7 +369,6 @@ struct CrewCardView: View {
             }
         }
         .onAppear {
-            // Only check for unread messages
             if let id = recipientId {
                 Task {
                     do {
@@ -382,7 +381,7 @@ struct CrewCardView: View {
                         
                         let count = response.count ?? 0
                         await MainActor.run {
-                            unreadMessageCount = count
+                            self.unreadMessageCount = count
                         }
                     } catch {
                         print("Error loading unread message count: \(error)")
@@ -401,29 +400,27 @@ struct CrewCardView: View {
     private func updateCrewStatus(_ newStatus: Status) async throws {
         if currentCrew is Driver {
             await SupabaseDataController.shared.updateDriverStatus(newStatus: newStatus, userID: nil, id: currentCrew.id)
-            CrewDataController.shared.update()
         } else {
             await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: newStatus, userID: nil, id: currentCrew.id)
-            CrewDataController.shared.update()
         }
     }
     
     private func deleteCrew() {
         if currentCrew is Driver {
-            Task {
+            Task { [weak dataManager] in
                 await SupabaseDataController.shared.softDeleteDriver(for: currentCrew.id)
-                CrewDataController.shared.update()
+                dataManager?.update()
             }
         }
         else {
-            Task {
+            Task { [weak dataManager] in
                 await SupabaseDataController.shared.softDeleteMaintenancePersonnel(for: currentCrew.id)
-                CrewDataController.shared.update()
+                dataManager?.update()
             }
         }
-        CrewDataController.shared.update()
     }
 }
+
 
 struct StatusCard: View {
     let title: String
