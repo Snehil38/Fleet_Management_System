@@ -58,7 +58,7 @@ struct ChatView: View {
                     .padding(.vertical)
                 }
                 .refreshable {
-                    await viewModel.refreshMessages()
+                    await viewModel.loadMessages()
                 }
                 .overlay {
                     if viewModel.messages.isEmpty && viewModel.isLoading {

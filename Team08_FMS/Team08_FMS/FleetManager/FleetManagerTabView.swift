@@ -7,14 +7,6 @@
 
 import SwiftUI
 
-// Renamed to avoid conflict with ChatViewModel
-struct TestNotificationPayload: Codable {
-    let message: String
-    let type: String
-    let created_at: String
-    let is_read: Bool
-}
-
 struct FleetManagerTabView: View {
     @StateObject private var vehicleManager = VehicleManager()
     @StateObject private var dataManager = CrewDataController.shared
@@ -58,16 +50,6 @@ struct FleetManagerTabView: View {
                     Text("Crew")
                 }
         }
-        .notificationBanner(viewModel: notificationsViewModel, showingNotifications: $showingNotifications)
-        .onChange(of: notificationsViewModel.showBanner) { _, newValue in
-            print("🔔 Banner state changed: \(newValue)")
-            if let notification = notificationsViewModel.currentBannerNotification {
-                print("🔔 Current notification: \(notification.message)")
-            }
-        }
-        .onChange(of: showingNotifications) { _, newValue in
-            print("🔔 Showing notifications sheet: \(newValue)")
-        }
         .task {
             // Initial load
             print("🔄 FleetManagerTabView: Loading initial data...")
@@ -75,10 +57,6 @@ struct FleetManagerTabView: View {
             CrewDataController.shared.update()
             listenForGeofenceEvents()
             await refreshData()
-            
-            // Debug: Test notification
-            print("🔔 Setting up test notification...")
-            await testNotification()
         }
         .onDisappear {
             refreshTask?.cancel()
@@ -97,30 +75,6 @@ struct FleetManagerTabView: View {
     
     func listenForGeofenceEvents() {
         SupabaseDataController.shared.subscribeToGeofenceEvents()
-    }
-    
-    // Debug function to test notification banner
-    private func testNotification() async {
-        do {
-            print("🔔 Creating test notification...")
-            let notification = TestNotificationPayload(
-                message: "Test notification banner",
-                type: "test",
-                created_at: ISO8601DateFormatter().string(from: Date()),
-                is_read: false
-            )
-            
-            let response = try await SupabaseDataController.shared.supabase.database
-                .from("notifications")
-                .insert(notification)
-                .select()
-                .single()
-                .execute()
-            
-            print("✅ Test notification created successfully")
-        } catch {
-            print("❌ Failed to create test notification: \(error)")
-        }
     }
 }
 

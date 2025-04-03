@@ -19,8 +19,6 @@ struct FleetManagerDashboardTabView: View {
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
     @State private var showingAlertsView = false
-    @State private var showBanner = false
-    @State private var currentNotification: (title: String, message: String, type: String)? = nil
     
     // Computed properties for counts and expenses
     private var availableVehiclesCount: Int {
@@ -91,196 +89,139 @@ struct FleetManagerDashboardTabView: View {
 
     var body: some View {
         NavigationView {
-            ZStack(alignment: .top) {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Stats Grid
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 16) {
-                            // Vehicles Stat
-                            StatCard(
-                                icon: "car.fill",
-                                iconColor: .blue,
-                                title: "Available Vehicles",
-                                value: "\(availableVehiclesCount)"
-                            )
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Stats Grid
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 16) {
+                        // Vehicles Stat
+                        StatCard(
+                            icon: "car.fill",
+                            iconColor: .blue,
+                            title: "Available Vehicles",
+                            value: "\(availableVehiclesCount)"
+                        )
 
-                            // Drivers Stat
-                            StatCard(
-                                icon: "person.fill",
-                                iconColor: .green,
-                                title: "Available Drivers",
-                                value: "\(availableDriversCount)"
-                            )
+                        // Drivers Stat
+                        StatCard(
+                            icon: "person.fill",
+                            iconColor: .green,
+                            title: "Available Drivers",
+                            value: "\(availableDriversCount)"
+                        )
 
-                            // Maintenance Personnel Stat
-                            StatCard(
-                                icon: "wrench.fill",
-                                iconColor: .orange,
-                                title: "Under Maintenance",
-                                value: "\(vehiclesUnderMaintenanceCount)"
-                            )
+                        // Maintenance Personnel Stat
+                        StatCard(
+                            icon: "wrench.fill",
+                            iconColor: .orange,
+                            title: "Under Maintenance",
+                            value: "\(vehiclesUnderMaintenanceCount)"
+                        )
 
-                            // Active Trips Stat
-                            StatCard(
-                                icon: "arrow.triangle.turn.up.right.diamond.fill",
-                                iconColor: .purple,
-                                title: "Active Trips",
-                                value: "\(activeTripsCount)"
-                            )
-                        }
-                        .padding(.horizontal)
-
-                        // Add Trip Button
-                        Button {
-                            showingAddTripSheet = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                Text("Add New Trip")
-                                    .fontWeight(.medium)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                            .shadow(color: Color.black.opacity(0.1), radius: 5)
-                        }
-                        .padding(.horizontal)
-
-                        // Financial Summary
-                        VStack(spacing: 16) {
-                            // Monthly Fuel Expenses
-                            FinancialCard(
-                                title: "Monthly Fuel Expenses",
-                                amount: "$\(String(format: "%.2f", totalFuelCost))",
-                                trend: .negative
-                            )
-
-                            // Monthly Salary Expenses
-                            FinancialCard(
-                                title: "Monthly Salary Expenses",
-                                amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
-                                trend: .negative
-                            )
-                            
-                            FinancialCard(
-                                title: "Service Expenses",
-                                amount: "$\(String(format: "%.2f", totalServiceExpenses))",
-                                trend: .negative
-                            )
-                            
-                            // Total Expenses
-                            FinancialCard(
-                                title: "Total Expenses",
-                                amount: "$\(String(format: "%.2f", totalExpenses))",
-                                trend: .negative
-                            )
-                            
-                            // Trip Revenue
-                            FinancialCard(
-                                title: "Trip Revenue",
-                                amount: "$\(String(format: "%.2f", totalTripRevenue))",
-                                trend: .positive
-                            )
-
-                            // Total Revenue
-                            FinancialCard(
-                                title: "Total Revenue",
-                                amount: "$\(String(format: "%.2f", totalRevenue))",
-                                trend: .positive
-                            )
-                        }
-                        .padding(.horizontal)
+                        // Active Trips Stat
+                        StatCard(
+                            icon: "arrow.triangle.turn.up.right.diamond.fill",
+                            iconColor: .purple,
+                            title: "Active Trips",
+                            value: "\(activeTripsCount)"
+                        )
                     }
-                    .padding(.vertical)
-                }
-                .navigationTitle("Fleet Manager")
-                .toolbar {
-                    ToolbarItemGroup(placement: .navigationBarTrailing) {
-                        // Alerts button
-                        Button {
-                            showingAlertsView = true
-                        } label: {
-                            Image(systemName: "bell.fill")
-                                .foregroundColor(.blue)
-                                .overlay(alignment: .topTrailing) {
-                                    if notificationsViewModel.unreadCount > 0 {
-                                        Text("\(notificationsViewModel.unreadCount)")
-                                            .font(.caption2)
-                                            .padding(4)
-                                            .foregroundColor(.white)
-                                            .background(Color.red)
-                                            .clipShape(Circle())
-                                            .offset(x: 10, y: -10)
-                                    }
-                                }
-                        }
-                        // Profile button
-                        Button {
-                            showingProfile = true
-                        } label: {
-                            Image(systemName: "person.circle.fill")
-                                .foregroundColor(.blue)
-                        }
-                    }
-                }
-                
-                // Floating Notification Banner
-                if showBanner, let notification = currentNotification {
-                    HStack(spacing: 12) {
-                        // Icon based on notification type
-                        Image(systemName: iconForType(notification.type))
-                            .font(.system(size: 20))
-                            .foregroundColor(colorForType(notification.type))
-                            .padding(8)
-                            .background(colorForType(notification.type).opacity(0.1))
-                            .clipShape(Circle())
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(notification.title)
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            Text(notification.message)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button {
-                            withAnimation(.spring()) {
-                                showBanner = false
-                            }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
-                                .font(.system(size: 20))
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
-                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     .padding(.horizontal)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(1)
-                    .onTapGesture {
-                        showingAlertsView = true
-                        showBanner = false
-                    }
-                    .onAppear {
-                        // Auto-dismiss after 5 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                            withAnimation(.spring()) {
-                                showBanner = false
-                            }
+
+                    // Add Trip Button
+                    Button {
+                        showingAddTripSheet = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                            Text("Add New Trip")
+                                .fontWeight(.medium)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5)
+                    }
+                    .padding(.horizontal)
+
+                    // Financial Summary
+                    VStack(spacing: 16) {
+                        // Monthly Fuel Expenses
+                        FinancialCard(
+                            title: "Monthly Fuel Expenses",
+                            amount: "$\(String(format: "%.2f", totalFuelCost))",
+                            trend: .negative
+                        )
+
+                        // Monthly Salary Expenses
+                        FinancialCard(
+                            title: "Monthly Salary Expenses",
+                            amount: "$\(String(format: "%.2f", totalMonthlySalaries))",
+                            trend: .negative
+                        )
+                        
+                        FinancialCard(
+                            title: "Service Expenses",
+                            amount: "$\(String(format: "%.2f", totalServiceExpenses))",
+                            trend: .negative
+                        )
+                        
+                        // Total Expenses
+                        FinancialCard(
+                            title: "Total Expenses",
+                            amount: "$\(String(format: "%.2f", totalExpenses))",
+                            trend: .negative
+                        )
+                        
+                        // Trip Revenue
+                        FinancialCard(
+                            title: "Trip Revenue",
+                            amount: "$\(String(format: "%.2f", totalTripRevenue))",
+                            trend: .positive
+                        )
+
+                        // Total Revenue
+                        FinancialCard(
+                            title: "Total Revenue",
+                            amount: "$\(String(format: "%.2f", totalRevenue))",
+                            trend: .positive
+                        )
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .navigationTitle("Fleet Manager")
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // Alerts button
+                    Button {
+                        showingAlertsView = true
+                    } label: {
+                        Image(systemName: "bell.fill")
+                            .foregroundColor(.blue)
+                            .overlay(alignment: .topTrailing) {
+                                if notificationsViewModel.unreadCount > 0 {
+                                    Text("\(notificationsViewModel.unreadCount)")
+                                        .font(.caption2)
+                                        .padding(4)
+                                        .foregroundColor(.white)
+                                        .background(Color.red)
+                                        .clipShape(Circle())
+                                        .offset(x: 10, y: -10)
+                                }
+                            }
+                    }
+                    // Profile button
+                    Button {
+                        showingProfile = true
+                    } label: {
+                        Image(systemName: "person.circle.fill")
+                            .foregroundColor(.blue)
                     }
                 }
             }
@@ -305,50 +246,25 @@ struct FleetManagerDashboardTabView: View {
                         .environmentObject(notificationsViewModel)
                 }
             }
-            .onAppear {
-                // Set up test notification after a delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    showTestNotification()
-                }
+            .task {
+                // Initial load
+                print("🔄 FleetManagerTabView: Loading initial data...")
+                vehicleManager.loadVehicles()
+                CrewDataController.shared.update()
+                listenForGeofenceEvents()
+                await refreshData()
             }
         }
     }
     
-    private func showTestNotification() {
-        currentNotification = (
-            title: "Test Notification",
-            message: "This is a test notification banner",
-            type: "info"
-        )
-        withAnimation(.spring()) {
-            showBanner = true
-        }
+    private func refreshData() async {
+        await TripDataController.shared.refreshAllTrips()
+        await SupabaseDataController.shared.fetchGeofenceEvents()
+        await dataManager.checkAndUpdateDriverTripStatus()
     }
     
-    private func iconForType(_ type: String) -> String {
-        switch type.lowercased() {
-        case "maintenance_due":
-            return "wrench.fill"
-        case "trip_update":
-            return "car.fill"
-        case "alert":
-            return "exclamationmark.triangle.fill"
-        default:
-            return "info.circle.fill"
-        }
-    }
-    
-    private func colorForType(_ type: String) -> Color {
-        switch type.lowercased() {
-        case "maintenance_due":
-            return .orange
-        case "trip_update":
-            return .blue
-        case "alert":
-            return .red
-        default:
-            return .gray
-        }
+    func listenForGeofenceEvents() {
+        SupabaseDataController.shared.subscribeToGeofenceEvents()
     }
 }
 
@@ -1634,4 +1550,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             break
         }
     }
+}
+
+#Preview {
+    FleetManagerTabView()
+        .environmentObject(SupabaseDataController.shared)
 }

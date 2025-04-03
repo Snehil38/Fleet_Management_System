@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UserNotifications
 @preconcurrency import Supabase
 
 private struct MessagePayload: Encodable {
@@ -21,6 +22,25 @@ private struct NotificationPayload: Encodable {
     let type: String
     let created_at: String
     let is_read: Bool
+}
+
+// Add DatabaseChange struct
+private struct DatabaseChange<T: Codable>: Codable {
+    let schema: String
+    let table: String
+    let commit_timestamp: String
+    let eventType: String
+    let new: T?
+    let old: T?
+    
+    enum CodingKeys: String, CodingKey {
+        case schema
+        case table
+        case commit_timestamp
+        case eventType = "type"
+        case new
+        case old
+    }
 }
 
 @MainActor
@@ -48,26 +68,95 @@ final class ChatViewModel: ObservableObject {
         self.recipientType = recipientType
         self.storageClient = supabaseDataController.supabase.storage
         
-        // Create storage bucket if it doesn't exist
         Task {
+            await requestNotificationPermission()
+            
             do {
                 try await createStorageBucketIfNeeded()
             } catch {
-                print("Error creating storage bucket: \(error)")
+                print("❌ Error creating storage bucket: \(error)")
+                self.error = error
             }
-        }
-        
-        // Load messages immediately when initialized
-        Task {
+            
             await loadMessages()
-        }
-        
-        // Set up realtime listener and refresh timer
-        Task { @MainActor in
             await setupMessageListener()
             updateUnreadCount()
             setupRefreshTimer()
         }
+    }
+    
+    private func requestNotificationPermission() async {
+        do {
+            let center = UNUserNotificationCenter.current()
+            try await center.requestAuthorization(options: [.alert, .sound, .badge])
+        } catch {
+            print("❌ Failed to request notification permission: \(error)")
+        }
+    }
+    
+    private func showMessageNotification(_ message: ChatMessage) async {
+        guard !message.isFromCurrentUser else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "\(recipientType.displayName) Message"
+        content.body = message.message_text
+        content.sound = .default
+        content.threadIdentifier = "chat_\(recipientId.uuidString)" // Group messages from same chat
+        
+        // Add custom data
+        content.userInfo = [
+            "message_id": message.id.uuidString,
+            "recipient_id": recipientId.uuidString,
+            "recipient_type": recipientType.rawValue
+        ]
+        
+        let request = UNNotificationRequest(
+            identifier: message.id.uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        } catch {
+            print("❌ Error showing message notification: \(error)")
+        }
+    }
+    
+    private func setupMessageListener() async {
+        // First, cleanup any existing channel
+        realtimeChannel?.unsubscribe()
+        
+        let channel = supabaseDataController.supabase.realtime
+            .channel("chat_messages")
+        
+        channel.on("postgres_changes", filter: .init(
+            event: "*",
+            schema: "public",
+            table: "chat_messages"
+        )) { [weak self] payload in
+            guard let self = self else { return }
+            
+            Task { @MainActor in
+                do {
+                    if payload.event == "INSERT" {
+                        if let data = try? JSONSerialization.data(withJSONObject: payload.payload["record"] ?? [:]),
+                           let message = try? JSONDecoder().decode(ChatMessage.self, from: data) {
+                            // Show notification for new message
+                            await self.showMessageNotification(message)
+                        }
+                    }
+                    await self.fetchNewMessages()
+                } catch {
+                    print("❌ Error handling message update: \(error)")
+                    self.error = error
+                }
+            }
+        }
+        
+        print("🔔 Subscribing to chat messages channel...")
+        channel.subscribe()
+        self.realtimeChannel = channel
     }
     
     func clearMessages() {
@@ -84,37 +173,6 @@ final class ChatViewModel: ObservableObject {
                 await self?.fetchNewMessages()
             }
         }
-    }
-    
-    private func setupMessageListener() async {
-        // First, cleanup any existing channel
-        if let channel = realtimeChannel {
-            channel.unsubscribe()
-            realtimeChannel = nil
-        }
-        
-        let channel = supabaseDataController.supabase.realtime
-            .channel("chat_messages")
-        
-        // Set up the channel before subscribing
-        channel.on("postgres_changes", filter: .init(
-            event: "*",
-            schema: "public",
-            table: "chat_messages"
-        )) { [weak self] payload in
-            guard let self = self else { return }
-            
-            Task { @MainActor in
-                await self.fetchNewMessages()
-            }
-        }
-        
-        // Subscribe to the channel
-        channel.subscribe()
-        print("Successfully subscribed to realtime updates")
-        
-        // Store the channel reference
-        self.realtimeChannel = channel
     }
     
     func loadMessages() async {
