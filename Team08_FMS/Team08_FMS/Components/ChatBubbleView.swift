@@ -96,91 +96,96 @@ struct ChatBubbleView: View {
                 }
                 
                 VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 2) {
-                    if let attachmentUrl = message.attachment_url {
-                        if message.attachment_type == "image/jpeg" {
-                            // Image message
-                            VStack(alignment: .leading, spacing: 4) {
-                                if let imageData = imageData, let uiImage = UIImage(data: imageData) {
-                                    Image(uiImage: uiImage)
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(maxWidth: 200, maxHeight: 200)
-                                        .cornerRadius(8)
-                                } else {
-                                    if isImageLoading {
-                                        ProgressView()
-                                            .frame(width: 200, height: 200)
-                                    } else {
-                                        Color.gray.opacity(0.3)
-                                            .frame(width: 200, height: 200)
+                    Group {
+                        if let attachmentUrl = message.attachment_url {
+                            if message.attachment_type == "image/jpeg" {
+                                // Image message
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if let imageData = imageData, let uiImage = UIImage(data: imageData) {
+                                        Image(uiImage: uiImage)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(maxWidth: 200, maxHeight: 200)
                                             .cornerRadius(8)
-                                            .onAppear {
-                                                loadImage(from: attachmentUrl)
-                                            }
-                                    }
-                                }
-                            }
-                            .padding(8)
-                            .background(backgroundColor)
-                            .cornerRadius(12)
-                        } else if message.attachment_type == "audio/m4a" {
-                            // Voice note message
-                            Button(action: {
-                                if let url = URL(string: attachmentUrl) {
-                                    audioPlayer.play(url: url)
-                                }
-                            }) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: audioPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(textColor)
-                                    
-                                    if audioPlayer.duration > 0 {
-                                        // Progress bar
-                                        GeometryReader { geometry in
-                                            ZStack(alignment: .leading) {
-                                                Rectangle()
-                                                    .fill(textColor.opacity(0.3))
-                                                    .frame(height: 4)
-                                                
-                                                Rectangle()
-                                                    .fill(textColor)
-                                                    .frame(width: geometry.size.width * CGFloat(audioPlayer.currentTime / audioPlayer.duration), height: 4)
-                                            }
-                                        }
-                                        .frame(height: 4)
-                                        
-                                        // Duration
-                                        Text(formatDuration(audioPlayer.currentTime))
-                                            .font(.caption)
-                                            .foregroundColor(textColor)
-                                            .frame(width: 40)
                                     } else {
-                                        Text("Voice Note")
-                                            .foregroundColor(textColor)
+                                        if isImageLoading {
+                                            ProgressView()
+                                                .frame(width: 200, height: 200)
+                                        } else {
+                                            Color.gray.opacity(0.3)
+                                                .frame(width: 200, height: 200)
+                                                .cornerRadius(8)
+                                                .onAppear {
+                                                    loadImage(from: attachmentUrl)
+                                                }
+                                        }
                                     }
                                 }
-                                .frame(width: 200)
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 12)
+                                .padding(8)
                                 .background(backgroundColor)
                                 .cornerRadius(12)
+                            } else if message.attachment_type == "audio/m4a" {
+                                // Voice note message
+                                Button(action: {
+                                    if let url = URL(string: attachmentUrl) {
+                                        audioPlayer.play(url: url)
+                                    }
+                                }) {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: audioPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                            .font(.system(size: 24))
+                                            .foregroundColor(textColor)
+                                        
+                                        if audioPlayer.duration > 0 {
+                                            // Progress bar
+                                            GeometryReader { geometry in
+                                                ZStack(alignment: .leading) {
+                                                    Rectangle()
+                                                        .fill(textColor.opacity(0.3))
+                                                        .frame(height: 4)
+                                                    
+                                                    Rectangle()
+                                                        .fill(textColor)
+                                                        .frame(width: geometry.size.width * CGFloat(audioPlayer.currentTime / audioPlayer.duration), height: 4)
+                                                }
+                                            }
+                                            .frame(height: 4)
+                                            
+                                            // Duration
+                                            Text(formatDuration(audioPlayer.currentTime))
+                                                .font(.caption)
+                                                .foregroundColor(textColor)
+                                                .frame(width: 40)
+                                        } else {
+                                            Text("Voice Note")
+                                                .foregroundColor(textColor)
+                                        }
+                                    }
+                                    .frame(width: 200)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 12)
+                                    .background(backgroundColor)
+                                    .cornerRadius(12)
+                                }
+                            } else {
+                                // Text message with unknown attachment
+                                Text(message.message_text)
+                                    .foregroundColor(textColor)
+                                    .padding(8)
+                                    .background(backgroundColor)
+                                    .cornerRadius(12)
                             }
                         } else {
-                            // Text message with unknown attachment
+                            // Regular text message
                             Text(message.message_text)
                                 .foregroundColor(textColor)
                                 .padding(8)
                                 .background(backgroundColor)
                                 .cornerRadius(12)
                         }
-                    } else {
-                        // Regular text message
-                        Text(message.message_text)
-                            .foregroundColor(textColor)
-                            .padding(8)
-                            .background(backgroundColor)
-                            .cornerRadius(12)
+                    }
+                    .onTapGesture(count: 2) {
+                        showDeleteAlert = true
                     }
                     
                     HStack(spacing: 4) {
@@ -204,9 +209,6 @@ struct ChatBubbleView: View {
                         }
                     }
                     .padding(.horizontal, 4)
-                }
-                .onLongPressGesture(minimumDuration: 0.5) {
-                    showDeleteAlert = true
                 }
                 
                 if message.isFromCurrentUser {
