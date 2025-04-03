@@ -1,7 +1,7 @@
 import SwiftUI
 import PDFKit
 
-struct MaintenancePersonnelServiceRequestDetailView: View {
+struct FleetManagerServiceRequestDetailView: View {
     let request: MaintenanceServiceRequest
     @ObservedObject var dataStore: MaintenancePersonnelDataStore
     @Environment(\.dismiss) private var dismiss
@@ -21,76 +21,19 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Vehicle Info Card
-                MaintenanceVehicleRequestInfoCard(request: request)
+                FleetManagerVehicleRequestInfoCard(request: request)
                     .padding(.horizontal)
                 
                 // Service Details Card
-                MaintenanceServiceDetailsCard(request: request)
+                FleetManagerMaintenanceServiceDetailsCard(request: request)
                     .padding(.horizontal)
-                
-                // Safety Checks Card
-                if !safetyChecks.isEmpty {
-                    MaintenanceSafetyChecksCard(checks: safetyChecks)
-                        .padding(.horizontal)
-                }
-                
                 // Expenses Card
-                if request.status != .pending {
-                    ExpensesCard(expenses: expenses)
-                        .padding(.horizontal)
-                }
+                FleetManagerExpensesCard(expenses: expenses)
+                    .padding(.horizontal)
                 
                 // Action Buttons
                 VStack(spacing: 12) {
-                    if request.status == .pending {
-                        Button(action: {
-                            startMaintenance()
-                        }) {
-                            HStack {
-                                Image(systemName: "play.fill")
-                                Text("Start Maintenance")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                        }
-                    } else if request.status == .inProgress {
-                        Button(action: {
-                            showingExpenseSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "dollarsign.circle.fill")
-                                Text("Add Expense")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                        }
-                        
-                        Button(action: {
-                            if expenses.isEmpty {
-                                alertMessage = "You must add at least one expense before completing the maintenance"
-                                showingAlert = true
-                            } else {
-                                showingCompletionAlert = true
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Mark as Completed")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(expenses.isEmpty ? Color.gray : Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                        }
-                        .disabled(expenses.isEmpty)
-                    } else if request.status == .completed {
+                    if request.status == .completed {
                         Button(action: {
                             expenseReceiptData = generateExpenseReceipt()
                             showingExpenseReceipt = true
@@ -201,11 +144,11 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
     
     private func startMaintenance() {
         Task {
-            if let userID = await SupabaseDataController.shared.getUserID() {
-                await dataStore.updateServiceRequestStatus(request, newStatus: .inProgress, userID: userID)
-            } else {
-                print("No userID found to assign the service request.")
-            }
+//            if let userID = await SupabaseDataController.shared.getUserID() {
+//                await dataStore.updateServiceRequestStatus(request, newStatus: .inProgress, userID: userID)
+//            } else {
+//                print("No userID found to assign the service request.")
+//            }
         }
         alertMessage = "Maintenance started successfully"
         showingAlert = true
@@ -283,7 +226,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
                 ctx.strokePath()
                 
                 // Draw label
-                let labelRect = CGRect(x: leftMargin + padding, y: y + padding, 
+                let labelRect = CGRect(x: leftMargin + padding, y: y + padding,
                                      width: labelWidth - padding * 2, height: rowHeight - padding * 2)
                 label.draw(in: labelRect, withAttributes: textAttributes)
                 
@@ -369,7 +312,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
 }
 
 // Add PDFKitView for displaying PDF
-struct MaintenancePDFKitView: UIViewRepresentable {
+struct FleetManagerPDFKitView: UIViewRepresentable {
     let data: Data
     
     func makeUIView(context: Context) -> PDFView {
@@ -384,7 +327,7 @@ struct MaintenancePDFKitView: UIViewRepresentable {
     }
 }
 
-struct ExpensesCard: View {
+struct FleetManagerExpensesCard: View {
     let expenses: [Expense]
     
     private var totalCost: Double {
@@ -421,7 +364,7 @@ struct ExpensesCard: View {
     }
 }
 
-struct ExpenseRow: View {
+struct FleetManagerExpenseRow: View {
     let expense: Expense
     
     var body: some View {
@@ -449,7 +392,7 @@ struct ExpenseRow: View {
     }
 }
 
-struct AddExpenseView: View {
+struct FleetManagerAddExpenseView: View {
     let request: MaintenanceServiceRequest
     @ObservedObject var dataStore: MaintenancePersonnelDataStore
     @Binding var description: String
@@ -521,7 +464,7 @@ struct AddExpenseView: View {
     }
 }
 
-struct MaintenanceVehicleRequestInfoCard: View {
+struct FleetManagerVehicleRequestInfoCard: View {
     let request: MaintenanceServiceRequest
     
     var body: some View {
@@ -544,7 +487,7 @@ struct MaintenanceVehicleRequestInfoCard: View {
     }
 }
 
-struct InfoRow: View {
+struct FleetManagerInfoRow: View {
     let title: String
     let value: String
     let icon: String
@@ -566,7 +509,7 @@ struct InfoRow: View {
     }
 }
 
-struct MaintenanceServiceDetailsCard: View {
+struct FleetManagerMaintenanceServiceDetailsCard: View {
     let request: MaintenanceServiceRequest
     
     var body: some View {
@@ -610,7 +553,7 @@ struct MaintenanceServiceDetailsCard: View {
     }
 }
 
-struct MaintenanceSafetyChecksCard: View {
+struct FleetManagerSafetyChecksCard: View {
     let checks: [SafetyCheck]
     
     var body: some View {
@@ -651,23 +594,3 @@ struct MaintenanceSafetyChecksCard: View {
         .padding(.horizontal)
     }
 }
-
-#Preview {
-    NavigationView {
-        MaintenancePersonnelServiceRequestDetailView(
-            request: MaintenanceServiceRequest(
-                vehicleId: UUID(),
-                vehicleName: "Test Vehicle",
-                serviceType: .routine,
-                description: "Test Description",
-                priority: .medium,
-                date: Date(),
-                dueDate: Date().addingTimeInterval(86400),
-                status: .pending,
-                notes: "Test Notes",
-                issueType: nil
-            ),
-            dataStore: MaintenancePersonnelDataStore()
-        )
-    }
-} 
