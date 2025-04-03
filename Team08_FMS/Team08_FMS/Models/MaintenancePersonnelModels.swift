@@ -175,7 +175,7 @@ class MaintenancePersonnelDataStore: ObservableObject {
         }
     }
     
-    func updateServiceRequestStatus(_ request: MaintenanceServiceRequest, newStatus: ServiceRequestStatus) async {
+    func updateServiceRequestStatus(_ request: MaintenanceServiceRequest, newStatus: ServiceRequestStatus, userID: UUID?) async {
         if let index = serviceRequests.firstIndex(where: { $0.id == request.id }) {
             var updatedRequest = request
             updatedRequest.status = newStatus
@@ -192,19 +192,31 @@ class MaintenancePersonnelDataStore: ObservableObject {
             }
             
             do {
-                let updateSuccess = try await SupabaseDataController.shared.updateServiceRequestStatus(
-                    serviceRequestId: updatedRequest.id,
-                    newStatus: newStatus
-                )
-                
-                if updateSuccess {
-                    // Capture a copy of updatedRequest using a capture list.
-                    await MainActor.run { [safeUpdatedRequest = updatedRequest] in
-                        serviceRequests[index] = safeUpdatedRequest
-                        print("Service request status updated successfully.")
+                if let userID = userID {
+                    let updateSuccess = try await SupabaseDataController.shared.assignServiceToPersonnel(serviceRequestId: updatedRequest.id, userID: userID)
+                    if updateSuccess {
+                        // Capture a copy of updatedRequest using a capture list.
+                        await MainActor.run { [safeUpdatedRequest = updatedRequest] in
+                            serviceRequests[index] = safeUpdatedRequest
+                            print("Service request status updated successfully.")
+                        }
+                    } else {
+                        print("Failed to update service request status in Supabase.")
                     }
                 } else {
-                    print("Failed to update service request status in Supabase.")
+                    let updateSuccess = try await SupabaseDataController.shared.updateServiceRequestStatus(
+                        serviceRequestId: updatedRequest.id,
+                        newStatus: newStatus
+                    )
+                    if updateSuccess {
+                        // Capture a copy of updatedRequest using a capture list.
+                        await MainActor.run { [safeUpdatedRequest = updatedRequest] in
+                            serviceRequests[index] = safeUpdatedRequest
+                            print("Service request status updated successfully.")
+                        }
+                    } else {
+                        print("Failed to update service request status in Supabase.")
+                    }
                 }
             } catch {
                 print("Error updating service request status: \(error)")

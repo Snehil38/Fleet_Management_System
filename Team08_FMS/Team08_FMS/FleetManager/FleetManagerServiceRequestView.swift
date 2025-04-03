@@ -144,7 +144,11 @@ struct FleetManagerServiceRequestDetailView: View {
     
     private func startMaintenance() {
         Task {
-            await dataStore.updateServiceRequestStatus(request, newStatus: .inProgress)
+//            if let userID = await SupabaseDataController.shared.getUserID() {
+//                await dataStore.updateServiceRequestStatus(request, newStatus: .inProgress, userID: userID)
+//            } else {
+//                print("No userID found to assign the service request.")
+//            }
         }
         alertMessage = "Maintenance started successfully"
         showingAlert = true
@@ -155,7 +159,7 @@ struct FleetManagerServiceRequestDetailView: View {
     
     private func completeServiceRequest() {
         Task {
-            await dataStore.updateServiceRequestStatus(request, newStatus: .completed)
+            await dataStore.updateServiceRequestStatus(request, newStatus: .completed, userID: nil)
             await dataStore.addToServiceHistory(from: request)
         }
         alertMessage = "Service request marked as completed"

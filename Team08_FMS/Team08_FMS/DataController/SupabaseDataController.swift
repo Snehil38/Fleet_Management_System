@@ -1893,6 +1893,25 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
+    func assignServiceToPersonnel(serviceRequestId: UUID, userID: UUID) async throws -> Bool {
+        let newStatus = ServiceRequestStatus.inProgress
+        let payload: [String: String] = ["status": newStatus.rawValue, "personnelID": userID.uuidString]
+        
+        // Perform the update on the Supabase table
+        let response = try await supabase
+            .from("maintenanceservicerequest")  // The table you are updating
+            .update(payload)  // Update the status column
+            .eq("id", value: serviceRequestId)  // Assuming `id` is the primary key
+            .execute()
+        
+        // Check if the response was successful
+        if response.status == 200 {
+            return true
+        } else {
+            throw NSError(domain: "SupabaseError", code: response.status, userInfo: [NSLocalizedDescriptionKey: "Failed to update service request status."])
+        }
+    }
+    
     func fetchAllExpense() async throws -> [Expense] {
         // Fetch expenses from Supabase filtered by requestID
         let response = try await supabase
