@@ -60,12 +60,12 @@ struct AlertsView: View {
                                 notifications: viewModel.notifications,
                                 onMarkAsRead: { notification in
                                     Task {
-                                        await viewModel.markAsRead(notification.id)
+                                        await viewModel.markAsRead(notification)
                                     }
                                 },
                                 onDelete: { notification in
                                     Task {
-                                        await viewModel.deleteNotification(notification.id)
+                                        await viewModel.deleteNotification(notification)
                                     }
                                 }
                             )
@@ -81,7 +81,7 @@ struct AlertsView: View {
         .navigationTitle("Alerts")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItemGroup(placement: .navigationBarLeading) {
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
@@ -91,12 +91,12 @@ struct AlertsView: View {
             }
             
             if !viewModel.notifications.isEmpty {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
                         Task {
                             await viewModel.markAllAsRead()
                         }
-                    }) {
+                    } label: {
                         Text("Mark All as Read")
                             .font(.subheadline)
                     }
@@ -206,9 +206,9 @@ struct AlertSummaryCard: View {
 }
 
 struct NotificationsListView: View {
-    let notifications: [Notification]
-    let onMarkAsRead: (Notification) -> Void
-    let onDelete: (Notification) -> Void
+    let notifications: [NotificationItem]
+    let onMarkAsRead: (NotificationItem) -> Void
+    let onDelete: (NotificationItem) -> Void
     
     var body: some View {
         LazyVStack(spacing: 12) {
@@ -238,71 +238,39 @@ struct NotificationsListView: View {
 }
 
 struct AlertNotificationRow: View {
-    let notification: Notification
+    let notification: NotificationItem
     
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: iconForType(notification.type))
+            Image(systemName: notification.type.iconName)
                 .font(.system(size: 24))
-                .foregroundColor(colorForType(notification.type))
+                .foregroundColor(notification.type.color)
                 .padding(6)
                 .background(Color(UIColor.systemGray6))
                 .clipShape(Circle())
-
+            
             VStack(alignment: .leading, spacing: 4) {
                 Text(notification.message)
-                    .font(notification.is_read ? .body : .headline)
+                    .font(.system(.body))
                     .foregroundColor(.primary)
                     .lineLimit(2)
-
-                Text(timeAgo(notification.created_at))
-                    .font(.caption)
+                
+                Text(notification.created_at, style: .relative)
+                    .font(.system(.caption))
                     .foregroundColor(.secondary)
             }
-
+            
             Spacer()
+            
+            if !notification.is_read {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 8, height: 8)
+            }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(notification.is_read ? Color(UIColor.systemBackground) : Color.blue.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(UIColor.separator), lineWidth: notification.is_read ? 0.5 : 0)
-        )
-    }
-    
-    private func timeAgo(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    private func iconForType(_ type: String) -> String {
-        switch type.lowercased() {
-        case "chat_message":
-            return "message.fill"
-        case "emergency":
-            return "exclamationmark.triangle.fill"
-        case "maintenance":
-            return "wrench.fill"
-        default:
-            return "bell.fill"
-        }
-    }
-    
-    private func colorForType(_ type: String) -> Color {
-        switch type.lowercased() {
-        case "chat_message":
-            return .blue
-        case "emergency":
-            return .red
-        case "maintenance":
-            return .orange
-        default:
-            return .gray
-        }
+        .padding()
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 }

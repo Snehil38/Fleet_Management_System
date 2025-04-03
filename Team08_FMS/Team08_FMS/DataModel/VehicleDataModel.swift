@@ -197,21 +197,6 @@ struct MaintenanceExpense: Identifiable, Codable {
     let date: Date
 }
 
-enum NotificationType: String, Codable {
-    case maintenanceDue
-    case tripUpdate
-    case alert
-    case info
-}
-
-struct NotificationItem: Identifiable, Codable {
-    var id: String
-    var title: String
-    var message: String
-    var date: Date
-    var type: NotificationType
-}
-
 struct AppSettings: Codable {
     var defaultOperatingHours: String
     var supportContact: String

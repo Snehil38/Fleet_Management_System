@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct NotificationBannerView: View {
-    let notification: Notification
+    let notification: NotificationItem
     let onTap: () -> Void
     let onDismiss: () -> Void
     @State private var offset: CGFloat = -120
@@ -10,11 +10,11 @@ struct NotificationBannerView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Icon
-            Image(systemName: iconForType(notification.type))
+            Image(systemName: notification.type.iconName)
                 .font(.system(size: 20))
-                .foregroundColor(colorForType(notification.type))
+                .foregroundColor(notification.type.color)
                 .padding(8)
-                .background(colorForType(notification.type).opacity(0.1))
+                .background(notification.type.color.opacity(0.1))
                 .clipShape(Circle())
             
             // Content
@@ -24,7 +24,7 @@ struct NotificationBannerView: View {
                     .foregroundColor(.primary)
                     .lineLimit(2)
                 
-                Text(timeAgo(notification.created_at))
+                Text(notification.created_at, style: .relative)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -70,38 +70,6 @@ struct NotificationBannerView: View {
         // Call onDismiss after animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             onDismiss()
-        }
-    }
-    
-    private func timeAgo(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    private func iconForType(_ type: String) -> String {
-        switch type.lowercased() {
-        case "chat_message":
-            return "message.fill"
-        case "emergency":
-            return "exclamationmark.triangle.fill"
-        case "maintenance":
-            return "wrench.fill"
-        default:
-            return "bell.fill"
-        }
-    }
-    
-    private func colorForType(_ type: String) -> Color {
-        switch type.lowercased() {
-        case "chat_message":
-            return .blue
-        case "emergency":
-            return .red
-        case "maintenance":
-            return .orange
-        default:
-            return .gray
         }
     }
 }
