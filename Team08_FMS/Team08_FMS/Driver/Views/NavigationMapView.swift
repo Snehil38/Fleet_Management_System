@@ -3,11 +3,13 @@ import MapKit
 
 struct NavigationMapView: UIViewRepresentable {
     let destination: CLLocationCoordinate2D
+    let pickup: CLLocationCoordinate2D  // Add pickup coordinate
     @Binding var userLocation: CLLocationCoordinate2D?
     @Binding var route: MKRoute?
     @Binding var userHeading: Double
     let followsUserLocation: Bool
     @Binding var isRouteCompleted: Bool
+    let geofenceRadius: CLLocationDistance = 50.0 // Increased from 200m to 500m for better visibility
     
     // For updating ETA and distance
     var onLocationUpdate: ((CLLocation) -> Void)?
@@ -24,6 +26,7 @@ struct NavigationMapView: UIViewRepresentable {
         
         enum AnnotationType {
             case source
+            case pickup
             case destination
             case completed
         }
@@ -84,42 +87,57 @@ struct NavigationMapView: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: MKMapView, context: Context) {
-        // Update route overlay based on completion status
-        if isRouteCompleted {
-            mapView.removeOverlays(mapView.overlays)
-            context.coordinator.currentRouteId = nil
-            context.coordinator.remainingPolyline = nil
-        } else if let route = route {
-            let currentRouteId = route.polyline.hash
-            if context.coordinator.currentRouteId != currentRouteId {
-                mapView.removeOverlays(mapView.overlays)
+        // Remove existing overlays and annotations
+        mapView.removeOverlays(mapView.overlays)
+        mapView.removeAnnotations(mapView.annotations.filter { !($0 is MKUserLocation) })
+        
+        // Add pickup annotation and geofence
+        let pickupAnnotation = MapAnnotation(
+            coordinate: pickup,
+            title: "Pickup",
+            subtitle: "Pickup location",
+            type: .pickup
+        )
+        mapView.addAnnotation(pickupAnnotation)
+        
+        // Add pickup geofence circle
+        let pickupGeofence = MKCircle(center: pickup, radius: geofenceRadius)
+        mapView.addOverlay(pickupGeofence, level: .aboveRoads)
+        
+        // Add destination annotation and geofence
+        let destinationAnnotation = MapAnnotation(
+            coordinate: destination,
+            title: "Destination",
+            subtitle: "Your delivery point",
+            type: .destination
+        )
+        mapView.addAnnotation(destinationAnnotation)
+        
+        // Add destination geofence circle
+        let destinationGeofence = MKCircle(center: destination, radius: geofenceRadius)
+        mapView.addOverlay(destinationGeofence, level: .aboveRoads)
+        
+        // Add route overlay if available
+        if let route = route {
+            mapView.addOverlay(route.polyline)
+            
+            // Show entire route if not following user
+            if !followsUserLocation && !context.coordinator.isUpdatingCamera {
+                let routeRect = route.polyline.boundingMapRect
+                // Add padding to the route rect
+                let paddedRect = routeRect.insetBy(
+                    dx: -routeRect.width * 0.1,
+                    dy: -routeRect.height * 0.1
+                )
+                let region = mapView.regionThatFits(
+                    MKCoordinateRegion(paddedRect)
+                )
                 
-                // Reset tracking state when route changes
-                context.coordinator.remainingPolyline = nil
-                context.coordinator.completedPathCoordinates = []
-                
-                // Add the full route initially
-                mapView.addOverlay(route.polyline)
-                context.coordinator.currentRouteId = currentRouteId
-                
-                // Show entire route if not following user
-                if !followsUserLocation && !context.coordinator.isUpdatingCamera {
-                    let routeRect = route.polyline.boundingMapRect
-                    // Add padding to the route rect
-                    let paddedRect = routeRect.insetBy(
-                        dx: -routeRect.width * 0.1,
-                        dy: -routeRect.height * 0.1
-                    )
-                    let region = mapView.regionThatFits(
-                        MKCoordinateRegion(paddedRect)
-                    )
-                    
-                    context.coordinator.queueCameraUpdate {
-                        UIView.animate(withDuration: 1.0) {
-                            mapView.setRegion(region, animated: false)
-                        } completion: { _ in
-                            context.coordinator.isUpdatingCamera = false
-                        }
+                context.coordinator.queueCameraUpdate {
+                    UIView.animate(withDuration: 1.0) {
+                        mapView.setRegion(region, animated: false)
+                    } completion: { _ in
+                        context.coordinator.isUpdatingCamera = false
                     }
                 }
             }
@@ -177,9 +195,10 @@ struct NavigationMapView: UIViewRepresentable {
         var isUpdatingCamera: Bool = false
         var updateTimer: Timer?
         var pendingCameraUpdate: (() -> Void)?
-        var lastRouteDeviation: Date?  // Track last time route was recalculated
+        var lastRouteDeviation: Date?
         var completedPathCoordinates: [CLLocationCoordinate2D] = []
         var remainingPolyline: MKPolyline?
+        private let minimumUpdateInterval: TimeInterval = 15.0 // 15 seconds between updates
         
         init(_ parent: NavigationMapView) {
             self.parent = parent
@@ -192,112 +211,92 @@ struct NavigationMapView: UIViewRepresentable {
         }
         
         private func setupUpdateTimer() {
-            // Increase update interval to 3 seconds
-            updateTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            // Set timer to fire every 15 seconds
+            updateTimer = Timer.scheduledTimer(withTimeInterval: minimumUpdateInterval, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 if !self.isUpdatingCamera, let pendingUpdate = self.pendingCameraUpdate {
                     self.isUpdatingCamera = true
-                    pendingUpdate()
-                    self.pendingCameraUpdate = nil
+                    DispatchQueue.main.async {
+                        pendingUpdate()
+                        self.pendingCameraUpdate = nil
+                        self.isUpdatingCamera = false
+                    }
                 }
             }
         }
         
         func queueCameraUpdate(_ update: @escaping () -> Void) {
-            pendingCameraUpdate = update
-        }
-        
-        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            if let routePolyline = overlay as? MKPolyline {
-                let renderer = MKPolylineRenderer(polyline: routePolyline)
-                renderer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.8)
-                renderer.lineWidth = 8
-                renderer.lineCap = .round
-                renderer.lineJoin = .round
-                
-                // Add second line for better visibility
-                let backgroundRenderer = MKPolylineRenderer(polyline: routePolyline)
-                backgroundRenderer.strokeColor = UIColor.white.withAlphaComponent(0.3)
-                backgroundRenderer.lineWidth = 10
-                backgroundRenderer.lineCap = .round
-                backgroundRenderer.lineJoin = .round
-                
-                return renderer
+            // Only queue update if enough time has passed
+            let now = Date()
+            if now.timeIntervalSince(lastUpdateTime) >= minimumUpdateInterval {
+                pendingCameraUpdate = update
+                lastUpdateTime = now
             }
-            return MKOverlayRenderer()
         }
         
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             if annotation is MKUserLocation {
-                let annotationView = MKAnnotationView(annotation: annotation, reuseIdentifier: "UserLocation")
-                // Update car icon based on route completion
-                if parent.isRouteCompleted {
-                    annotationView.image = UIImage(systemName: "checkmark.circle.fill")?.withTintColor(.systemGreen, renderingMode: .alwaysOriginal)
-                } else {
-                    annotationView.image = UIImage(systemName: "car.fill")
-                }
-                annotationView.canShowCallout = true
-                return annotationView
+                return nil
             }
             
-            guard let mapAnnotation = annotation as? MapAnnotation else { return nil }
+            guard let customAnnotation = annotation as? MapAnnotation else {
+                return nil
+            }
             
             let identifier = "CustomPin"
             var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
             
             if annotationView == nil {
-                annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                annotationView = MKMarkerAnnotationView(annotation: customAnnotation, reuseIdentifier: identifier)
                 annotationView?.canShowCallout = true
-                
-                // Add custom callout with more info
-                let detailLabel = UILabel()
-                detailLabel.numberOfLines = 2
-                detailLabel.font = .systemFont(ofSize: 12)
-                annotationView?.detailCalloutAccessoryView = detailLabel
-                
-                // Add right callout accessory
-                let infoButton = UIButton(type: .detailDisclosure)
-                infoButton.tintColor = .systemBlue
-                annotationView?.rightCalloutAccessoryView = infoButton
+            } else {
+                annotationView?.annotation = customAnnotation
             }
             
-            annotationView?.annotation = annotation
-            
-            // Enhanced annotation styling
-            switch mapAnnotation.type {
+            switch customAnnotation.type {
             case .source:
-                if parent.isRouteCompleted {
-                    annotationView?.markerTintColor = .systemGreen
-                    annotationView?.glyphImage = UIImage(systemName: "checkmark.circle.fill")
-                } else {
-                    annotationView?.markerTintColor = .systemBlue
-                    annotationView?.glyphImage = UIImage(systemName: "location.fill")
-                }
-                annotationView?.animatesWhenAdded = true
-                
+                annotationView?.markerTintColor = .systemBlue
+                annotationView?.glyphImage = UIImage(systemName: "location.fill")
             case .destination:
-                if parent.isRouteCompleted {
-                    annotationView?.markerTintColor = .systemGreen
-                    annotationView?.glyphImage = UIImage(systemName: "flag.checkered.circle.fill")
-                } else {
-                    annotationView?.markerTintColor = .systemRed
-                    annotationView?.glyphImage = UIImage(systemName: "flag.fill")
-                }
-                annotationView?.displayPriority = .required
-                
+                annotationView?.markerTintColor = .systemRed
+                annotationView?.glyphImage = UIImage(systemName: "flag.fill")
             case .completed:
                 annotationView?.markerTintColor = .systemGreen
                 annotationView?.glyphImage = UIImage(systemName: "checkmark.circle.fill")
-                annotationView?.displayPriority = .required
+            case .pickup:
+                annotationView?.markerTintColor = .systemGreen
+                annotationView?.glyphImage = UIImage(systemName: "location.fill")
             }
             
-            // Add shadow for depth
-            annotationView?.layer.shadowColor = UIColor.black.cgColor
-            annotationView?.layer.shadowOpacity = 0.3
-            annotationView?.layer.shadowOffset = CGSize(width: 0, height: 2)
-            annotationView?.layer.shadowRadius = 4
-            
             return annotationView
+        }
+        
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = .systemBlue
+                renderer.lineWidth = 5
+                return renderer
+            } else if let circle = overlay as? MKCircle {
+                let renderer = MKCircleRenderer(circle: circle)
+                
+                // Check if this is the pickup or destination geofence
+                if circle.coordinate.latitude == parent.pickup.latitude && 
+                   circle.coordinate.longitude == parent.pickup.longitude {
+                    // Pickup geofence (green)
+                    renderer.fillColor = UIColor.systemGreen.withAlphaComponent(0.2)
+                    renderer.strokeColor = UIColor.systemGreen
+                } else {
+                    // Destination geofence (red)
+                    renderer.fillColor = UIColor.systemRed.withAlphaComponent(0.2)
+                    renderer.strokeColor = UIColor.systemRed
+                }
+                
+                renderer.lineWidth = 4
+                renderer.lineDashPattern = [30, 20]
+                return renderer
+            }
+            return MKOverlayRenderer(overlay: overlay)
         }
         
         // For simulator testing
@@ -446,70 +445,77 @@ struct NavigationMapView: UIViewRepresentable {
             }
         }
         
-        // Add map region change monitoring with stricter timing
+        // Update map region change monitoring
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             let now = Date()
-            // Increase minimum time between updates to 2 seconds
-            if now.timeIntervalSince(lastUpdateTime) < 2.0 {
-                return
+            // Only log updates that occur after minimum interval
+            if now.timeIntervalSince(lastUpdateTime) >= minimumUpdateInterval {
+                lastUpdateTime = now
+                updateCount += 1
+                
+                #if DEBUG
+                let span = mapView.region.span
+                print("Map Update #\(updateCount)")
+                print("New zoom levels - Latitude span: \(span.latitudeDelta), Longitude span: \(span.longitudeDelta)")
+                print("Center coordinate: \(mapView.region.center)")
+                print("Camera altitude: \(mapView.camera.altitude)")
+                print("-------------------")
+                #endif
             }
-            lastUpdateTime = now
+        }
+        
+        func updateUserLocation(_ mapView: MKMapView) {
+            guard parent.followsUserLocation,
+                  let userLocation = parent.userLocation,
+                  CLLocationCoordinate2DIsValid(userLocation) else { return }
             
-            updateCount += 1
-            let span = mapView.region.span
-            print("Map Update #\(updateCount)")
-            print("New zoom levels - Latitude span: \(span.latitudeDelta), Longitude span: \(span.longitudeDelta)")
-            print("Center coordinate: \(mapView.region.center)")
-            print("Camera altitude: \(mapView.camera.altitude)")
-            print("-------------------")
+            let now = Date()
+            // Only update user location if enough time has passed
+            if now.timeIntervalSince(lastUpdateTime) >= minimumUpdateInterval {
+                let region = MKCoordinateRegion(
+                    center: userLocation,
+                    latitudinalMeters: 1000,
+                    longitudinalMeters: 1000
+                )
+                DispatchQueue.main.async {
+                    mapView.setRegion(mapView.regionThatFits(region), animated: true)
+                    self.lastUpdateTime = now
+                }
+            }
         }
         
         // Add method to check for route deviation
         func checkRouteDeviation(userLocation: CLLocation, route: MKRoute) -> Bool {
-            // Don't check too frequently - at most once every 10 seconds
-            if let lastDeviation = lastRouteDeviation, 
-               Date().timeIntervalSince(lastDeviation) < 10 {
+            guard let closestPoint = findClosestPointOnRoute(userLocation: userLocation, route: route) else {
                 return false
             }
             
-            // Find the closest point on the route
-            var closestDistance = Double.greatestFiniteMagnitude
+            let distanceFromRoute = userLocation.distance(from: closestPoint)
+            return distanceFromRoute > parent.routeDeviationThreshold
+        }
+        
+        private func findClosestPointOnRoute(userLocation: CLLocation, route: MKRoute) -> CLLocation? {
+            var closestPoint: CLLocation?
+            var minDistance = Double.infinity
             
-            // Sample points from the route polyline
-            let polyline = route.polyline
-            let pointCount = polyline.pointCount
+            let routePoints = route.polyline.points()
+            let pointCount = route.polyline.pointCount
             
-            // Get the route's point data
-            let points = polyline.points()
-            
-            // Check distance to each point on the route
             for i in 0..<pointCount {
-                let polylinePoint = points[i]
-                let coordinate = CLLocationCoordinate2D(
-                    latitude: CLLocationDegrees(polylinePoint.x),
-                    longitude: CLLocationDegrees(polylinePoint.y)
+                let point = routePoints[i]
+                let location = CLLocation(
+                    latitude: CLLocationDegrees(point.x),
+                    longitude: CLLocationDegrees(point.y)
                 )
+                let distance = userLocation.distance(from: location)
                 
-                let routeLocation = CLLocation(
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude
-                )
-                
-                let distance = userLocation.distance(from: routeLocation)
-                if distance < closestDistance {
-                    closestDistance = distance
+                if distance < minDistance {
+                    minDistance = distance
+                    closestPoint = location
                 }
             }
             
-            // If we're more than threshold distance from the route, consider it a deviation
-            let hasDeviated = closestDistance > parent.routeDeviationThreshold
-            
-            if hasDeviated {
-                lastRouteDeviation = Date()
-                print("Route deviation detected: \(closestDistance) meters from route")
-            }
-            
-            return hasDeviated
+            return closestPoint
         }
     }
 } 

@@ -11,7 +11,7 @@ struct RoleSelectionView: View {
                 Text("TrackNGo")
                     .font(.system(.title, design: .default))
                     .fontWeight(.bold)
-                    .foregroundColor(Color.pink.opacity(0.5))
+                    .foregroundColor(Color.blue.opacity(0.5))
                     .padding(.top, 20)
                 
                 Image("image")
@@ -86,7 +86,7 @@ struct LoginView: View {
                     .multilineTextAlignment(.center)
                     .font(.title)
                     .fontWeight(.bold)
-                    .foregroundColor(Color.pink.opacity(0.5))
+                    .foregroundColor(Color.blue.opacity(0.5))
                     .padding(.top, 20)
                     
                 TextField("Email", text: $email)

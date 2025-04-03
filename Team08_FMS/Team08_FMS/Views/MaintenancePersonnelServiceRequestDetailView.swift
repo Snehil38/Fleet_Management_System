@@ -1,4 +1,5 @@
 import SwiftUI
+import PDFKit
 
 struct MaintenancePersonnelServiceRequestDetailView: View {
     let request: MaintenanceServiceRequest
@@ -13,6 +14,8 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
     @State private var selectedExpenseCategory: ExpenseCategory = .parts
     @State private var safetyChecks: [SafetyCheck] = []
     @State private var expenses: [Expense] = []
+    @State private var showingExpenseReceipt = false
+    @State private var expenseReceiptData: Data?
     
     var body: some View {
         ScrollView {
@@ -87,6 +90,21 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
                             .cornerRadius(10)
                         }
                         .disabled(expenses.isEmpty)
+                    } else if request.status == .completed {
+                        Button(action: {
+                            expenseReceiptData = generateExpenseReceipt()
+                            showingExpenseReceipt = true
+                        }) {
+                            HStack {
+                                Image(systemName: "doc.text.fill")
+                                Text("View Expense Receipt")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
                     }
                 }
                 .padding(.horizontal)
@@ -100,7 +118,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         } message: {
             Text(alertMessage)
         }
-        .sheet(isPresented: $showingExpenseSheet) {
+        .sheet(isPresented: $showingExpenseSheet, onDismiss: {loadExpenses()}){
             NavigationView {
                 AddExpenseView(
                     request: request,
@@ -119,6 +137,31 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
             }
         } message: {
             Text("Are you sure you want to mark this service request as completed?")
+        }
+        .sheet(isPresented: $showingExpenseReceipt) {
+            if let data = expenseReceiptData {
+                NavigationView {
+                    PDFKitView(data: data)
+                        .navigationTitle("Expense Receipt")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Done") {
+                                    showingExpenseReceipt = false
+                                }
+                            }
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                ShareLink(
+                                    item: data,
+                                    preview: SharePreview(
+                                        "Maintenance Expense Receipt",
+                                        image: Image(systemName: "doc.fill")
+                                    )
+                                )
+                            }
+                        }
+                }
+            }
         }
         .onAppear {
             loadSafetyChecks()
@@ -178,8 +221,164 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
             dismiss()
         }
     }
+    
+    private func generateExpenseReceipt() -> Data {
+        let pdfMetaData = [
+            kCGPDFContextCreator: "FMS App",
+            kCGPDFContextAuthor: "Maintenance Personnel",
+            kCGPDFContextTitle: "Maintenance Expense Receipt"
+        ]
+        
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = pdfMetaData as [String: Any]
+        
+        let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8) // A4 size
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        let pdfData = renderer.pdfData { context in
+            context.beginPage()
+            let ctx = UIGraphicsGetCurrentContext()!
+            
+            // Set up text attributes
+            let titleAttributes = [
+                NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 24),
+                NSAttributedString.Key.foregroundColor: UIColor.black
+            ]
+            let headerAttributes = [
+                NSAttributedString.Key.font: UIFont.boldSystemFont(ofSize: 14),
+                NSAttributedString.Key.foregroundColor: UIColor.black
+            ]
+            let textAttributes = [
+                NSAttributedString.Key.font: UIFont.systemFont(ofSize: 12),
+                NSAttributedString.Key.foregroundColor: UIColor.black
+            ]
+            
+            // Draw title
+            let title = "MAINTENANCE EXPENSE RECEIPT"
+            let titleSize = title.size(withAttributes: titleAttributes)
+            let titleX = (pageRect.width - titleSize.width) / 2
+            title.draw(at: CGPoint(x: titleX, y: 40), withAttributes: titleAttributes)
+            
+            // Set up table drawing parameters
+            var yPosition: CGFloat = 100
+            let leftMargin: CGFloat = 50
+            let labelWidth: CGFloat = 150  // Width for labels
+            let valueWidth: CGFloat = 350  // Width for values
+            let rowHeight: CGFloat = 25
+            let padding: CGFloat = 5
+            
+            // Function to draw a table row with word wrap
+            func drawTableRow(label: String, value: String, atY y: CGFloat) -> CGFloat {
+                let rect = CGRect(x: leftMargin, y: y, width: labelWidth + valueWidth, height: rowHeight)
+                ctx.stroke(rect)
+                
+                // Draw vertical line between columns
+                let midX = leftMargin + labelWidth
+                ctx.move(to: CGPoint(x: midX, y: y))
+                ctx.addLine(to: CGPoint(x: midX, y: y + rowHeight))
+                ctx.strokePath()
+                
+                // Draw label
+                let labelRect = CGRect(x: leftMargin + padding, y: y + padding, 
+                                     width: labelWidth - padding * 2, height: rowHeight - padding * 2)
+                label.draw(in: labelRect, withAttributes: textAttributes)
+                
+                // Draw value with potential wrapping
+                let valueRect = CGRect(x: midX + padding, y: y + padding,
+                                     width: valueWidth - padding * 2, height: rowHeight - padding * 2)
+                value.draw(in: valueRect, withAttributes: textAttributes)
+                
+                return y + rowHeight
+            }
+            
+            // Draw Service Request Information section
+            "Service Request Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+            yPosition += 25
+            
+            yPosition = drawTableRow(label: "Request ID:", value: request.id.uuidString, atY: yPosition)
+            yPosition = drawTableRow(label: "Vehicle:", value: request.vehicleName, atY: yPosition)
+            yPosition = drawTableRow(label: "Service Type:", value: request.serviceType.rawValue, atY: yPosition)
+            yPosition = drawTableRow(label: "Priority:", value: request.priority.rawValue, atY: yPosition)
+            
+            yPosition += 20
+            
+            // Draw Expenses section
+            "Expenses".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+            yPosition += 25
+            
+            // Draw expense items
+            for expense in expenses {
+                yPosition = drawTableRow(
+                    label: expense.description,
+                    value: String(format: "$%.2f", expense.amount),
+                    atY: yPosition
+                )
+            }
+            
+            yPosition += 10
+            
+            // Draw total
+            let totalCost = expenses.reduce(0) { $0 + $1.amount }
+            yPosition = drawTableRow(
+                label: "Total Cost:",
+                value: String(format: "$%.2f", totalCost),
+                atY: yPosition
+            )
+            
+            yPosition += 20
+            
+            // Draw Completion Information section
+            "Completion Information".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+            yPosition += 25
+            
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .long
+            dateFormatter.timeStyle = .short
+            
+            yPosition = drawTableRow(
+                label: "Completion Date:",
+                value: dateFormatter.string(from: Date()),
+                atY: yPosition
+            )
+            
+            yPosition += 40
+            
+            // Draw Signature section
+            "Maintenace Personnel Signature:".draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: headerAttributes)
+            yPosition += 25
+            
+            // Draw signature box
+            let signatureRect = CGRect(x: leftMargin, y: yPosition, width: 200, height: 60)
+            ctx.stroke(signatureRect)
+            
+            yPosition += 80
+            
+            // Draw date
+            dateFormatter.dateStyle = .long
+            dateFormatter.timeStyle = .none
+            let dateString = "Date: \(dateFormatter.string(from: Date()))"
+            dateString.draw(at: CGPoint(x: leftMargin, y: yPosition), withAttributes: textAttributes)
+        }
+        
+        return pdfData
+    }
 }
 
+// Add PDFKitView for displaying PDF
+struct MaintenancePDFKitView: UIViewRepresentable {
+    let data: Data
+    
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.document = PDFDocument(data: data)
+        pdfView.autoScales = true
+        return pdfView
+    }
+    
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        uiView.document = PDFDocument(data: data)
+    }
+}
 
 struct ExpensesCard: View {
     let expenses: [Expense]
@@ -217,7 +416,6 @@ struct ExpensesCard: View {
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
-
 
 struct ExpenseRow: View {
     let expense: Expense
