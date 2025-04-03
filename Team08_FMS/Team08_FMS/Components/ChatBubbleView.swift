@@ -69,6 +69,8 @@ struct ChatBubbleView: View {
     @StateObject private var supabaseController = SupabaseDataController.shared
     @State private var currentUserId: UUID?
     @StateObject private var audioPlayer = AudioPlayer()
+    @State private var showDeleteAlert = false
+    var onDelete: () -> Void = {} // Default empty closure
     
     private var backgroundColor: Color {
         message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray6)
@@ -203,6 +205,9 @@ struct ChatBubbleView: View {
                     }
                     .padding(.horizontal, 4)
                 }
+                .onLongPressGesture(minimumDuration: 0.5) {
+                    showDeleteAlert = true
+                }
                 
                 if message.isFromCurrentUser {
                     // Driver icon
@@ -221,6 +226,25 @@ struct ChatBubbleView: View {
         .padding(.vertical, 4)
         .opacity(isAnimating ? 1 : 0)
         .offset(y: isAnimating ? 0 : 20)
+        .alert("Delete Message", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    do {
+                        try await supabaseController.supabase.database
+                            .from("chat_messages")
+                            .update(["is_deleted": true])
+                            .eq("id", value: message.id)
+                            .execute()
+                        onDelete()
+                    } catch {
+                        print("Error deleting message: \(error)")
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete this message?")
+        }
         .onAppear {
             withAnimation(ChatBubbleAnimation.messageAppearance) {
                 isAnimating = true
