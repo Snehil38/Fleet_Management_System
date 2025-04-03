@@ -7,7 +7,19 @@ private func createStorageBucketIfNeeded() async throws {
                 print("Bucket already exists: \(storageBucket)")
             } catch {
                 print("Bucket does not exist, creating: \(storageBucket)")
-                // Create the bucket with public access and specific mime types
+                // First create the bucket in the storage.buckets table
+                try await supabaseDataController.supabase.database
+                    .from("storage.buckets")
+                    .insert([
+                        "id": storageBucket,
+                        "name": storageBucket,
+                        "public": true,
+                        "file_size_limit": 10485760,
+                        "allowed_mime_types": ["image/jpeg", "image/png"]
+                    ])
+                    .execute()
+                
+                // Then create the bucket in storage
                 try await storageClient.createBucket(
                     storageBucket,
                     options: BucketOptions(
@@ -44,10 +56,32 @@ func sendImage(_ image: UIImage) async {
                 return
             }
             
+            guard let currentUserId = await supabaseDataController.getUserID() else {
+                print("No user ID found")
+                return
+            }
+            
             let fileName = "chat/\(UUID().uuidString).jpg"
             print("Attempting to upload file: \(fileName) to bucket: \(storageBucket)")
             
-            // Upload image to storage
+            // First create the object entry in storage.objects
+            try await supabaseDataController.supabase.database
+                .from("storage.objects")
+                .insert([
+                    "bucket_id": storageBucket,
+                    "name": fileName,
+                    "owner": currentUserId.uuidString,
+                    "size": finalImageData.count,
+                    "mime_type": "image/jpeg",
+                    "metadata": [
+                        "lastModified": Date().timeIntervalSince1970,
+                        "size": finalImageData.count,
+                        "type": "image/jpeg"
+                    ]
+                ])
+                .execute()
+            
+            // Then upload the actual file
             try await storageClient
                 .from(storageBucket)
                 .upload(
@@ -71,12 +105,6 @@ func sendImage(_ image: UIImage) async {
             
             print("Got public URL: \(publicURL.absoluteString)")
             
-            // Send message with image attachment
-            guard let currentUserId = await supabaseDataController.getUserID() else {
-                print("No user ID found")
-                return
-            }
-            
             let userRole = supabaseDataController.userRole
             let (messageFleetManagerId, messageRecipientId): (UUID, UUID)
             
@@ -90,18 +118,6 @@ func sendImage(_ image: UIImage) async {
             
             // Convert URL to string
             let urlString = publicURL.absoluteString
-            
-            // First insert into storage.objects to ensure the file is tracked
-            try await supabaseDataController.supabase.database
-                .from("storage.objects")
-                .insert([
-                    "bucket_id": storageBucket,
-                    "name": fileName,
-                    "owner": currentUserId.uuidString,
-                    "size": finalImageData.count,
-                    "mime_type": "image/jpeg"
-                ])
-                .execute()
             
             let message = ChatMessage(
                 id: UUID(),
