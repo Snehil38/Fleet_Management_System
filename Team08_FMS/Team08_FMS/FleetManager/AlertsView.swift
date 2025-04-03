@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct AlertsView: View {
-    @ObservedObject var supabase = SupabaseDataController.shared
-    @State private var events: [GeofenceEvents] = []
+    @StateObject private var viewModel = NotificationsViewModel()
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
@@ -11,23 +10,70 @@ struct AlertsView: View {
                 .ignoresSafeArea()
 
             VStack {
-                if events.isEmpty {
-                    EmptysStateView()
+                if viewModel.isLoading && viewModel.notifications.isEmpty {
+                    ProgressView("Loading alerts...")
+                        .padding()
+                } else if let error = viewModel.error {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.red)
+                        
+                        Text("Error Loading Alerts")
+                            .font(.headline)
+                        
+                        Text(error.localizedDescription)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button {
+                            Task {
+                                await viewModel.loadNotifications()
+                            }
+                        } label: {
+                            Text("Try Again")
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding()
+                } else if viewModel.notifications.isEmpty {
+                    AlertEmptyStateView()
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
                             // Summary Cards Section
-//                            SummarySection()
-//                                .padding(.top, 8)
-//                                .padding(.horizontal)
+                            AlertSummarySection(
+                                unreadCount: viewModel.unreadCount,
+                                totalCount: viewModel.notifications.count
+                            )
+                            .padding(.top, 8)
+                            .padding(.horizontal)
                             
-                            // Alerts List
-                            AlertsListView()
-                                .padding(.top, 16)
+                            // Notifications List
+                            NotificationsListView(
+                                notifications: viewModel.notifications,
+                                onMarkAsRead: { notification in
+                                    Task {
+                                        await viewModel.markAsRead(notification)
+                                    }
+                                },
+                                onDelete: { notification in
+                                    Task {
+                                        await viewModel.deleteNotification(notification)
+                                    }
+                                }
+                            )
+                            .padding(.top, 16)
                         }
                     }
                     .refreshable {
-                        loadData()
+                        await viewModel.loadNotifications()
                     }
                 }
             }
@@ -35,8 +81,7 @@ struct AlertsView: View {
         .navigationTitle("Alerts")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Back Button for modal views
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItemGroup(placement: .navigationBarLeading) {
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
@@ -44,86 +89,37 @@ struct AlertsView: View {
                     }
                 }
             }
-        }
-        .onAppear {
-            loadData()
-        }
-    }
-
-    // MARK: - Helper Methods
-    
-    func loadData() {
-        events = supabase.geofenceEvents.sorted(by: { $0.timestamp > $1.timestamp })
-    }
-    
-    func markAsRead(_ event: GeofenceEvents) {
-        if let index = events.firstIndex(where: { $0.id == event.id }) {
-            events[index].isRead = true
-        }
-    }
-    
-    func deleteEvent(_ event: GeofenceEvents) {
-        events.removeAll { $0.id == event.id }
-    }
-    
-    // MARK: - UI Components
-    
-    @ViewBuilder
-    private func SummarySection() -> some View {
-        HStack(spacing: 12) {
-            // Unread Card
-            SummaryCard(
-                icon: "bell.fill",
-                title: "Unread",
-                count: events.filter { !$0.isRead }.count,
-                color: .blue
-            )
             
-            // Total Card
-            SummaryCard(
-                icon: "bell",
-                title: "Total",
-                count: events.count,
-                color: .gray
-            )
-        }
-    }
-    
-    @ViewBuilder
-    private func AlertsListView() -> some View {
-        LazyVStack(spacing: 12) {
-            ForEach(events) { event in
-                AlertRow(event: event)
-                    .padding(.horizontal)
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        if !event.isRead {
-                            Button {
-                                withAnimation {
-                                    markAsRead(event)
-                                }
-                            } label: {
-                                Label("Mark as Read", systemImage: "checkmark")
-                            }
-                            .tint(.blue)
+            if !viewModel.notifications.isEmpty {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        Task {
+                            await viewModel.markAllAsRead()
                         }
+                    } label: {
+                        Text("Mark All as Read")
+                            .font(.subheadline)
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            withAnimation {
-                                deleteEvent(event)
-                            }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+                }
             }
+        }
+        .task {
+            await viewModel.loadNotifications()
+        }
+        .alert("Enable Notifications", isPresented: $viewModel.showNotificationPermissionAlert) {
+            Button("Open Settings") {
+                viewModel.openAppSettings()
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("To receive important alerts about your fleet, please enable notifications in Settings.")
         }
     }
 }
 
 // MARK: - Supporting Views
 
-struct EmptysStateView: View {
+struct AlertEmptyStateView: View {
     var body: some View {
         VStack(spacing: 24) {
             ZStack {
@@ -152,7 +148,32 @@ struct EmptysStateView: View {
     }
 }
 
-struct SummaryCard: View {
+struct AlertSummarySection: View {
+    let unreadCount: Int
+    let totalCount: Int
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Unread Card
+            AlertSummaryCard(
+                icon: "bell.fill",
+                title: "Unread",
+                count: unreadCount,
+                color: .blue
+            )
+            
+            // Total Card
+            AlertSummaryCard(
+                icon: "bell",
+                title: "Total",
+                count: totalCount,
+                color: .gray
+            )
+        }
+    }
+}
+
+struct AlertSummaryCard: View {
     let icon: String
     let title: String
     let count: Int
@@ -192,50 +213,72 @@ struct SummaryCard: View {
     }
 }
 
-struct AlertRow: View {
-    var event: GeofenceEvents
+struct NotificationsListView: View {
+    let notifications: [NotificationItem]
+    let onMarkAsRead: (NotificationItem) -> Void
+    let onDelete: (NotificationItem) -> Void
+    
+    var body: some View {
+        LazyVStack(spacing: 12) {
+            ForEach(notifications) { notification in
+                AlertNotificationRow(notification: notification)
+                    .padding(.horizontal)
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        if !notification.is_read {
+                            Button {
+                                onMarkAsRead(notification)
+                            } label: {
+                                Label("Mark as Read", systemImage: "checkmark")
+                            }
+                            .tint(.blue)
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            onDelete(notification)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+    }
+}
 
+struct AlertNotificationRow: View {
+    let notification: NotificationItem
+    
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: event.isRead ? "bell" : "bell.fill")
+            Image(systemName: notification.type.iconName)
                 .font(.system(size: 24))
-                .foregroundColor(event.isRead ? .gray : .blue)
+                .foregroundColor(notification.type.color)
                 .padding(6)
                 .background(Color(UIColor.systemGray6))
                 .clipShape(Circle())
-
+            
             VStack(alignment: .leading, spacing: 4) {
-                Text(event.message)
-                    .font(event.isRead ? .body : .headline)
+                Text(notification.message)
+                    .font(.system(.body))
                     .foregroundColor(.primary)
                     .lineLimit(2)
-
-                Text("Trip: \(event.tripId.uuidString)")
-                    .font(.caption)
+                
+                Text(notification.created_at, style: .relative)
+                    .font(.system(.caption))
                     .foregroundColor(.secondary)
             }
-
+            
             Spacer()
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(event.timestamp, style: .time)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-
-                Text(event.timestamp, style: .date)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+            
+            if !notification.is_read {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 8, height: 8)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(event.isRead ? Color(UIColor.systemBackground) : Color.blue.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(UIColor.separator), lineWidth: event.isRead ? 0.5 : 0)
-        )
+        .padding()
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 }

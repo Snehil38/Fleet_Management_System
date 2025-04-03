@@ -566,7 +566,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 let avgSpeed = recentReadings.map { $0.speed }.reduce(0, +) / Double(recentReadings.count)
                 
                 // Convert speed to km/h for easier calculation
-                let speedKmh = avgSpeed * 3.6
+//                let speedKmh = avgSpeed * 3.6
                 
                 // Update remaining time based on current speed and remaining distance
                 if remainingDistance > 0 {

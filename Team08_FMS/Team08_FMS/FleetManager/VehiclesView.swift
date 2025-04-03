@@ -164,7 +164,7 @@ private struct VehicleCard: View {
                                 priority: .medium,
                                 date: Date(),
                                 dueDate: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date(),
-                                status: .pending,
+                                status: .assigned,
                                 notes: "Maintenance scheduled; verify fluid levels and tire pressure.",
                                 issueType: "Routine"
                             )
@@ -375,136 +375,80 @@ private struct DeleteVehiclesView: View {
 struct VehiclesView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
-    @StateObject private var notificationsViewModel = NotificationsViewModel()
+    @EnvironmentObject private var notificationsViewModel: NotificationsViewModel
     @State private var showingAddVehicle = false
-    @State private var showingDeleteMode = false
-    @State private var showingProfile = false
-    @State private var showingMessages = false
     @State private var showingNotifications = false
     @State private var searchText = ""
-    @State private var selectedStatus: VehicleStatus?
-
-    private let minimumUpdateInterval: TimeInterval = 15.0
-
-    private func matchesSearch(_ vehicle: Vehicle) -> Bool {
-        guard !searchText.isEmpty else { return true }
-        let searchText = self.searchText.lowercased()
-
-        return vehicle.name.lowercased().contains(searchText) ||
-               vehicle.make.lowercased().contains(searchText) ||
-               vehicle.model.lowercased().contains(searchText) ||
-               vehicle.licensePlate.lowercased().contains(searchText)
-    }
-
-    private var filteredVehicles: [Vehicle] {
-        let vehicles: [Vehicle]
-        
-        // Don't call loadVehicles here as it was causing unnecessary reloads
-        if let status = selectedStatus {
-            // Filter directly from the published array
-            vehicles = vehicleManager.vehicles.filter { $0.status == status }
-        } else {
-            vehicles = vehicleManager.vehicles
-        }
-        return vehicles.filter(matchesSearch)
-    }
-
+    @State private var selectedFilter: VehicleStatus? = nil
+    @State private var showingFilterSheet = false
+    
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    SearchBarView(searchText: $searchText)
-                    StatusFilterView(selectedStatus: $selectedStatus)
+            VStack {
+                // Search and filter bar
+                HStack {
+                   // SearchBar(text: $searchText)
                     
-                    if vehicleManager.isLoading && vehicleManager.vehicles.isEmpty {
-                        ProgressView("Loading vehicles...")
-                            .padding(.top, 50)
-                    } else if vehicleManager.loadError != nil && vehicleManager.vehicles.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 40))
-                                .foregroundColor(.orange)
-                            Text("Failed to load vehicles")
-                                .font(.system(.headline, design: .default))
-                            Text(vehicleManager.loadError ?? "Unknown error")
-                                .font(.system(.subheadline, design: .default))
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                            Button("Retry") {
-                                vehicleManager.loadVehicles()
-                            }
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                        }
-                        .padding()
-                    } else {
-                        VehicleListView(vehicles: filteredVehicles, vehicleManager: vehicleManager)
-                    }
-                    
-                    if vehicleManager.isLoading && !vehicleManager.vehicles.isEmpty {
-                        ProgressView()
-                            .padding()
+                    Button(action: { showingFilterSheet = true }) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.title2)
+                            .foregroundColor(selectedFilter != nil ? .blue : .gray)
                     }
                 }
-                .padding(.vertical)
-            }
-            .onAppear {
-                if vehicleManager.vehicles.isEmpty {
-                    vehicleManager.loadVehicles()
+                .padding(.horizontal)
+                
+                // Vehicle list
+                ScrollView {
+                    VehicleListView(
+                        vehicles: filteredVehicles,
+                        vehicleManager: vehicleManager
+                    )
+                    .padding(.vertical)
+                }
+                .refreshable {
+                    await vehicleManager.loadVehiclesAsync()
                 }
             }
             .navigationTitle("Vehicles")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button(action: { showingNotifications = true }) {
-                            Image(systemName: "bell.fill")
-                                .overlay(
-                                    Group {
-                                        if notificationsViewModel.unreadCount > 0 {
-                                            Text("\(min(notificationsViewModel.unreadCount, 99))")
-                                                .font(.caption2)
-                                                .padding(4)
-                                                .background(Color.red)
-                                                .clipShape(Circle())
-                                                .offset(x: 10, y: -10)
-                                        }
-                                    }
-                                )
-                        }
-                        
-                        Button(action: { showingAddVehicle = true }) {
-                            Image(systemName: "plus")
-                        }
+                    Button(action: { showingAddVehicle = true }) {
+                        Image(systemName: "plus")
                     }
                 }
             }
-            .sheet(isPresented: $showingProfile) {
-                NavigationView {
-                    FleetManagerProfileView()
-                        .environmentObject(dataManager)
-                }
-            }
-            .sheet(isPresented: $showingMessages) {
-                NavigationView {
-                    ContactView()
-                        .environmentObject(dataManager)
-                }
-            }
-            .sheet(isPresented: $showingAddVehicle) {
-                VehicleSaveView(vehicleManager: vehicleManager)
-            }
-            .sheet(isPresented: $showingNotifications) {
-                NotificationsView()
-            }
+//            .sheet(isPresented: $showingAddVehicle) {
+//                AddVehicleView()
+//            }
+//            .sheet(isPresented: $showingFilterSheet) {
+//                FilterSheet(selectedFilter: $selectedFilter)
+//            }
+//            .sheet(isPresented: $showingNotifications) {
+//                AlertsView()
+//                    .environmentObject(notificationsViewModel)
+//            }
         }
     }
     
-    func refreshVehicles() async {
-        await vehicleManager.loadVehiclesAsync()
+    private var filteredVehicles: [Vehicle] {
+        var vehicles = vehicleManager.vehicles
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            vehicles = vehicles.filter { vehicle in
+                vehicle.name.localizedCaseInsensitiveContains(searchText) ||
+                vehicle.licensePlate.localizedCaseInsensitiveContains(searchText) ||
+                vehicle.make.localizedCaseInsensitiveContains(searchText) ||
+                vehicle.model.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        // Apply status filter
+        if let filter = selectedFilter {
+            vehicles = vehicles.filter { $0.status == filter }
+        }
+        
+        return vehicles
     }
 }
 

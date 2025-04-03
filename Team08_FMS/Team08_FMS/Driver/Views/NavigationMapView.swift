@@ -9,7 +9,7 @@ struct NavigationMapView: UIViewRepresentable {
     @Binding var userHeading: Double
     let followsUserLocation: Bool
     @Binding var isRouteCompleted: Bool
-    let geofenceRadius: CLLocationDistance = 500.0 // Increased from 200m to 500m for better visibility
+    let geofenceRadius: CLLocationDistance = 50.0 // Increased from 200m to 500m for better visibility
     
     // For updating ETA and distance
     var onLocationUpdate: ((CLLocation) -> Void)?

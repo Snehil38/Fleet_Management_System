@@ -6,6 +6,7 @@ struct MaintenancePersonnelDashboardView: View {
     @State private var selectedPriority: ServiceRequestPriority?
     @State private var showingProfile = false
     @State private var showingChat = false
+    @State private var userID: UUID?
     
     var body: some View {
         NavigationView {
@@ -97,21 +98,40 @@ struct MaintenancePersonnelDashboardView: View {
             .sheet(isPresented: $showingChat) {
                 MaintenancePersonnelChatView()
             }
+            .refreshable {
+                await dataStore.loadData()
+            }
+        }
+        .task {
+            self.userID = await SupabaseDataController.shared.getUserID()
         }
     }
     
     private var filteredRequests: [MaintenanceServiceRequest] {
-        var filtered = dataStore.serviceRequests.filter { $0.status == selectedStatus }
-        if let priority = selectedPriority {
-            filtered = filtered.filter { $0.priority == priority }
+        dataStore.serviceRequests.filter { request in
+            // Always filter by status.
+            guard request.status == selectedStatus else { return false }
+            
+            // If a priority is selected, filter by it.
+            if let priority = selectedPriority, request.priority != priority {
+                return false
+            }
+            
+            // If there's a valid userID, only allow requests with no assigned personnel or those matching the user.
+            if let currentUserID = userID {
+                return request.personnelID == nil || request.personnelID == currentUserID
+            }
+            
+            // If userID is nil, do not filter on personnel.
+            return true
         }
-        return filtered
     }
 }
 
 struct StatsOverviewView: View {
     @ObservedObject var dataStore: MaintenancePersonnelDataStore
     @Binding var selectedStatus: ServiceRequestStatus
+    @State var userID: UUID?
     
     var body: some View {
         VStack(spacing: 16) {
@@ -160,18 +180,34 @@ struct StatsOverviewView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .task {
+            userID = await SupabaseDataController.shared.getUserID()
+        }
     }
     
+    private var filteredRequests: [MaintenanceServiceRequest] {
+        dataStore.serviceRequests.filter { request in
+            // If there's a valid userID, only allow requests with no assigned personnel or those matching the user.
+            if let currentUserID = userID {
+                return request.personnelID == nil || request.personnelID == currentUserID
+            }
+            
+            // If userID is nil, do not filter on personnel.
+            return true
+        }
+    }
+
+    
     private var pendingCount: Int {
-        dataStore.serviceRequests.filter { $0.status == .pending }.count
+        filteredRequests.filter { $0.status == .pending }.count
     }
     
     private var inProgressCount: Int {
-        dataStore.serviceRequests.filter { $0.status == .inProgress }.count
+        filteredRequests.filter { $0.status == .inProgress }.count
     }
     
     private var completedCount: Int {
-        dataStore.serviceRequests.filter { $0.status == .completed }.count
+        filteredRequests.filter { $0.status == .completed }.count
     }
 }
 

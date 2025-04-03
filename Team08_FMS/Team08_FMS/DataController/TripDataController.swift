@@ -359,11 +359,72 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
-//    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-//        guard let location = locations.last else { return }
-//        // Handle location updates if needed
-//    }
-    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last, let currentTrip = currentTrip else { return }
+        
+        // Print the current location
+        print("Current user location: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        
+        // Check if the user is inside any monitored geofenced areas
+        for region in manager.monitoredRegions {
+            if let circularRegion = region as? CLCircularRegion {
+                if circularRegion.contains(location.coordinate) {
+                    print("User is in geofenced area: \(circularRegion.identifier)")
+                    switch circularRegion.identifier {
+                    case "sourceRegion":
+                        isInSourceRegion = true
+                        print("DEBUG: Entered source region")
+                        let message = "Vehicle: \(currentTrip.vehicleDetails.name) is in the source region"
+                        let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
+                        supabaseController.insertIntoGeofenceEvents(event: event)
+                        checkTripStartEligibility()
+                        
+                        if !upcomingTrips.isEmpty {
+                            sendNotification(
+                                title: "Ready to Start Trip",
+                                body: "You are now in the pickup area. You can start your next trip when ready."
+                            )
+                        }
+                        
+                    case "destinationRegion":
+                        isInDestinationRegion = true
+                        print("DEBUG: Entered destination region")
+                        let message = "Vehicle: \(currentTrip.vehicleDetails.name) is i the destination region"
+                        let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
+                        supabaseController.insertIntoGeofenceEvents(event: event)
+                        tripTimer?.invalidate()
+                        tripTimer = nil
+                        
+                        if let startTime = tripStartTime {
+                            let duration = Date().timeIntervalSince(startTime)
+                            let durationString = formatTimeRemaining(duration)
+                            
+                            Task {
+                                await notifyFleetManager(message: "Vehicle has reached destination for trip \(currentTrip.id.uuidString). Trip duration: \(durationString)")
+                            }
+                        }
+                        
+                    default:
+                        print("DEBUG: Entered unknown region: \(circularRegion.identifier)")
+                        
+                    }
+                }
+            }
+        }
+        
+        // Calculate distances to source and destination
+        let sourceLocation = CLLocation(latitude: currentTrip.sourceCoordinate.latitude,
+                                        longitude: currentTrip.sourceCoordinate.longitude)
+        let destinationLocation = CLLocation(latitude: currentTrip.destinationCoordinate.latitude,
+                                             longitude: currentTrip.destinationCoordinate.longitude)
+        
+        let distanceToSource = location.distance(from: sourceLocation)
+        let distanceToDestination = location.distance(from: destinationLocation)
+        
+        print("Distance from current location to source region: \(distanceToSource) meters")
+        print("Distance from current location to destination region: \(distanceToDestination) meters")
+    }
+
     func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
         print("DEBUG: Successfully started monitoring region: \(region.identifier)")
         if let circularRegion = region as? CLCircularRegion {

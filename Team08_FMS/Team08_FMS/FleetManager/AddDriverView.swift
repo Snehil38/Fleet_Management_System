@@ -151,7 +151,7 @@ struct AddDriverView: View {
                         TextField("Driver License Number", text: $licenseNumber)
                             .onChange(of: licenseNumber) { _, _ in licenseNumberEdited = true }
                         if licenseNumberEdited && !isLicenseValid {
-                            Text("License number cannot be empty.")
+                            Text("License number format is invalid. Please use the format: AA 00 0000 0000000")
                                 .font(.caption)
                                 .foregroundColor(.red)
                         }

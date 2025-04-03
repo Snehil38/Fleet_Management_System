@@ -10,19 +10,23 @@ import SwiftUI
 struct FleetManagerTabView: View {
     @StateObject private var vehicleManager = VehicleManager()
     @StateObject private var dataManager = CrewDataController.shared
+    @StateObject private var notificationsViewModel = NotificationsViewModel()
     @State private var refreshTask: Task<Void, Never>?
+    @State private var showingNotifications = false
 
     var body: some View {
         TabView {
             FleetManagerDashboardTabView()
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
+                .environmentObject(notificationsViewModel)
                 .tabItem {
                     Image(systemName: "gauge")
                     Text("Dashboard")
                 }
             
             FleetTripsView()
+                .environmentObject(notificationsViewModel)
                 .tabItem {
                     Image(systemName: "shippingbox.fill")
                     Text("Trips")
@@ -31,6 +35,7 @@ struct FleetManagerTabView: View {
             VehiclesView()
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
+                .environmentObject(notificationsViewModel)
                 .tabItem {
                     Image(systemName: "car.fill")
                     Text("Vehicles")
@@ -39,6 +44,7 @@ struct FleetManagerTabView: View {
             FleetCrewManagementView()
                 .environmentObject(dataManager)
                 .environmentObject(vehicleManager)
+                .environmentObject(notificationsViewModel)
                 .tabItem {
                     Image(systemName: "person.2.fill")
                     Text("Crew")
@@ -46,21 +52,18 @@ struct FleetManagerTabView: View {
         }
         .task {
             // Initial load
+            print("🔄 FleetManagerTabView: Loading initial data...")
             vehicleManager.loadVehicles()
             CrewDataController.shared.update()
             listenForGeofenceEvents()
             await refreshData()
-            
-            // Start periodic refresh
-//            refreshTask = Task {
-//                while !Task.isCancelled {
-//                    try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-//                    await refreshData()
-//                }
-//            }
         }
         .onDisappear {
             refreshTask?.cancel()
+        }
+        .sheet(isPresented: $showingNotifications) {
+            AlertsView()
+                .environmentObject(notificationsViewModel)
         }
     }
     
@@ -77,4 +80,5 @@ struct FleetManagerTabView: View {
 
 #Preview {
     FleetManagerTabView()
+        .environmentObject(SupabaseDataController.shared)
 }
