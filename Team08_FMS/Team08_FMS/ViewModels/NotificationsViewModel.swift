@@ -62,7 +62,7 @@ final class NotificationsViewModel: ObservableObject {
         isLoading = true
         
         do {
-            let response = try await supabaseDataController.supabase.database
+            let response = try await supabaseDataController.supabase
                 .from("notifications")
                 .select()
                 .order("created_at", ascending: false)
@@ -90,7 +90,7 @@ final class NotificationsViewModel: ObservableObject {
     
     func markAsRead(_ notificationId: UUID) async {
         do {
-            try await supabaseDataController.supabase.database
+            try await supabaseDataController.supabase
                 .from("notifications")
                 .update(["is_read": true])
                 .eq("id", value: notificationId)
@@ -104,7 +104,7 @@ final class NotificationsViewModel: ObservableObject {
     
     func markAllAsRead() async {
         do {
-            try await supabaseDataController.supabase.database
+            try await supabaseDataController.supabase
                 .from("notifications")
                 .update(["is_read": true])
                 .eq("is_read", value: false)
@@ -118,7 +118,7 @@ final class NotificationsViewModel: ObservableObject {
     
     func deleteNotification(_ notificationId: UUID) async {
         do {
-            try await supabaseDataController.supabase.database
+            try await supabaseDataController.supabase
                 .from("notifications")
                 .delete()
                 .eq("id", value: notificationId)

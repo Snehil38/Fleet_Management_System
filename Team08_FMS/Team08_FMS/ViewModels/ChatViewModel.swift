@@ -261,7 +261,7 @@ final class ChatViewModel: ObservableObject {
         )
         
         do {
-            let response = try await supabaseDataController.supabase.database
+            let response = try await supabaseDataController.supabase
                 .from("notifications")
                 .insert(notification)
                 .select()
@@ -318,7 +318,7 @@ final class ChatViewModel: ObservableObject {
                     isFromCurrentUser: true
                 )
                 
-                let response = try await supabaseDataController.supabase.database
+                let response = try await supabaseDataController.supabase
                     .from("chat_messages")
                     .insert(message)
                     .select()
