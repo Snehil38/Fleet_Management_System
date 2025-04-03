@@ -15,16 +15,67 @@ struct ChatBubbleView: View {
     }
     
     var body: some View {
-        HStack {
+        HStack(alignment: .bottom, spacing: 0) {
             if message.isFromCurrentUser {
-                Spacer(minLength: 30)
-                messageContent(alignment: .trailing)
-            } else {
-                messageContent(alignment: .leading)
-                Spacer(minLength: 30)
+                Spacer(minLength: 50)
+            }
+            
+            VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 4) {
+                HStack {
+                    if !message.isFromCurrentUser {
+                        // Fleet manager icon
+                        Image(systemName: "person.circle.fill")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 24))
+                            .padding(.trailing, 4)
+                    }
+                    
+                    VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 2) {
+                        Text(message.message_text)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(backgroundColor)
+                            .foregroundColor(textColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        
+                        HStack(spacing: 4) {
+                            Text(formatDate(message.created_at))
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                            
+                            if message.isFromCurrentUser {
+                                Group {
+                                    switch message.status {
+                                    case .sent:
+                                        Image(systemName: "checkmark")
+                                    case .delivered:
+                                        Image(systemName: "checkmark.circle")
+                                    case .read:
+                                        Image(systemName: "checkmark.circle.fill")
+                                    }
+                                }
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                    }
+                    
+                    if message.isFromCurrentUser {
+                        // Driver icon
+                        Image(systemName: "car.circle.fill")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 24))
+                            .padding(.leading, 4)
+                    }
+                }
+            }
+            
+            if !message.isFromCurrentUser {
+                Spacer(minLength: 50)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .opacity(isAnimating ? 1 : 0)
         .offset(y: isAnimating ? 0 : 20)
@@ -35,43 +86,8 @@ struct ChatBubbleView: View {
             
             // Get current user ID when view appears
             Task {
-                do {
-                    currentUserId = await supabaseController.getUserID()
-                }
+                currentUserId = await supabaseController.getUserID()
             }
-        }
-    }
-    
-    private func messageContent(alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 2) {
-            Text(message.message_text)
-                .foregroundColor(textColor)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(backgroundColor)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            
-            HStack(spacing: 4) {
-                Text(formatDate(message.created_at))
-                    .font(.caption2)
-                    .foregroundColor(.gray)
-                
-                if message.isFromCurrentUser {
-                    Group {
-                        switch message.status {
-                        case .sent:
-                            Image(systemName: "checkmark")
-                        case .delivered:
-                            Image(systemName: "checkmark.circle")
-                        case .read:
-                            Image(systemName: "checkmark.circle.fill")
-                        }
-                    }
-                    .font(.caption2)
-                    .foregroundColor(.gray)
-                }
-            }
-            .padding(alignment == .trailing ? .trailing : .leading, 4)
         }
     }
     

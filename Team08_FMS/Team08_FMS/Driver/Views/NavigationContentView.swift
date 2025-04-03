@@ -13,10 +13,11 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var nextStepDistance: CLLocationDistance = 0
     @Published var alternativeRoutes: [MKRoute] = []
     @Published var recentLocations: [CLLocation] = [] // Track recent locations for smooth animation
+    @Published var etaUpdateError: String?
     
     private let locationManager: CLLocationManager
     private let _destination: CLLocationCoordinate2D
-    private let _sourceCoordinate: CLLocationCoordinate2D?
+    let sourceCoordinate: CLLocationCoordinate2D?  // Changed from private to public
     private let vehicleType: VehicleType
     
     // Track both the last update time and the last location
@@ -58,9 +59,14 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         _destination
     }
     
+    private var lastSpeedUpdateTime: Date?
+    private var speedReadings: [(speed: Double, timestamp: Date)] = []
+    private let speedHistoryDuration: TimeInterval = 300 // Keep 5 minutes of speed history
+    private let minimumSpeedThreshold: Double = 1.0 // Minimum speed in m/s to consider for ETA
+    
     init(destination: CLLocationCoordinate2D, sourceCoordinate: CLLocationCoordinate2D? = nil, vehicleType: VehicleType = .truck(height: 4.5, weight: 40000, length: 16.5)) {
         self._destination = destination
-        self._sourceCoordinate = sourceCoordinate
+        self.sourceCoordinate = sourceCoordinate  // Updated to use the public property
         self.vehicleType = vehicleType
         self.locationManager = CLLocationManager()
         
@@ -148,7 +154,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
             } else {
                 // Use provided source coordinate if available, otherwise use current location
-                let sourceCoordinate = _sourceCoordinate ?? location.coordinate
+                let sourceCoordinate = self.sourceCoordinate ?? location.coordinate
                 request.source = MKMapItem(placemark: MKPlacemark(coordinate: sourceCoordinate))
             }
             
@@ -538,31 +544,86 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let distance = lastTwo[0].distance(from: lastTwo[1])
         let time = lastTwo[1].timestamp.timeIntervalSince(lastTwo[0].timestamp)
         
-        return distance / time // meters per second
+        // Add error handling for invalid time intervals
+        guard time > 0 else {
+            etaUpdateError = "Invalid time interval between location updates"
+            return 0
+        }
+        
+        let speed = distance / time // meters per second
+        
+        // Store speed reading with timestamp
+        let now = Date()
+        speedReadings.append((speed: speed, timestamp: now))
+        
+        // Remove old speed readings
+        speedReadings = speedReadings.filter { now.timeIntervalSince($0.timestamp) <= speedHistoryDuration }
+        
+        return speed
     }
     
     private func updateETABasedOnSpeed(_ speed: CLLocationSpeed) {
-        guard let route = route else { return }
-        
-        // Only update if we're moving (speed > 0.5 m/s or about 1.8 km/h)
-        if speed > 0.5 {
-            // Convert speed to km/h for easier calculation
-            let speedKmh = speed * 3.6
-            print(route)
-            print(speedKmh)
-            
-            // Update remaining time based on current speed and remaining distance
-            if remainingDistance > 0 {
-                remainingTime = (remainingDistance * 1000) / speed // Convert km to m for calculation
-            }
-            
-            // Update next step distance if we have a current step
-            if let currentStep = currentStep,
-               let userLocation = userLocation {
-                let stepCoord = currentStep.polyline.coordinate
-                nextStepDistance = calculateDistance(from: userLocation, to: stepCoord)
-            }
+        guard let route = route else {
+            etaUpdateError = "No active route"
+            return
         }
+        
+        // Only update if we're moving (speed > minimumSpeedThreshold)
+        if speed > minimumSpeedThreshold {
+            // Calculate average speed from recent readings
+            let recentReadings = speedReadings.filter { 
+                Date().timeIntervalSince($0.timestamp) <= 60 // Last minute of readings
+            }
+            
+            if !recentReadings.isEmpty {
+                let avgSpeed = recentReadings.map { $0.speed }.reduce(0, +) / Double(recentReadings.count)
+                
+                // Convert speed to km/h for easier calculation
+                let speedKmh = avgSpeed * 3.6
+                
+                // Update remaining time based on current speed and remaining distance
+                if remainingDistance > 0 {
+                    // Add some buffer for traffic lights and intersections
+                    let estimatedDelay = calculateEstimatedDelays(for: route)
+                    let baseTime = (remainingDistance / avgSpeed) // Base time in seconds
+                    remainingTime = baseTime + estimatedDelay
+                    
+                    // Ensure minimum reasonable ETA
+                    let minimumTime = remainingDistance / 30.0 // Assume maximum reasonable speed of 30 m/s
+                    remainingTime = max(remainingTime, minimumTime)
+                }
+            }
+        } else {
+            // If speed is too low, use route's original ETA with some buffer
+            remainingTime = route.expectedTravelTime * 1.1
+        }
+        
+        // Update next step distance if we have a current step
+        if let currentStep = currentStep,
+           let userLocation = userLocation {
+            let stepCoord = currentStep.polyline.coordinate
+            nextStepDistance = calculateDistance(from: userLocation, to: stepCoord)
+        }
+    }
+    
+    private func calculateEstimatedDelays(for route: MKRoute) -> TimeInterval {
+        var totalDelay: TimeInterval = 0
+        
+        // Count number of turns and traffic signals in remaining steps
+        for step in route.steps {
+            if step.instructions.contains("turn") || 
+               step.instructions.contains("Take") ||
+               step.instructions.contains("Exit") {
+                totalDelay += 15 // Add 15 seconds for each turn
+            }
+            
+            // Add delay for traffic signals (estimated from step distance)
+            let stepDistance = step.distance
+            let estimatedSignals = Int(stepDistance / 500) // Assume traffic signal every 500m in urban areas
+            totalDelay += TimeInterval(estimatedSignals * 30) // 30 seconds per signal
+        }
+        
+        return totalDelay
     }
     
     // Add force recalculation method
@@ -599,11 +660,36 @@ struct RealTimeNavigationView: View {
         ))
     }
     
+    private func formatTime(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval / 3600)
+        let minutes = Int((timeInterval.truncatingRemainder(dividingBy: 3600)) / 60)
+        
+        if hours > 0 {
+            return String(format: "%dh %02dm", hours, minutes)
+        } else if minutes > 0 {
+            return String(format: "%dm", minutes)
+        } else {
+            return "1m" // Show minimum of 1 minute
+        }
+    }
+    
+    // Add error handling alert
+    private var errorAlert: Alert {
+        Alert(
+            title: Text("Navigation Update Error"),
+            message: Text(navigationManager.etaUpdateError ?? "Unknown error occurred"),
+            dismissButton: .default(Text("OK")) {
+                navigationManager.etaUpdateError = nil
+            }
+        )
+    }
+    
     var body: some View {
         ZStack(alignment: .top) {
             // Navigation Map
             NavigationMapView(
                 destination: navigationManager.destination,
+                pickup: navigationManager.sourceCoordinate ?? navigationManager.userLocation ?? navigationManager.destination,  // Use source or current location as pickup
                 userLocation: $navigationManager.userLocation,
                 route: $navigationManager.route,
                 userHeading: $navigationManager.userHeading,
@@ -640,9 +726,15 @@ struct RealTimeNavigationView: View {
             VStack(spacing: 0) {
                 // Top banner
                 HStack(spacing: 16) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.white)
+                    Button(action: {
+                        navigationManager.stopNavigation()
+                        onDismiss()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.leading, 8)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(destination)
@@ -659,7 +751,7 @@ struct RealTimeNavigationView: View {
                     
                     // ETA and Distance Info
                     VStack(alignment: .trailing) {
-                        Text("\(navigationManager.remainingTime.formattedDuration)")
+                        Text(formatTime(navigationManager.remainingTime))
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
@@ -768,6 +860,11 @@ struct RealTimeNavigationView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 100) // Increased to prevent overlap with tab bar
             }
+            
+            // Add error handling alert
+            .alert(isPresented: .constant(navigationManager.etaUpdateError != nil)) {
+                errorAlert
+            }
         }
         .navigationBarTitle("", displayMode: .inline)
         .navigationBarBackButtonHidden(true)
@@ -791,13 +888,6 @@ struct RealTimeNavigationView: View {
         }
         .onDisappear {
             navigationManager.stopNavigation()
-        }
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Navigation Alert"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
         }
         .alert(isPresented: $isDeviationAlertShown) {
             Alert(

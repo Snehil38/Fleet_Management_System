@@ -16,6 +16,13 @@ private struct MessagePayload: Encodable {
     let attachment_type: String?
 }
 
+private struct NotificationPayload: Encodable {
+    let message: String
+    let type: String
+    let created_at: String
+    let is_read: Bool
+}
+
 @MainActor
 final class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
@@ -245,61 +252,62 @@ final class ChatViewModel: ObservableObject {
         }
     }
     
+    private func createNotification(message: String, type: String) async throws {
+        let notification = NotificationPayload(
+            message: message,
+            type: type,
+            created_at: ISO8601DateFormatter().string(from: Date()),
+            is_read: false
+        )
+        
+        do {
+            let response = try await supabaseDataController.supabase.database
+                .from("notifications")
+                .insert(notification)
+                .select()
+                .single()
+                .execute()
+            
+            if let jsonObject = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] {
+                if let id = jsonObject["id"] as? String {
+                    print("Notification created with ID: \(id)")
+                }
+                if let messageText = jsonObject["message"] as? String {
+                    print("Notification message: \(messageText)")
+                }
+            }
+        } catch {
+            print("Failed to create notification: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
     func sendMessage(_ text: String) {
-        Task { @MainActor in
+        Task {
             do {
-                // Get the current user's ID
-                guard let userId = await supabaseDataController.getUserID() else {
+                guard let currentUserId = await supabaseDataController.getUserID() else {
                     print("No user ID found")
                     return
                 }
                 
-                // Get the fleet manager's ID
-                guard let fleetManagers = try? await supabaseDataController.fetchFleetManagers(),
-                      let firstManager = fleetManagers.first,
-                      let fleetManagerId = firstManager.userID else {
-                    print("No fleet manager found")
-                    return
-                }
-                
-                // Get the current user's role
                 let userRole = supabaseDataController.userRole
-                print("Current user role: \(userRole ?? "Invalid")")
+                print("Sending message as role: \(userRole ?? "unknown")")
                 
-                // Determine message direction based on user role
-                let (messageFleetManagerId, messageRecipientId, messageRecipientType): (UUID, UUID, String)
+                let (messageFleetManagerId, messageRecipientId): (UUID, UUID)
                 
                 if userRole == "fleet_manager" {
-                    // Fleet manager sending to driver/maintenance
-                    messageFleetManagerId = userId
+                    messageFleetManagerId = currentUserId
                     messageRecipientId = recipientId
-                    messageRecipientType = recipientType.rawValue
-                } else if userRole == "driver" {
-                    // Driver sending to fleet manager
-                    messageFleetManagerId = fleetManagerId
-                    messageRecipientId = userId
-                    messageRecipientType = RecipientType.driver.rawValue
-                } else if userRole == "maintenance_personnel" {
-                    // Maintenance sending to fleet manager
-                    messageFleetManagerId = fleetManagerId
-                    messageRecipientId = userId
-                    messageRecipientType = RecipientType.maintenance.rawValue
                 } else {
-                    print("Invalid user role")
-                    return
+                    messageFleetManagerId = recipientId
+                    messageRecipientId = currentUserId
                 }
                 
-                print("Sending message with:")
-                print("Fleet Manager ID: \(messageFleetManagerId)")
-                print("Recipient ID: \(messageRecipientId)")
-                print("Recipient Type: \(messageRecipientType)")
-                
-                // Create message payload
                 let message = ChatMessage(
                     id: UUID(),
                     fleet_manager_id: messageFleetManagerId,
                     recipient_id: messageRecipientId,
-                    recipient_type: messageRecipientType,
+                    recipient_type: recipientType.rawValue,
                     message_text: text,
                     status: .sent,
                     created_at: Date(),
@@ -310,22 +318,39 @@ final class ChatViewModel: ObservableObject {
                     isFromCurrentUser: true
                 )
                 
-                // Insert message into database
-                let response = try await supabaseDataController.supabase
+                let response = try await supabaseDataController.supabase.database
                     .from("chat_messages")
                     .insert(message)
+                    .select()
+                    .single()
                     .execute()
                 
-                print("Message sent successfully: \(response)")
-                
-                // Add message to local state (already on main thread due to @MainActor)
-                self.messages.append(message)
-                
-                // Trigger a message reload to ensure consistency
-                await self.loadMessages()
+                if let jsonObject = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] {
+                    if let id = jsonObject["id"] as? String {
+                        print("Message sent with ID: \(id)")
+                    }
+                    if let messageText = jsonObject["message_text"] as? String {
+                        print("Message content: \(messageText)")
+                    }
+                    
+                    // Create notification for fleet manager if message is from driver
+                    if userRole != "fleet_manager" {
+                        let notificationMessage = "New message from \(recipientType.rawValue): \(text)"
+                        try await createNotification(
+                            message: notificationMessage,
+                            type: "chat_message"
+                        )
+                    }
+                    
+                    await MainActor.run {
+                        self.messages.append(message)
+                    }
+                    
+                    await loadMessages()
+                }
                 
             } catch {
-                print("Error sending message: \(error)")
+                print("Error sending message: \(error.localizedDescription)")
                 self.error = error
             }
         }
