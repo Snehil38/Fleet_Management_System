@@ -134,6 +134,7 @@ struct MaintenanceServiceRequest: Identifiable, Codable, Equatable {
     var totalCost: Double
     var startDate: Date?
     var completionDate: Date?
+    var personnelID: UUID?
     
     init(vehicleId: UUID, vehicleName: String, serviceType: ServiceType, description: String, priority: ServiceRequestPriority, date: Date, dueDate: Date, status: ServiceRequestStatus, notes: String, issueType: String? = nil) {
         self.id = UUID()
