@@ -212,7 +212,7 @@ struct ExpensesCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
@@ -335,7 +335,7 @@ struct MaintenanceVehicleRequestInfoCard: View {
             InfoRow(title: "Due Date", value: request.dueDate.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -401,7 +401,7 @@ struct MaintenanceServiceDetailsCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -443,7 +443,7 @@ struct MaintenanceSafetyChecksCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
