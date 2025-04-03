@@ -25,10 +25,12 @@ struct MaintenancePersonnelRoutineSchedule: Identifiable, Codable {
 
 class MaintenancePersonnelDataStore: ObservableObject {
     @Published var serviceRequests: [MaintenanceServiceRequest] = []
+    @Published var filteredRequests: [MaintenanceServiceRequest] = []
     @Published var serviceHistory: [MaintenancePersonnelServiceHistory] = []
     @Published var routineSchedules: [MaintenancePersonnelRoutineSchedule] = []
     @Published var inspectionRequests: [InspectionRequest] = []  // Assuming these remain local or handled separately
     @Published var totalExpenses: Double = 0
+    private var userID: UUID?
     
     init() {
         // Load data from Supabase when the data store is created
@@ -74,10 +76,23 @@ class MaintenancePersonnelDataStore: ObservableObject {
             let fetchedRoutineSchedules = try await SupabaseDataController.shared.fetchRoutineSchedule()
             let fetchedServiceRequests = try await SupabaseDataController.shared.fetchServiceRequests()
 
+            Task {
+                userID = await SupabaseDataController.shared.getUserID()
+            }
+            
             await MainActor.run {
                 self.serviceHistory = fetchedServiceHistory
                 self.routineSchedules = fetchedRoutineSchedules
                 self.serviceRequests = fetchedServiceRequests
+                self.filteredRequests = serviceRequests.filter { request in
+                    // If there's a valid userID, only allow requests with no assigned personnel or those matching the user.
+                    if let currentUserID = userID {
+                        return request.personnelID == nil || request.personnelID == currentUserID
+                    }
+                    
+                    // If userID is nil, do not filter on personnel.
+                    return true
+                }
             }
         } catch {
             print("Error loading data: \(error)")

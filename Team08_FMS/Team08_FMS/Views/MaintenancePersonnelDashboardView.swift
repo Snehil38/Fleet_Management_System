@@ -108,23 +108,11 @@ struct MaintenancePersonnelDashboardView: View {
     }
     
     private var filteredRequests: [MaintenanceServiceRequest] {
-        dataStore.serviceRequests.filter { request in
-            // Always filter by status.
-            guard request.status == selectedStatus else { return false }
-            
-            // If a priority is selected, filter by it.
-            if let priority = selectedPriority, request.priority != priority {
-                return false
-            }
-            
-            // If there's a valid userID, only allow requests with no assigned personnel or those matching the user.
-            if let currentUserID = userID {
-                return request.personnelID == nil || request.personnelID == currentUserID
-            }
-            
-            // If userID is nil, do not filter on personnel.
-            return true
+        var filtered = dataStore.serviceRequests.filter { $0.status == selectedStatus }
+        if let priority = selectedPriority {
+            filtered = filtered.filter { $0.priority == priority && ($0.personnelID == nil || $0.personnelID == userID!) }
         }
+        return filtered
     }
 }
 
@@ -182,15 +170,15 @@ struct StatsOverviewView: View {
     }
     
     private var pendingCount: Int {
-        dataStore.serviceRequests.filter { $0.status == .pending }.count
+        dataStore.filteredRequests.filter { $0.status == .pending }.count
     }
     
     private var inProgressCount: Int {
-        dataStore.serviceRequests.filter { $0.status == .inProgress }.count
+        dataStore.filteredRequests.filter { $0.status == .inProgress }.count
     }
     
     private var completedCount: Int {
-        dataStore.serviceRequests.filter { $0.status == .completed }.count
+        dataStore.filteredRequests.filter { $0.status == .completed }.count
     }
 }
 
