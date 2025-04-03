@@ -1,4 +1,65 @@
 import SwiftUI
+import AVFoundation
+
+class AudioPlayer: ObservableObject {
+    private var player: AVPlayer?
+    private var currentURL: URL?
+    @Published var isPlaying = false
+    private var timeObserver: Any?
+    @Published var currentTime: TimeInterval = 0
+    @Published var duration: TimeInterval = 0
+    
+    func play(url: URL) {
+        if isPlaying {
+            player?.pause()
+            isPlaying = false
+        } else {
+            if currentURL != url {
+                // New URL, create new player
+                player = AVPlayer(url: url)
+                currentURL = url
+                setupTimeObserver()
+                if let duration = player?.currentItem?.duration {
+                    self.duration = CMTimeGetSeconds(duration)
+                }
+            }
+            player?.play()
+            isPlaying = true
+            
+            // Reset isPlaying when audio finishes
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: player?.currentItem,
+                queue: .main
+            ) { [weak self] _ in
+                self?.isPlaying = false
+                self?.currentTime = 0
+            }
+        }
+    }
+    
+    private func setupTimeObserver() {
+        let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            self?.currentTime = CMTimeGetSeconds(time)
+        }
+    }
+    
+    func stop() {
+        player?.pause()
+        if let observer = timeObserver {
+            player?.removeTimeObserver(observer)
+        }
+        player = nil
+        currentURL = nil
+        isPlaying = false
+        currentTime = 0
+    }
+    
+    deinit {
+        stop()
+    }
+}
 
 struct ChatBubbleView: View {
     let message: ChatMessage
@@ -7,13 +68,14 @@ struct ChatBubbleView: View {
     @State private var isAnimating = false
     @StateObject private var supabaseController = SupabaseDataController.shared
     @State private var currentUserId: UUID?
+    @StateObject private var audioPlayer = AudioPlayer()
     
     private var backgroundColor: Color {
-        message.isFromCurrentUser ? .blue : Color(.systemGray5)
+        message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray6)
     }
     
     private var textColor: Color {
-        message.isFromCurrentUser ? .white : .black
+        message.isFromCurrentUser ? .white : .primary
     }
     
     var body: some View {
@@ -23,18 +85,17 @@ struct ChatBubbleView: View {
             }
             
             VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 4) {
-                HStack {
-                    if !message.isFromCurrentUser {
-                        // Fleet manager icon
-                        Image(systemName: "person.circle.fill")
-                            .foregroundColor(.gray)
-                            .font(.system(size: 24))
-                            .padding(.trailing, 4)
-                    }
-                    
-                    VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 2) {
-                        if let attachmentUrl = message.attachment_url,
-                           message.attachment_type == "image/jpeg" {
+                if !message.isFromCurrentUser {
+                    // Fleet manager icon
+                    Image(systemName: "person.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 24))
+                        .padding(.trailing, 4)
+                }
+                
+                VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 2) {
+                    if let attachmentUrl = message.attachment_url {
+                        if message.attachment_type == "image/jpeg" {
                             // Image message
                             VStack(alignment: .leading, spacing: 4) {
                                 if let imageData = imageData, let uiImage = UIImage(data: imageData) {
@@ -56,59 +117,99 @@ struct ChatBubbleView: View {
                                             }
                                     }
                                 }
-                                
-                                Text(message.created_at, style: .time)
-                                    .font(.caption2)
-                                    .foregroundColor(.gray)
                             }
                             .padding(8)
-                            .background(message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray6))
+                            .background(backgroundColor)
                             .cornerRadius(12)
-                        } else {
-                            // Text message
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(message.message_text)
-                                    .foregroundColor(message.isFromCurrentUser ? .white : .primary)
-                                
-                                Text(message.created_at, style: .time)
-                                    .font(.caption2)
-                                    .foregroundColor(message.isFromCurrentUser ? .white.opacity(0.8) : .gray)
-                            }
-                            .padding(8)
-                            .background(message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray6))
-                            .cornerRadius(12)
-                        }
-                        
-                        HStack(spacing: 4) {
-                            Text(formatDate(message.created_at))
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                            
-                            if message.isFromCurrentUser {
-                                Group {
-                                    switch message.status {
-                                    case .sent:
-                                        Image(systemName: "checkmark")
-                                    case .delivered:
-                                        Image(systemName: "checkmark.circle")
-                                    case .read:
-                                        Image(systemName: "checkmark.circle.fill")
+                        } else if message.attachment_type == "audio/m4a" {
+                            // Voice note message
+                            Button(action: {
+                                if let url = URL(string: attachmentUrl) {
+                                    audioPlayer.play(url: url)
+                                }
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: audioPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(textColor)
+                                    
+                                    if audioPlayer.duration > 0 {
+                                        // Progress bar
+                                        GeometryReader { geometry in
+                                            ZStack(alignment: .leading) {
+                                                Rectangle()
+                                                    .fill(textColor.opacity(0.3))
+                                                    .frame(height: 4)
+                                                
+                                                Rectangle()
+                                                    .fill(textColor)
+                                                    .frame(width: geometry.size.width * CGFloat(audioPlayer.currentTime / audioPlayer.duration), height: 4)
+                                            }
+                                        }
+                                        .frame(height: 4)
+                                        
+                                        // Duration
+                                        Text(formatDuration(audioPlayer.currentTime))
+                                            .font(.caption)
+                                            .foregroundColor(textColor)
+                                            .frame(width: 40)
+                                    } else {
+                                        Text("Voice Note")
+                                            .foregroundColor(textColor)
                                     }
                                 }
-                                .font(.caption2)
-                                .foregroundColor(.gray)
+                                .frame(width: 200)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .background(backgroundColor)
+                                .cornerRadius(12)
                             }
+                        } else {
+                            // Text message with unknown attachment
+                            Text(message.message_text)
+                                .foregroundColor(textColor)
+                                .padding(8)
+                                .background(backgroundColor)
+                                .cornerRadius(12)
                         }
-                        .padding(.horizontal, 4)
+                    } else {
+                        // Regular text message
+                        Text(message.message_text)
+                            .foregroundColor(textColor)
+                            .padding(8)
+                            .background(backgroundColor)
+                            .cornerRadius(12)
                     }
                     
-                    if message.isFromCurrentUser {
-                        // Driver icon
-                        Image(systemName: "car.circle.fill")
-                            .foregroundColor(.blue)
-                            .font(.system(size: 24))
-                            .padding(.leading, 4)
+                    HStack(spacing: 4) {
+                        Text(formatDate(message.created_at))
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                        
+                        if message.isFromCurrentUser {
+                            Group {
+                                switch message.status {
+                                case .sent:
+                                    Image(systemName: "checkmark")
+                                case .delivered:
+                                    Image(systemName: "checkmark.circle")
+                                case .read:
+                                    Image(systemName: "checkmark.circle.fill")
+                                }
+                            }
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                        }
                     }
+                    .padding(.horizontal, 4)
+                }
+                
+                if message.isFromCurrentUser {
+                    // Driver icon
+                    Image(systemName: "car.circle.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 24))
+                        .padding(.leading, 4)
                 }
             }
             
@@ -125,11 +226,19 @@ struct ChatBubbleView: View {
                 isAnimating = true
             }
             
-            // Get current user ID when view appears
             Task {
                 currentUserId = await supabaseController.getUserID()
             }
         }
+        .onDisappear {
+            audioPlayer.stop()
+        }
+    }
+    
+    private func formatDuration(_ timeInterval: TimeInterval) -> String {
+        let minutes = Int(timeInterval) / 60
+        let seconds = Int(timeInterval) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
     
     private func formatDate(_ date: Date) -> String {

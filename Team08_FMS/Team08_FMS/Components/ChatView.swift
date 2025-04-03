@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 enum RecipientType: String {
     case maintenance = "maintenance"
@@ -11,6 +12,48 @@ enum RecipientType: String {
         case .driver:
             return "Driver"
         }
+    }
+}
+
+class AudioRecorder: NSObject, ObservableObject {
+    @Published var isRecording = false
+    private var audioRecorder: AVAudioRecorder?
+    private var recordingURL: URL?
+    
+    override init() {
+        super.init()
+        setupRecorder()
+    }
+    
+    private func setupRecorder() {
+        let audioFilename = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("recording.m4a")
+        let settings = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 44100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder?.prepareToRecord()
+            recordingURL = audioFilename
+        } catch {
+            print("Failed to setup audio recorder: \(error)")
+        }
+    }
+    
+    func startRecording() {
+        audioRecorder?.record()
+        isRecording = true
+    }
+    
+    func stopRecording() -> URL? {
+        audioRecorder?.stop()
+        isRecording = false
+        return recordingURL
     }
 }
 
@@ -27,6 +70,8 @@ struct ChatView: View {
     @StateObject private var tripController = TripDataController.shared
     @State private var isShowingImagePicker = false
     @State private var selectedImage: UIImage?
+    @StateObject private var audioRecorder = AudioRecorder()
+    @State private var isRecording = false
     
     init(recipientType: RecipientType, recipientId: UUID, recipientName: String, contextData: [String: String]? = nil) {
         self.recipientType = recipientType
@@ -213,27 +258,55 @@ struct ChatView: View {
                     }
                 }
                 
+                // Microphone button
+                Button(action: {
+                    if audioRecorder.isRecording {
+                        if let audioURL = audioRecorder.stopRecording() {
+                            Task {
+                                await viewModel.sendVoiceNote(audioURL)
+                                scrollToBottom()
+                            }
+                        }
+                    } else {
+                        audioRecorder.startRecording()
+                    }
+                }) {
+                    Image(systemName: audioRecorder.isRecording ? "stop.circle.fill" : "mic")
+                        .font(.system(size: 20))
+                        .foregroundColor(audioRecorder.isRecording ? .red : ChatThemeColors.primary)
+                        .animation(.easeInOut, value: audioRecorder.isRecording)
+                }
+                
                 // Message text field
-                TextField("Type a message...", text: $messageText)
-                    .padding(12)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(20)
-                    .focused($isFocused)
+                if !audioRecorder.isRecording {
+                    TextField("Type a message...", text: $messageText)
+                        .padding(12)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(20)
+                        .focused($isFocused)
+                } else {
+                    Text("Recording...")
+                        .foregroundColor(.red)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(20)
+                }
                 
                 // Send button
-                Button(action: {
-                    sendMessage()
-                }) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(messageText.isEmpty ? Color.gray : ChatThemeColors.primary)
-                        )
+                if !audioRecorder.isRecording {
+                    Button(action: sendMessage) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(messageText.isEmpty ? Color.gray : ChatThemeColors.primary)
+                            )
+                    }
+                    .disabled(messageText.isEmpty)
                 }
-                .disabled(messageText.isEmpty)
             }
             .padding(.horizontal)
             .padding(.vertical, 8)

@@ -521,14 +521,15 @@ final class ChatViewModel: ObservableObject {
                     options: BucketOptions(
                         public: true,
                         fileSizeLimit: String(10485760), // 10MB limit
-                        allowedMimeTypes: ["image/jpeg", "image/png"]
+                        allowedMimeTypes: ["image/jpeg", "image/png", "audio/m4a", "audio/mpeg", "audio/mp4"]
                     )
                 )
                 print("Successfully created bucket: \(storageBucket)")
             }
         } catch {
             print("Error managing storage bucket: \(error)")
-            throw error
+            // Don't throw the error, just log it - the bucket might already exist
+            print("Attempting to proceed with upload anyway...")
         }
     }
     
@@ -636,6 +637,108 @@ final class ChatViewModel: ObservableObject {
             
         } catch {
             print("Error sending image: \(error.localizedDescription)")
+            self.error = error
+        }
+    }
+    
+    func sendVoiceNote(_ audioURL: URL) async {
+        do {
+            // Read audio file data
+            let audioData = try Data(contentsOf: audioURL)
+            
+            guard let currentUserId = await supabaseDataController.getUserID() else {
+                print("No user ID found")
+                return
+            }
+            
+            let fileName = "chat/\(UUID().uuidString).m4a"
+            print("Attempting to upload voice note: \(fileName)")
+            
+            // Upload the file to storage
+            try await storageClient
+                .from(storageBucket)
+                .upload(
+                    path: fileName,
+                    file: audioData,
+                    options: FileOptions(
+                        contentType: "audio/m4a",
+                        upsert: true
+                    )
+                )
+            
+            print("Successfully uploaded voice note, getting public URL...")
+            
+            // Get the public URL
+            let publicURL = try await storageClient
+                .from(storageBucket)
+                .createSignedURL(
+                    path: fileName,
+                    expiresIn: 365 * 24 * 60 * 60 // 1 year in seconds
+                )
+            
+            print("Got public URL: \(publicURL.absoluteString)")
+            
+            let userRole = supabaseDataController.userRole
+            let (messageFleetManagerId, messageRecipientId): (UUID, UUID)
+            
+            if userRole == "fleet_manager" {
+                messageFleetManagerId = currentUserId
+                messageRecipientId = recipientId
+            } else {
+                messageFleetManagerId = recipientId
+                messageRecipientId = currentUserId
+            }
+            
+            // Convert URL to string
+            let urlString = publicURL.absoluteString
+            
+            let message = ChatMessage(
+                id: UUID(),
+                fleet_manager_id: messageFleetManagerId,
+                recipient_id: messageRecipientId,
+                recipient_type: recipientType.rawValue,
+                message_text: "🎤 Voice Note",
+                status: .sent,
+                created_at: Date(),
+                updated_at: Date(),
+                is_deleted: false,
+                attachment_url: urlString,
+                attachment_type: "audio/m4a",
+                isFromCurrentUser: true
+            )
+            
+            print("Sending message with voice note URL: \(urlString)")
+            
+            let response = try await supabaseDataController.supabase.database
+                .from("chat_messages")
+                .insert(message)
+                .select()
+                .single()
+                .execute()
+            
+            if let jsonObject = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] {
+                if let id = jsonObject["id"] as? String {
+                    print("Message with voice note sent, ID: \(id)")
+                }
+                
+                // Create notification for fleet manager if message is from driver
+                if userRole != "fleet_manager" {
+                    let notificationMessage = "New voice note from \(recipientType.rawValue)"
+                    try await createNotification(
+                        message: notificationMessage,
+                        type: "chat_message"
+                    )
+                }
+                
+                await MainActor.run {
+                    self.messages.append(message)
+                }
+                
+                await loadMessages()
+            }
+            
+        } catch {
+            print("Error sending voice note: \(error.localizedDescription)")
             self.error = error
         }
     }
