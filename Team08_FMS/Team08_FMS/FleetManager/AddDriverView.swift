@@ -61,7 +61,9 @@ struct AddDriverView: View {
     }
     
     private var isLicenseValid: Bool {
-        !licenseNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let trimmedLicense = licenseNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let regex = "^[A-Z]{2}\\s?[0-9]{2}\\s?[0-9]{4}\\s?[0-9]{7}$"
+        return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmedLicense)
     }
     
     private var isSalaryValid: Bool {
