@@ -117,7 +117,10 @@ class MaintenancePersonnelDataStore: ObservableObject {
             // Insert the new service history record.
             try await SupabaseDataController.shared.insertServiceHistory(history: newHistory)
             // Refresh the local service history data after insertion.
-            serviceHistory = try await SupabaseDataController.shared.fetchServiceHistory()
+            let history = try await SupabaseDataController.shared.fetchServiceHistory()
+            await MainActor.run {
+                self.serviceHistory = history
+            }
         } catch {
             print("Error adding service history: \(error)")
         }

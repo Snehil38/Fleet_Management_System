@@ -101,11 +101,11 @@ struct DriverTabView: View {
                                     VStack(alignment: .leading, spacing: 20) {
                                         HStack {
                                             Text("Upcoming Trips")
-                                                .font(.system(size: 24, weight: .bold))
+                                                .font(.system(.title2, design: .default).weight(.bold))
                                             
                                             if !tripController.upcomingTrips.isEmpty {
                                                 Text("\(tripController.upcomingTrips.count)")
-                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .font(.system(.headline, design: .default).weight(.semibold))
                                                     .foregroundColor(.white)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 4)
@@ -369,12 +369,89 @@ struct DriverTabView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            tripLocationsView(trip)
+            // Route Information
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "map.fill")
+                        .foregroundColor(.blue)
+                    Text("Route Information")
+                        .font(.headline)
+                }
+                
+                ZStack {
+                    // Background with rounded corners
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemBackground))
+                    
+                    HStack(alignment: .top, spacing: 12) {
+                        // Left side: Line with dots
+                        ZStack {
+                            // Vertical line
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 2)
+                                .frame(height: 100)
+                            
+                            // Dots
+                            VStack(spacing: 0) {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 8, height: 8)
+                                
+                                Spacer()
+                                
+                                Rectangle()
+                                    .fill(Color.red)
+                                    .frame(width: 8, height: 8)
+                            }
+                            .frame(height: 100)
+                        }
+                        .padding(.top, 8)
+                        
+                        // Right side: Location details
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Pickup Location
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Pickup")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.green)
+                                Text(trip.startingPoint)
+                                    .font(.system(size: 16, weight: .regular))
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(8)
+                            
+                            // Destination Location
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Destination")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.red)
+                                Text(trip.destination)
+                                    .font(.system(size: 16, weight: .regular))
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                        Spacer()
+                    }
+                    .padding(16)
+                }
+            }
+            .padding(16)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
             
-            // Status Cards - Integrated with route selection
+            // Status Cards
             if !isCurrentTripDeclined {
                 HStack(spacing: 10) {
-                    // ETA Card - Updates based on selected route
+                    // ETA Card
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Circle()
@@ -385,12 +462,10 @@ struct DriverTabView: View {
                                         .font(.system(size: 14))
                                         .foregroundColor(.blue)
                                 )
-                            
                             Text("ETA")
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
                         }
-                        
                         Text(selectedRouteEta(trip))
                             .font(.system(size: 24, weight: .bold))
                     }
@@ -399,7 +474,7 @@ struct DriverTabView: View {
                     .background(Color.blue.opacity(0.1))
                     .cornerRadius(12)
                     
-                    // Distance Card - Updates based on selected route
+                    // Distance Card
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Circle()
@@ -410,12 +485,10 @@ struct DriverTabView: View {
                                         .font(.system(size: 14))
                                         .foregroundColor(.green)
                                 )
-                            
                             Text("Distance")
                                 .font(.system(size: 14))
                                 .foregroundColor(.gray)
                         }
-                        
                         Text(selectedRouteDistance(trip))
                             .font(.system(size: 24, weight: .bold))
                     }
@@ -425,7 +498,99 @@ struct DriverTabView: View {
                     .cornerRadius(12)
                 }
             }
-            tripActionButtons(trip)
+            
+            // Action Buttons
+            HStack(spacing: 10) {
+                // Start Navigation Button
+                Button(action: {
+                    if !trip.hasCompletedPreTrip {
+                        alertMessage = "Please complete pre-trip inspection before starting navigation"
+                        showingAlert = true
+                    } else if trip.vehicleDetails.status == .underMaintenance {
+                        alertMessage = "Vehicle is under maintenance"
+                        showingAlert = true
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingNavigation = true
+                        }
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "location.fill")
+                        Text("Start Navigation")
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .cornerRadius(10)
+                }
+                
+                // Pre-Trip Inspection Button
+                Button(action: {
+                    showingPreTripInspection = true
+                }) {
+                    HStack {
+                        Image(systemName: "checklist")
+                        Text("Pre-Trip\nInspection")
+                            .multilineTextAlignment(.center)
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                }
+            }
+            
+            // Mark Delivered and SOS Buttons
+            HStack(spacing: 10) {
+                // Mark Delivered Button
+                Button(action: {
+                    if !trip.hasCompletedPreTrip {
+                        alertMessage = "Please complete pre-trip inspection before marking as delivered"
+                        showingAlert = true
+                    } else if trip.vehicleDetails.status == .underMaintenance {
+                        alertMessage = "Vehicle is under maintenance"
+                        showingAlert = true
+                    } else {
+                        Task {
+                            await MainActor.run {
+                                markCurrentTripDelivered()
+                            }
+                        }
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Mark Delivered")
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.green)
+                    .cornerRadius(10)
+                }
+                
+                // SOS Button
+                Button(action: {
+                    showingSosModal = true
+                }) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text("SOS")
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.red)
+                    .cornerRadius(10)
+                }
+            }
         }
     }
     
@@ -737,9 +902,9 @@ struct DriverTabView: View {
                 .font(.system(size: 40))
                 .foregroundColor(.gray)
             Text("No Upcoming Trips")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             Text("Check back later for new assignments")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity)
@@ -756,9 +921,9 @@ struct DriverTabView: View {
                 .font(.system(size: 40))
                 .foregroundColor(.gray)
             Text("No Recent Deliveries")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             Text("Completed deliveries will appear here")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity)

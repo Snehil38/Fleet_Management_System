@@ -219,8 +219,9 @@ class CrewDataController: ObservableObject {
                 }
                 
                 // Update local state in one UI refresh
+                let driversToUpdate = updatedDrivers
                 await MainActor.run {
-                    for (id, status) in updatedDrivers {
+                    for (id, status) in driversToUpdate {
                         if let index = drivers.firstIndex(where: { $0.id == id }) {
                             drivers[index].status = status
                         }
@@ -264,8 +265,9 @@ class CrewDataController: ObservableObject {
             }
             
             // Update local state in one UI refresh
+            let vehiclesToUpdate = updatedVehicles
             await MainActor.run {
-                for (id, status) in updatedVehicles {
+                for (id, status) in vehiclesToUpdate {
                     if let index = vehicleManager.vehicles.firstIndex(where: { $0.id == id }) {
                         vehicleManager.vehicles[index].status = status
                     }

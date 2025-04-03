@@ -193,7 +193,7 @@ struct VehicleInspectionView: View {
                         Task {
                             do {
                                 if isPreTrip {
-                                    await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
+                                    await SupabaseDataController.shared.updateVehicleStatus(newStatus: .underMaintenance, vehicleID: trip.vehicleDetails.id)
                                 }
                                 try await SupabaseDataController.shared.insertServiceRequest(request: newRequest)
                                 print("Maintenance service request inserted successfully.")

@@ -518,7 +518,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                         msrp,
                         pollution_expiry,
                         insurance_expiry,
-                        status
+                        status,
+                        lastMaintenanceDistance,
+                        totalDistance
                     )
                 """)
                 .eq("is_deleted", value: false)
@@ -691,7 +693,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let vehicles: Vehicle
             }
 
-            let query = supabaseController.supabase
+            var query = supabaseController.supabase
                 .from("trips")
                 .select("""
                     id,
@@ -730,16 +732,18 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                         msrp,
                         pollution_expiry,
                         insurance_expiry,
-                        status
+                        status,
+                        lastMaintenanceDistance,
+                        totalDistance
                     )
                 """)
                 .eq("is_deleted", value: false)
 
             // Add driver filter if driverId is set
             if let driverId = driverId {
-                query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
+                query = query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
             }
-
+            
             // Execute the query
             let response = try await query.execute()
             
@@ -908,8 +912,10 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             
             Task {
                 let id = await supabaseController.getUserID()
+                let totalDistance = Int(trip.vehicleDetails.totalDistance) + (Int(trip.distance) ?? 0)
                 await supabaseController.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
                 await supabaseController.updateDriverStatus(newStatus: .available, userID: id, id: nil)
+                await supabaseController.updateVehicleTotalMaintenance(totalDistance: totalDistance, vehicleID: trip.vehicleDetails.id)
             }
             
             // Update end time in Supabase
@@ -1008,8 +1014,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             // Refresh trips to ensure everything is in sync with server
             Task {
                 let id = await supabaseController.getUserID()
-                await supabaseController.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
-                await supabaseController.updateDriverStatus(newStatus: .available, userID: id, id: nil)
+                await supabaseController.updateVehicleStatus(newStatus: .underMaintenance, vehicleID: trip.vehicleDetails.id)
+                await supabaseController.updateDriverStatus(newStatus: .busy, userID: id, id: nil)
             }
             try await fetchTrips()
             print("Trips refreshed after starting trip")

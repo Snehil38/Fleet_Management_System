@@ -327,6 +327,34 @@ class SupabaseDataController: ObservableObject {
         }
     }
     
+    // Function to send an OTP for a forgot-password scenario.
+    func sendOTPForForgotPassword(email: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        Task {
+            do {
+                // Attempt to send an OTP via email. Note: 'shouldCreateUser' is false because this is for password recovery.
+                _ = try await supabase.auth.signInWithOTP(email: email, shouldCreateUser: false)
+                completion(.success(()))
+            } catch {
+                print("Error sending OTP: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    // Function to verify the OTP entered by the user during password recovery.
+    func verifyOTPForForgotPassword(email: String, otp: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        Task {
+            do {
+                // Verify the OTP code. Adjust the 'type' parameter if your backend expects a different OTP type.
+                _ = try await supabase.auth.verifyOTP(email: email, token: otp, type: .magiclink)
+                completion(.success(()))
+            } catch {
+                print("OTP verification failed: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
+    
     func sendOTP(email: String, completion: @escaping (Bool, String?) -> Void) {
         Task {
             if !isGenPass {
@@ -919,9 +947,8 @@ class SupabaseDataController: ObservableObject {
             // This significantly reduces the data transfer size
             let response = try await supabase
                 .from("vehicles")
-                .select("id, name, year, make, model, vin, license_plate, vehicle_type, color, body_type, body_subtype, msrp, pollution_expiry, insurance_expiry, status, driver_id")
+                .select()
                 .notEquals("status", value: "Decommissioned")
-                .limit(100) // Add pagination to improve performance
                 .execute()
             
             let data = response.data
@@ -1147,7 +1174,9 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId
+            driver_id: vehicle.driverId,
+            lastMaintenanceDistance: vehicle.lastMaintenanceDistance,
+            totalDistance: vehicle.totalDistance
 //            pollution_certificate: pollutionCertBase64,
 //            rc: rcBase64,
 //            insurance: insuranceBase64
@@ -1199,7 +1228,9 @@ class SupabaseDataController: ObservableObject {
             pollution_expiry: pollutionExpiryString,
             insurance_expiry: insuranceExpiryString,
             status: vehicle.status,
-            driver_id: vehicle.driverId
+            driver_id: vehicle.driverId,
+            lastMaintenanceDistance: vehicle.lastMaintenanceDistance,
+            totalDistance: vehicle.totalDistance
         )
 
         do {
@@ -1239,6 +1270,36 @@ class SupabaseDataController: ObservableObject {
             let response = try await supabase
                 .from("vehicles")
                 .update(["status": newStatus.rawValue])
+                .eq("id", value: vehicleID)
+                .execute()
+            
+            print("Update success: \(response)")
+        } catch {
+            print("Error updating vehicle: \(error)")
+        }
+    }
+    
+    func updateVehicleLastMaintenance(lastMaintenanceDistance: Int, vehicleID: UUID) async {
+        do {
+            // 6. Update the payload in Supabase by filtering with the vehicle's `id`
+            let response = try await supabase
+                .from("vehicles")
+                .update(["lastMaintenanceDistance": lastMaintenanceDistance])
+                .eq("id", value: vehicleID)
+                .execute()
+            
+            print("Update success: \(response)")
+        } catch {
+            print("Error updating vehicle: \(error)")
+        }
+    }
+    
+    func updateVehicleTotalMaintenance(totalDistance: Int, vehicleID: UUID) async {
+        do {
+            // 6. Update the payload in Supabase by filtering with the vehicle's `id`
+            let response = try await supabase
+                .from("vehicles")
+                .update(["totalDistance": totalDistance])
                 .eq("id", value: vehicleID)
                 .execute()
             

@@ -214,14 +214,90 @@ struct PDFViewer: UIViewRepresentable {
     }
 }
 
+// MARK: - Odometer Section
+private struct OdometerSection: View {
+    let vehicle: Vehicle
+    @State private var showingServiceAlert = false
+    
+    var totalDistance: Double {
+        Double(vehicle.totalDistance)
+    }
+    
+    var needsMaintenance: Bool {
+        return (Int(totalDistance) - vehicle.lastMaintenanceDistance) >= 10000
+    }
+    
+    var body: some View {
+        Section("Odometer Information") {
+            HStack {
+                Text("Total Distance:")
+                Spacer()
+                Text(String(format: "%.1f km", totalDistance))
+            }
+            
+            if needsMaintenance {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text("Maintenance Required")
+                        .foregroundColor(.orange)
+                    Spacer()
+                    Button("Schedule Service") {
+                        showingServiceAlert = true
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+        }
+        .onAppear {
+            // Check maintenance status when view appears
+            if needsMaintenance {
+                showingServiceAlert = true
+            }
+        }
+        .onChange(of: totalDistance) { _, newValue in
+            if newValue >= 10000 {
+                showingServiceAlert = true
+            }
+        }
+        .alert("Service Required", isPresented: $showingServiceAlert) {
+            Button("Schedule Service", role: .destructive) {
+                Task {
+                    let maintenanceRequest = MaintenanceServiceRequest(
+                        vehicleId: vehicle.id,
+                        vehicleName: vehicle.name,
+                        serviceType: .routine,
+                        description: "Perform routine maintenance check and oil change",
+                        priority: .medium,
+                        date: Date(),
+                        dueDate: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date(),
+                        status: .pending,
+                        notes: "Maintenance scheduled; verify fluid levels and tire pressure.",
+                        issueType: "Routine"
+                    )
+                    try await SupabaseDataController.shared.insertServiceRequest(request: maintenanceRequest)
+                    await SupabaseDataController.shared.updateVehicleStatus(newStatus: VehicleStatus.underMaintenance, vehicleID: vehicle.id)
+                    await SupabaseDataController.shared.updateVehicleLastMaintenance(lastMaintenanceDistance: Int(totalDistance), vehicleID: vehicle.id)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This vehicle has covered \(String(format: "%.1f", totalDistance)) km and requires maintenance service. Please schedule a service check as soon as possible.")
+        }
+    }
+}
+
 // MARK: - Main View
 struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var vehicleManager: VehicleManager
+    @StateObject private var maintenanceStore = MaintenancePersonnelDataStore()
     @State private var isEditing = false
     @State private var isSaving = false
     @State private var isLoadingDetails = false
     @State private var detailLoadError: String? = nil
+    @State private var serviceRequests: [MaintenanceServiceRequest] = []
+    @State private var totalExpenses: Double = 0.0
 
     let vehicle: Vehicle
     
@@ -347,6 +423,8 @@ struct VehicleDetailView: View {
     @State private var pdfError: String? = nil
     @State private var showingPDFError = false
     @State private var pdfData: Data? = nil
+    @State private var refreshTimer: Timer?
+    @State private var serviceRequestRefreshTimer: Timer?
     
     var body: some View {
         Form {
@@ -354,13 +432,12 @@ struct VehicleDetailView: View {
                 // Basic Information Section with inline errors.
                 basicInformationSection
                 vehicleDetailsSection
-                
-                // Documents Section
-//                documentSection
             } else {
                 // View mode sections
                 readOnlyBasicInfoSection
                 readOnlyVehicleDetailsSection
+                OdometerSection(vehicle: vehicle)
+                serviceRequestDetailsSection
             }
         }
         .navigationTitle("Vehicle Details")
@@ -398,6 +475,33 @@ struct VehicleDetailView: View {
                 $0.vehicleDetails.id == vehicle.id && 
                 ($0.status == .inProgress || $0.status == .delivered)
             })
+            
+            // Load service requests and expenses immediately
+            Task {
+                await loadServiceRequestsAndExpenses()
+            }
+            
+            // Start refresh timer for vehicle and crew data
+            refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+                Task {
+                    await vehicleManager.loadVehiclesAsync()
+                    CrewDataController.shared.update()
+                }
+            }
+            
+            // Start refresh timer for service requests with a longer interval
+            serviceRequestRefreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+                Task {
+                    await loadServiceRequestsAndExpenses()
+                }
+            }
+        }
+        .onDisappear {
+            // Stop refresh timers when view disappears
+            refreshTimer?.invalidate()
+            refreshTimer = nil
+            serviceRequestRefreshTimer?.invalidate()
+            serviceRequestRefreshTimer = nil
         }
         .task {
             // Initial load of vehicle data
@@ -495,6 +599,193 @@ struct VehicleDetailView: View {
             LabeledContent(label: "Body Type", value: vehicle.bodyType.rawValue)
             LabeledContent(label: "Body Subtype", value: vehicle.bodySubtype)
             LabeledContent(label: "MSRP", value: "$\(String(format: "%.2f", vehicle.msrp))")
+            
+            // Add odometer reading
+            let totalDistance = Double(vehicle.totalDistance)
+            LabeledContent(label: "Odometer", value: String(format: "%.1f km", totalDistance))
+        }
+    }
+    
+    // Add Service Request Details Section
+    private var serviceRequestDetailsSection: some View {
+        Section("Service Request Details") {
+            if serviceRequests.isEmpty {
+                Text("No service requests found")
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Total Expense Card
+                    HStack {
+                        Image(systemName: "dollarsign.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.title2)
+                        Text("Total Expenses:")
+                            .font(.headline)
+                        Spacer()
+                        if isLoadingDetails {
+                            ProgressView()
+                        } else {
+                            Text("$\(totalExpenses, specifier: "%.2f")")
+                                .font(.headline)
+                                .foregroundColor(.green)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    
+                    // Individual Service Requests
+                    ForEach(serviceRequests) { request in
+                        VStack(alignment: .leading, spacing: 12) {
+                            // Header with Service Type and Status
+                            HStack(alignment: .center) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(request.serviceType.rawValue)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "calendar")
+                                            .foregroundColor(.blue)
+                                        Text("Due: \(request.dueDate.formatted(date: .abbreviated, time: .shortened))")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                Text(request.status.rawValue)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(statusColor(for: request.status).opacity(0.2))
+                                    .foregroundColor(statusColor(for: request.status))
+                                    .cornerRadius(8)
+                            }
+                            
+                            if let issueType = request.issueType {
+                                Divider()
+                                    .padding(.vertical, 4)
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "exclamationmark.triangle")
+                                            .foregroundColor(.orange)
+                                        Text("Issue Type:")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                    }
+                                    
+                                    Text(issueType)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .padding(.leading, 26)
+                                }
+                            }
+                            
+                            if !request.notes.isEmpty {
+                                Divider()
+                                    .padding(.vertical, 4)
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "note.text")
+                                            .foregroundColor(.blue)
+                                        Text("Notes:")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                    }
+                                    
+                                    Text(request.notes)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .padding(.leading, 26)
+                                }
+                            }
+                            
+                            if request.totalCost > 0 {
+                                Divider()
+                                    .padding(.vertical, 4)
+                                
+                                HStack(spacing: 8) {
+                                    Image(systemName: "dollarsign.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Total Cost:")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                    
+                                    Text("$\(request.totalCost, specifier: "%.2f")")
+                                        .font(.subheadline)
+                                        .foregroundColor(.green)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 8)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            Task {
+                isLoadingDetails = true
+                await loadServiceRequestsAndExpenses()
+                isLoadingDetails = false
+            }
+        }
+    }
+    
+    private func loadServiceRequestsAndExpenses() async {
+        do {
+            // Load service requests
+            await maintenanceStore.loadData()
+            let filteredRequests = maintenanceStore.serviceRequests.filter { $0.vehicleId == vehicle.id }
+            var totalCost: Double = 0.0
+            var updatedRequests = [MaintenanceServiceRequest]()
+            
+            // Fetch expenses for each request
+            for var request in filteredRequests {
+                do {
+                    let expenses = try await maintenanceStore.fetchExpenses(for: request.id)
+                    let requestTotal = expenses.reduce(0.0) { $0 + $1.amount }
+                    totalCost += requestTotal
+                    request.totalCost = requestTotal
+                    updatedRequests.append(request)
+                } catch {
+                    print("Error fetching expenses for request \(request.id): \(error)")
+                    // Still include the request even if expenses failed to load
+                    updatedRequests.append(request)
+                }
+            }
+            
+            // Update UI on main thread
+            await MainActor.run {
+                self.serviceRequests = updatedRequests
+                self.totalExpenses = totalCost
+            }
+        }
+    }
+    
+    private func statusColor(for status: ServiceRequestStatus) -> Color {
+        switch status {
+        case .pending:
+            return .orange
+        case .assigned:
+            return .blue
+        case .inProgress:
+            return .green
+        case .completed:
+            return .gray
+        case .cancelled:
+            return .red
         }
     }
     
@@ -854,21 +1145,21 @@ struct VehicleSaveView: View {
                 }
 
                 // Documents Section remains unchanged.
-                DocumentsSection(
-                    pollutionCertificate: $pollutionCertificate,
-                    rc: $rc,
-                    insurance: $insurance,
-                    pollutionExpiry: $pollutionExpiry,
-                    insuranceExpiry: $insuranceExpiry,
-                    showingPollutionPicker: $showingPollutionPicker,
-                    showingRCPicker: $showingRCPicker,
-                    showingInsurancePicker: $showingInsurancePicker,
-                    showingDeliveryReceipt: $showingDeliveryReceipt,
-                    pdfData: $pdfData,
-                    pdfError: $pdfError,
-                    showingPDFError: $showingPDFError,
-                    currentTrip: nil
-                )
+//                DocumentsSection(
+//                    pollutionCertificate: $pollutionCertificate,
+//                    rc: $rc,
+//                    insurance: $insurance,
+//                    pollutionExpiry: $pollutionExpiry,
+//                    insuranceExpiry: $insuranceExpiry,
+//                    showingPollutionPicker: $showingPollutionPicker,
+//                    showingRCPicker: $showingRCPicker,
+//                    showingInsurancePicker: $showingInsurancePicker,
+//                    showingDeliveryReceipt: $showingDeliveryReceipt,
+//                    pdfData: $pdfData,
+//                    pdfError: $pdfError,
+//                    showingPDFError: $showingPDFError,
+//                    currentTrip: nil
+//                )
             }
             .navigationTitle("Add Vehicle")
             .navigationBarTitleDisplayMode(.inline)

@@ -9,7 +9,7 @@ struct RoleSelectionView: View {
         NavigationStack {
             VStack(spacing: 20) {
                 Text("TrackNGo")
-                    .font(.title)
+                    .font(.system(.title, design: .default))
                     .fontWeight(.bold)
                     .foregroundColor(Color.pink.opacity(0.5))
                     .padding(.top, 20)
@@ -21,7 +21,7 @@ struct RoleSelectionView: View {
                     .padding(.bottom, 20)
                 
                 Text("Select Your Role")
-                    .font(.headline)
+                    .font(.system(.headline, design: .default))
                 
                 VStack(spacing: 10) {
                     ForEach(roles, id: \.self) { role in
@@ -31,7 +31,7 @@ struct RoleSelectionView: View {
                             navigateToLogin = true
                         }) {
                             Text(role)
-                                .font(.headline)
+                                .font(.system(.headline, design: .default))
                                 .foregroundColor(.white)
                                 .padding()
                                 .frame(maxWidth: .infinity)
@@ -63,6 +63,7 @@ struct LoginView: View {
     @State private var isLoading: Bool = false
     @State private var navigateToVerify = false
     @State private var isPasswordVisible: Bool = false
+    @State private var navigateToForgotPassword = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -153,6 +154,18 @@ struct LoginView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(isLoading || !isValidEmail(email) || !isValidPassword(password))
+            
+            // Forgot Password Button
+            Button(action: {
+                navigateToForgotPassword = true
+            }) {
+                Text("Forgot Password?")
+                    .foregroundColor(.blue)
+                    .font(.footnote)
+            }
+            .padding(.top, 5)
+
+            Spacer()
         }
         .padding()
         .alert(isPresented: $dataController.showAlert) {
@@ -160,6 +173,9 @@ struct LoginView: View {
         }
         .navigationDestination(isPresented: $navigateToVerify) {
             VerifyOTPView(email: email)
+        }
+        .navigationDestination(isPresented: $navigateToForgotPassword) { // Navigate to Forget Password View
+            ForgotPasswordView()
         }
     }
     
@@ -175,7 +191,6 @@ struct LoginView: View {
         return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
     }
 }
-
 
 struct PasswordCriteriaView: View {
     let password: String

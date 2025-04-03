@@ -193,7 +193,6 @@ struct ExpensesCard: View {
             HStack {
                 Text("Expenses")
                     .font(.headline)
-                    .foregroundColor(.primary)
                 Spacer()
                 Text("Total: $\(totalCost, specifier: "%.2f")")
                     .font(.subheadline)
@@ -213,7 +212,7 @@ struct ExpensesCard: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
@@ -278,20 +277,20 @@ struct AddExpenseView: View {
                     }
                 }
             }
-            .navigationTitle("Add Expense")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
+        }
+        .navigationTitle("Add Expense")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    isPresented = false
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add") {
-                        addExpense()
-                    }
-                    .disabled(description.isEmpty || amount.isEmpty || !isValidAmount)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Add") {
+                    addExpense()
                 }
+                .disabled(description.isEmpty || amount.isEmpty || !isValidAmount)
             }
         }
     }
@@ -327,7 +326,6 @@ struct MaintenanceVehicleRequestInfoCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Vehicle Information")
                 .font(.headline)
-                .foregroundColor(.primary)
             
             Divider()
             
@@ -337,7 +335,7 @@ struct MaintenanceVehicleRequestInfoCard: View {
             InfoRow(title: "Due Date", value: request.dueDate.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -372,41 +370,38 @@ struct MaintenanceServiceDetailsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Service Details")
-                .font(.headline)
-                .foregroundColor(.primary)
+                .font(.system(.headline, design: .default))
             
             Divider()
             
             Text(request.description)
-                .font(.subheadline)
-                .foregroundColor(.primary)
+                .font(.system(.subheadline, design: .default))
+                .foregroundColor(.secondary)
             
             if let issueType = request.issueType {
                 Text("Issue Type")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .fontWeight(.medium)
-                    .foregroundColor(.primary)
                     .padding(.top, 4)
                 
                 Text(issueType)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.secondary)
             }
             
             if !request.notes.isEmpty {
                 Text("Notes")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .fontWeight(.medium)
-                    .foregroundColor(.primary)
                     .padding(.top, 4)
                 
                 Text(request.notes)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .default))
                     .foregroundColor(.secondary)
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -420,21 +415,19 @@ struct MaintenanceSafetyChecksCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Safety Checks")
                 .font(.headline)
-                .foregroundColor(.primary)
             
             Divider()
             
             ForEach(checks) { check in
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: check.isChecked ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(check.isChecked ? .green : .secondary)
+                        .foregroundColor(check.isChecked ? .green : .gray)
                         .font(.title3)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(check.item)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(.primary)
                         
                         if !check.notes.isEmpty {
                             Text(check.notes)
@@ -450,7 +443,7 @@ struct MaintenanceSafetyChecksCard: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)

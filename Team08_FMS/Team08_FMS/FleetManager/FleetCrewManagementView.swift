@@ -122,7 +122,7 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .fontWeight(.medium)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -142,9 +142,9 @@ private struct EmptyStateView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.secondary)
             Text("No \(type == .drivers ? "drivers" : "maintenance personnel") found")
-                .font(.headline)
+                .font(.system(.headline, design: .default))
             Text("Add new crew members or try different filters")
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .default))
                 .foregroundColor(.secondary)
         }
         .padding()
@@ -400,9 +400,11 @@ struct CrewCardView: View {
     
     private func updateCrewStatus(_ newStatus: Status) async throws {
         if currentCrew is Driver {
-            try await dataManager.updateDriverStatus(currentCrew.id, status: newStatus)
+            await SupabaseDataController.shared.updateDriverStatus(newStatus: newStatus, userID: nil, id: currentCrew.id)
+            CrewDataController.shared.update()
         } else {
-            dataManager.updateMaintenancePersonnelStatus(currentCrew.id, status: newStatus)
+            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: newStatus, userID: nil, id: currentCrew.id)
+            CrewDataController.shared.update()
         }
     }
     
@@ -451,8 +453,13 @@ struct StatusCard: View {
                 .foregroundColor(.primary)
 
             Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.system(.subheadline, design: .default))
+                .fontWeight(.medium)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(isSelected ? Color.accentColor : Color(.systemGray6))
+                .foregroundColor(isSelected ? .white : .primary)
+                .clipShape(Capsule())
         }
         .padding()
         .frame(width: 110, height: 100)

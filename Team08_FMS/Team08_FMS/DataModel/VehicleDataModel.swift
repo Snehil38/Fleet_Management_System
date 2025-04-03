@@ -81,6 +81,8 @@ struct VehiclePayload: Codable {
     let insurance_expiry: String
     let status: VehicleStatus
     let driver_id: UUID?
+    let lastMaintenanceDistance: Int
+    let totalDistance: Int
 }
 
 struct Vehicle: Identifiable, Codable, Equatable {
@@ -100,6 +102,8 @@ struct Vehicle: Identifiable, Codable, Equatable {
     var insuranceExpiry: Date
     var status: VehicleStatus
     var driverId: UUID?
+    var lastMaintenanceDistance: Int = 0
+    var totalDistance: Int = 0
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -118,6 +122,8 @@ struct Vehicle: Identifiable, Codable, Equatable {
         case insuranceExpiry = "insurance_expiry"
         case status
         case driverId = "driver_id"
+        case lastMaintenanceDistance
+        case totalDistance
     }
     
     static func == (lhs: Vehicle, rhs: Vehicle) -> Bool {
