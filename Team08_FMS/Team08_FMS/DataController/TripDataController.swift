@@ -521,7 +521,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                         status,
                         lastMaintenanceDistance,
                         totalDistance
-                    )
+                    ),middle_pickup,middle_pickup_latitude,middle_pickup_longitude
                 """)
                 .eq("is_deleted", value: false)
             
@@ -555,9 +555,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let estimated_distance: Double?
                 let estimated_time: Double?
                 let vehicles: Vehicle
-                let midPoint: String?
-                let midPointLat: Double?
-                let  midPointLong :Double?
+                let middle_pickup: String?
+                let middle_pickup_latitude: Double?
+                let middle_pickup_longitude: Double?
                 
                 // Add computed properties to parse distance and fuel cost
                 var parsedDistance: String {
@@ -610,8 +610,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     pickup: data.pickup,
                     estimated_distance: data.estimated_distance,
                     estimated_time: data.estimated_time,
-                    midPoint: data.midPoint,
-                    midPointLat: data.midPointLat,midPointLong: data.midPointLong
+                    midPoint: data.middle_pickup,
+                    midPointLat: data.middle_pickup_latitude,
+                    midPointLong: data.middle_pickup_longitude
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }
@@ -696,9 +697,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 let estimated_distance: Double?
                 let estimated_time: Double?
                 let vehicles: Vehicle
-                let midPoint: String?
-                let midPointLat: Double?
-                let midPointLong:Double?
+                let middle_pickup: String?
+                let middle_pickup_latitude: Double?
+                let middle_pickup_longitude: Double?
             }
 
             var query = supabaseController.supabase
@@ -781,9 +782,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     pickup: data.pickup,
                     estimated_distance: data.estimated_distance,
                     estimated_time: data.estimated_time,
-                    midPoint: data.midPoint,
-                    midPointLat: data.midPointLat,midPointLong: data.midPointLong
-                    
+                    midPoint: data.middle_pickup,
+                    midPointLat: data.middle_pickup_latitude,
+                    midPointLong: data.middle_pickup_longitude
                 )
                 return Trip(from: supabaseTrip, vehicle: data.vehicles)
             }

@@ -283,9 +283,35 @@ struct TripCardView: View {
                 }
             }
             
-            // Trip name
+            // Rest of the card content
             Text(trip.displayName)
                 .font(.headline)
+            
+            // Pickup location
+            if let pickup = trip.pickup {
+                HStack(spacing: 4) {
+                    Image(systemName: "location.circle.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 14))
+                    
+                    Text("From: \(pickup)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // Mid-point if available
+            if let midPoint = trip.middle_Pickup {
+                HStack(spacing: 4) {
+                    Image(systemName: "location.fill.viewfinder")
+                        .foregroundColor(.purple)
+                        .font(.system(size: 14))
+                    
+                    Text("Via: \(midPoint)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
             
             // Destination
             HStack(spacing: 4) {
@@ -293,7 +319,7 @@ struct TripCardView: View {
                     .foregroundColor(.red)
                     .font(.system(size: 14))
                 
-                Text(trip.destination)
+                Text("To: \(trip.destination)")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -496,211 +522,224 @@ struct TripDetailView: View {
         isDestinationValid && isAddressValid
     }
     
-    private func calculateFuelCost(from distance: String) -> (String, Double) {
-        // Extract numeric value from distance string
-        let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
-            .joined()
-        
-        if let distance = Double(numericDistance) {
-            // Calculate fuel cost ($0.5 per km/mile)
-            let fuelCost = distance * 0.5
-            return (String(format: "$%.2f", fuelCost), fuelCost)
+    // Helper to determine if search results should be shown
+    private func shouldShowLocationResults() -> Bool {
+        // First check if we have results and an active field
+        guard !searchResults.isEmpty && activeTextField != nil else { 
+            return false 
         }
-        return ("N/A", 0.0)
-    }
-    
-    private func calculateTotalRevenue(distance: String, fuelCost: Double) -> String {
-        let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
-            .joined()
         
-        if let distance = Double(numericDistance) {
-            // Total Revenue = Fuel Cost + ($0.25 × Distance) + $50
-            let distanceRevenue = distance * 0.25
-            let totalRevenue = fuelCost + distanceRevenue + 50.0
-            return String(format: "$%.2f", totalRevenue)
+        // Check destination field
+        if activeTextField == .destination && !destinationSelected {
+            return true
         }
-        return "N/A"
+        
+        // Check address field
+        if activeTextField == .address && !addressSelected {
+            return true
+        }
+        
+        return false
     }
 
-    var body: some View {
-        NavigationView {
-            List {
-                // Trip Information Section with driver assignment
-                Section(header: Text("TRIP INFORMATION")) {
-                    if isEditing {
-                        // Editable Trip ID (non-editable)
-                        HStack {
-                            Text("Trip ID")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(trip.id.uuidString)
-                        }
-                        
-                        // Editable Destination
-                        VStack(alignment: .leading, spacing: 4) {
-                            TextField("Destination", text: $editedDestination)
-                                .onChange(of: editedDestination) { _, newValue in 
-                                    destinationEdited = true
-                                    
-                                    // If destination was previously selected and user is editing
-                                    if destinationSelected && !newValue.isEmpty {
-                                        if newValue != editedDestination {
-                                            destinationSelected = false
-                                        }
-                                    }
-                                    
-                                    // Only show search results if not already selected and query has 3+ chars
-                                    if !destinationSelected && newValue.count > 2 {
-                                        searchCompleter.queryFragment = newValue
-                                        activeTextField = .destination
-                                    } else {
-                                        searchResults = []
-                                    }
-                                }
-                            if destinationEdited && !isDestinationValid {
-                                Text("Destination cannot be empty")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        
-                        // Editable Address
-                        VStack(alignment: .leading, spacing: 4) {
-                            TextField("Address", text: $editedAddress)
-                                .onChange(of: editedAddress) { _, newValue in 
-                                    addressEdited = true
-                                    
-                                    // If address was previously selected and user is editing
-                                    if addressSelected && !newValue.isEmpty {
-                                        if newValue != editedAddress {
-                                            addressSelected = false
-                                        }
-                                    }
-                                    
-                                    // Only show search results if not already selected and query has 3+ chars
-                                    if !addressSelected && newValue.count > 2 {
-                                        searchCompleter.queryFragment = newValue
-                                        activeTextField = .address
-                                    } else {
-                                        searchResults = []
-                                    }
-                                }
-                            if addressEdited && !isAddressValid {
-                                Text("Address cannot be empty")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        
-                        // Search Results if any - only show when appropriate based on selection state
-                        if !searchResults.isEmpty && activeTextField != nil && 
-                           ((activeTextField == .destination && !destinationSelected) || 
-                            (activeTextField == .address && !addressSelected)) {
-                            TripsLocationSearchResults(results: searchResults) { result in
-                                if activeTextField == .destination {
-                                    destinationSelected = true
-                                    searchForLocation(result.title, isDestination: true)
-                                } else {
-                                    addressSelected = true
-                                    searchForLocation(result.title, isDestination: false)
-                                }
-                            }
-                        }
-                        
-                        // Non-editable distance
-                        if !calculatedDistance.isEmpty {
-                            HStack {
-                                Text("Distance")
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text(calculatedDistance)
-                                    .foregroundColor(calculatedDistance != trip.distance ? .blue : .primary)
-                            }
-                        }
-                        
-                        // Driver assignment
-                        HStack {
-                            Text("Driver")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            
-                            Menu {
-                                // Option to unassign driver
-                                Button(action: {
-                                    selectedDriverId = nil
-                                }) {
-                                    HStack {
-                                        Text("Unassign driver")
-                                            .foregroundColor(.red)
-                                        Spacer()
-                                        if selectedDriverId == nil {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                                
-                                Divider()
-                                
-                                // Available drivers
-                                ForEach(CrewDataController.shared.drivers.filter { $0.status == .available }, id: \.userID) { driver in
-                                    Button(action: {
-                                        selectedDriverId = driver.userID
-                                    }) {
-                                        HStack {
-                                            Text(driver.name)
-                                            Spacer()
-                                            if selectedDriverId == driver.userID {
-                                                Image(systemName: "checkmark")
-                                            }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack {
-                                    if let driverId = selectedDriverId,
-                                       let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
-                                        Text(driver.name)
-                                            .foregroundColor(.primary)
-                                    } else {
-                                        Text("Unassigned")
-                                            .foregroundColor(.gray)
-                                    }
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            .onAppear {
-                                // Ensure crew data is updated when menu appears
-                                CrewDataController.shared.update()
-                            }
-                        }
-                    } else {
-                        TripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
-                        TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
-                        TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
-                        if !trip.distance.isEmpty {
-                            TripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
-                        }
-                        
-                        // Driver information
-                        if let driverId = trip.driverId,
-                           let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
-                            TripDetailRow(icon: "person.fill", title: "Driver", value: driver.name)
-                        } else {
-                            TripDetailRow(icon: "person.fill", title: "Driver", value: "Unassigned")
+    // MARK: - Helper Views
+    
+    @ViewBuilder
+    private func tripIdRow() -> some View {
+        HStack {
+            Text("Trip ID")
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(trip.id.uuidString)
+        }
+    }
+    
+    @ViewBuilder
+    private func destinationField() -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField("Destination", text: $editedDestination)
+                .onChange(of: editedDestination) { _, newValue in 
+                    handleDestinationChange(newValue)
+                }
+            if destinationEdited && !isDestinationValid {
+                Text("Destination cannot be empty")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func addressField() -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField("Address", text: $editedAddress)
+                .onChange(of: editedAddress) { _, newValue in 
+                    handleAddressChange(newValue)
+                }
+            if addressEdited && !isAddressValid {
+                Text("Address cannot be empty")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func locationSearchResults() -> some View {
+        if shouldShowLocationResults() {
+            TripsLocationSearchResults(results: searchResults) { result in
+                if activeTextField == .destination {
+                    destinationSelected = true
+                    searchForLocation(result.title, isDestination: true)
+                } else {
+                    addressSelected = true
+                    searchForLocation(result.title, isDestination: false)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func distanceInfo() -> some View {
+        if !calculatedDistance.isEmpty {
+            HStack {
+                Text("Distance")
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(calculatedDistance)
+                    .foregroundColor(calculatedDistance != trip.distance ? .blue : .primary)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func driverAssignment() -> some View {
+        HStack {
+            Text("Driver")
+                .foregroundColor(.secondary)
+            Spacer()
+            
+            Menu {
+                // Option to unassign driver
+                Button(action: {
+                    selectedDriverId = nil
+                }) {
+                    HStack {
+                        Text("Unassign driver")
+                            .foregroundColor(.red)
+                        Spacer()
+                        if selectedDriverId == nil {
+                            Image(systemName: "checkmark")
                         }
                     }
                 }
                 
+                Divider()
+                
+                // Available drivers
+                ForEach(CrewDataController.shared.drivers.filter { $0.status == .available }, id: \.userID) { driver in
+                    Button(action: {
+                        selectedDriverId = driver.userID
+                    }) {
+                        HStack {
+                            Text(driver.name)
+                            Spacer()
+                            if selectedDriverId == driver.userID {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    if let driverId = selectedDriverId,
+                       let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+                        Text(driver.name)
+                            .foregroundColor(.primary)
+                    } else {
+                        Text("Unassigned")
+                            .foregroundColor(.gray)
+                    }
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+            .onAppear {
+                // Ensure crew data is updated when menu appears
+                CrewDataController.shared.update()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func editingView() -> some View {
+        VStack {
+            tripIdRow()
+            destinationField()
+            addressField()
+            locationSearchResults()
+            distanceInfo()
+            driverAssignment()
+        }
+    }
+    
+    @ViewBuilder
+    private func nonEditingView() -> some View {
+        VStack {
+            TripDetailRow(icon: "number", title: "Trip ID", value: trip.id.uuidString)
+            
+            // Show pickup location if available
+            if let pickup = trip.pickup {
+                TripDetailRow(icon: "location.circle.fill", title: "Pickup", value: pickup)
+            }
+            
+            // Show mid-point if available
+            if let midPoint = trip.middle_Pickup {
+                TripDetailRow(icon: "location.fill.viewfinder", title: "Mid-Point", value: midPoint)
+            }
+            
+            TripDetailRow(icon: "mappin.circle.fill", title: "Destination", value: trip.destination)
+            TripDetailRow(icon: "location.fill", title: "Address", value: trip.address)
+            
+            if !trip.distance.isEmpty {
+                TripDetailRow(icon: "arrow.left.and.right", title: "Distance", value: trip.distance)
+            }
+            
+            // Driver information
+            if let driverId = trip.driverId,
+                let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
+                TripDetailRow(icon: "person.fill", title: "Driver", value: driver.name)
+            } else {
+                TripDetailRow(icon: "person.fill", title: "Driver", value: "Unassigned")
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            List {
+                // Trip Information Section with driver assignment
+                Section {
+                    if isEditing {
+                        editingView()
+                    } else {
+                        nonEditingView()
+                    }
+                } header: {
+                    Text("TRIP INFORMATION")
+                }
+                
                 // Vehicle Information Section
-                Section(header: Text("VEHICLE INFORMATION")) {
+                Section {
                     TripDetailRow(icon: "car.fill", title: "Vehicle Type", value: trip.vehicleDetails.bodyType.rawValue)
                     TripDetailRow(icon: "number", title: "License Plate", value: trip.vehicleDetails.licensePlate)
+                } header: {
+                    Text("VEHICLE INFORMATION")
                 }
                 
                 // Delivery Status Section
-                Section(header: Text("DELIVERY STATUS")) {
+                Section {
                     TripDetailRow(icon: statusIcon, title: "Status", value: statusText)
                     TripDetailRow(
                         icon: trip.hasCompletedPreTrip ? "checkmark.circle.fill" : "clock.badge.checkmark.fill",
@@ -712,64 +751,42 @@ struct TripDetailView: View {
                         title: "Post-Trip Inspection",
                         value: trip.hasCompletedPostTrip ? "Completed" : "Required"
                     )
+                } header: {
+                    Text("DELIVERY STATUS")
                 }
                 
-                // Proof of Delivery Section (for completed trips)
-//                if trip.status == .delivered {
-//                    Section(header: Text("PROOF OF DELIVERY")) {
-//                        Button(action: {
-//                            do {
-//                                pdfData = try TripDataController.shared.generateDeliveryReceipt(for: trip, signature: fleetManagerSignature)
-//                                showingDeliveryReceipt = true
-//                            } catch {
-//                                pdfError = error.localizedDescription
-//                                showingPDFError = true
-//                            }
-//                        }) {
-//                            HStack {
-//                                Image(systemName: "doc.text.fill")
-//                                    .foregroundColor(.blue)
-//                                Text("Delivery Receipt")
-//                                Spacer()
-//                                Image(systemName: "chevron.right")
-//                                    .foregroundColor(.gray)
-//                            }
-//                        }
-//                        
-//                        Button(action: {
-//                            showingSignatureSheet = true
-//                        }) {
-//                            HStack {
-//                                Image(systemName: "signature")
-//                                    .foregroundColor(.blue)
-//                                Text("Fleet Manager Signature")
-//                                Spacer()
-//                                if fleetManagerSignature != nil {
-//                                    Image(systemName: "checkmark.circle.fill")
-//                                        .foregroundColor(.green)
-//                                }
-//                                Image(systemName: "chevron.right")
-//                                    .foregroundColor(.gray)
-//                            }
-//                        }
-//                        
-//                        if let pdfData = pdfData {
-//                            ShareLink(item: pdfData, preview: SharePreview("Delivery Receipt", image: Image(systemName: "doc.fill"))) {
-//                                HStack {
-//                                    Image(systemName: "square.and.arrow.up")
-//                                        .foregroundColor(.blue)
-//                                    Text("Download Receipt")
-//                                    Spacer()
-//                                    Image(systemName: "chevron.right")
-//                                        .foregroundColor(.gray)
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
+                // Added Pickup Section
+                Section {
+                    if let middlePickup = trip.middle_Pickup, !middlePickup.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "location.fill.viewfinder")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 20))
+                                Text(middlePickup)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            if let lat = trip.middle_pickup_latitude, 
+                               let long = trip.middle_pickup_longitude {
+                                Text("Coordinates: \(String(format: "%.5f", lat)), \(String(format: "%.5f", long))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        Text("N/A")
+                            .foregroundColor(.gray)
+                            .italic()
+                    }
+                } header: {
+                    Text("ADDED PICKUP")
+                }
                 
                 // Notes Section
-                Section(header: Text("NOTES")) {
+                Section {
                     if isEditing {
                         TextEditor(text: $editedNotes)
                             .frame(minHeight: 100)
@@ -783,7 +800,19 @@ struct TripDetailView: View {
                                 
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Trip: \(trip.id.uuidString)")
-                                    Text("From: \(trip.address)")
+                                    
+                                    // Show pickup location in notes section if available
+                                    if let pickup = trip.pickup {
+                                        Text("From: \(pickup)")
+                                    } else {
+                                        Text("From: \(trip.address)")
+                                    }
+                                    
+                                    // Show mid-point location in notes section if available
+                                    if let midPoint = trip.middle_Pickup {
+                                        Text("Mid-Point: \(midPoint)")
+                                    }
+                                    
                                     Text("To: \(trip.destination)")
                                     
                                     if !trip.distance.isEmpty {
@@ -809,6 +838,8 @@ struct TripDetailView: View {
                         .foregroundColor(.primary)
                         .padding(.vertical, 8)
                     }
+                } header: {
+                    Text("NOTES")
                 }
                 
                 // Add Assign Driver Button for unassigned trips only
@@ -818,353 +849,297 @@ struct TripDetailView: View {
                             showingAssignSheet = true
                         }) {
                             HStack {
-                                Image(systemName: "person.badge.plus")
+                                Image(systemName: "person.fill.badge.plus")
                                     .foregroundColor(.blue)
                                 Text("Assign Driver")
+                                    .bold()
                                     .foregroundColor(.blue)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .center)
                         }
+                    } header: {
+                        Text("Driver Assignment")
                     }
                 }
                 
-                // Delete section for upcoming trips
-                if trip.status == .pending || trip.status == .assigned {
-                    Section {
-                        Button(role: .destructive) {
-                            showingDeleteAlert = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "trash")
-                                Text("Delete Trip")
-                                Spacer()
-                            }
+                // Add Delete Button for admins - placed at bottom for safety
+                Section {
+                    Button(action: {
+                        showingDeleteAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash.fill")
+                                .foregroundColor(.red)
+                            Text("Delete Trip")
+                                .bold()
+                                .foregroundColor(.red)
                         }
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
+                } header: {
+                    Text("Danger Zone")
+                }
+                .alert(isPresented: $showingDeleteAlert) {
+                    Alert(
+                        title: Text("Delete Trip"),
+                        message: Text("Are you sure you want to delete this trip? This action cannot be undone."),
+                        primaryButton: .destructive(Text("Delete")) {
+                            Task {
+                                do {
+                                    try await tripController.deleteTrip(id: trip.id)
+                                    dismiss()
+                                } catch {
+                                    print("Error deleting trip: \(error)")
+                                }
+                            }
+                        },
+                        secondaryButton: .cancel()
+                    )
                 }
             }
-            .listStyle(InsetGroupedListStyle())
             .navigationTitle("Trip Details")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                initializeEditingFields()
-                setupSearchCompleter()
-            }
             .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    // Edit/Save button
+                    if isEditing {
+                        Button(action: {
+                            Task {
+                                await save()
+                            }
+                        }) {
+                            Text("Save")
+                                .bold()
+                                .opacity(isSaving ? 0.5 : 1.0)
+                        }
+                        .disabled(isSaving || !isFormValid)
+                    } else {
+                        Button(action: {
+                            startEditing()
+                        }) {
+                            Text("Edit")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                
-                if trip.status == .pending || trip.status == .assigned {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(isEditing ? "Save" : "Edit") {
-                            if isEditing {
-                                if isFormValid {
-                                    saveChanges()
-                                }
-                            } else {
-                                initializeEditingFields()
-                                isEditing.toggle()
-                            }
+                    if isEditing {
+                        Button(action: {
+                            cancelEditing()
+                        }) {
+                            Text("Cancel")
                         }
-                        .disabled(isEditing && !isFormValid)
                     }
                 }
             }
-            .alert("Delete Trip", isPresented: $showingDeleteAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    deleteTrip()
-                }
-            } message: {
-                Text("Are you sure you want to delete this trip? This action cannot be undone.")
-            }
-            .alert("Changes Saved", isPresented: $showingSaveSuccess) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Trip details have been updated successfully.")
-            }
-            .sheet(isPresented: $showingAssignSheet) {
-                AssignDriverView(trip: trip)
-            }
-            .sheet(isPresented: $showingDeliveryReceipt) {
-                NavigationView {
-                    if let data = pdfData {
-                        PDFViewer(data: data)
-                            .navigationTitle("Delivery Receipt")
-                            .navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                ToolbarItem(placement: .navigationBarTrailing) {
-                                    Button("Done") {
-                                        showingDeliveryReceipt = false
-                                    }
-                                }
-                            }
-                    }
-                }
-            }
-            .sheet(isPresented: $showingSignatureSheet) {
-                NavigationView {
-                    SignatureCaptureView(signature: $fleetManagerSignature)
-                        .navigationTitle("Fleet Manager Signature")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Cancel") {
-                                    showingSignatureSheet = false
-                                }
-                            }
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Done") {
-                                    showingSignatureSheet = false
-                                }
-                            }
-                        }
-                }
-            }
-            .alert("Error", isPresented: $showingPDFError) {
-                Button("OK") {
-                    showingPDFError = false
-                }
-            } message: {
-                Text(pdfError ?? "Failed to generate delivery receipt")
-            }
+        }
+        .onAppear {
+            setupInitialState()
         }
     }
     
-    private func initializeEditingFields() {
+    // Setup initial state when view appears
+    private func setupInitialState() {
         editedDestination = trip.destination
         editedAddress = trip.address
         editedNotes = trip.notes ?? ""
-        calculatedDistance = trip.distance
-        calculatedTime = trip.eta
         selectedDriverId = trip.driverId
         
+        // Setup search completer delegate
+        searchCompleterDelegate = TripsSearchCompleterDelegate(onUpdate: { results in
+            self.searchResults = results
+        })
+        searchCompleter.delegate = searchCompleterDelegate
+        searchCompleter.resultTypes = .address
+        
+        // Refresh trip data to ensure we have the latest middle pickup info
+        Task {
+            await tripController.refreshAllTrips()
+        }
+    }
+    
+    // Start editing mode
+    private func startEditing() {
+        isEditing = true
+    }
+    
+    // Cancel editing and reset form
+    private func cancelEditing() {
+        isEditing = false
+        
+        // Reset form values
+        editedDestination = trip.destination
+        editedAddress = trip.address
+        editedNotes = trip.notes ?? ""
+        
+        // Reset validation flags
         destinationEdited = false
         addressEdited = false
         notesEdited = false
+        
+        // Reset selection state
+        destinationSelected = false
+        addressSelected = false
+        
+        // Clear search
+        searchResults = []
+        activeTextField = nil
     }
     
-    private func setupSearchCompleter() {
-        searchCompleter.resultTypes = .pointOfInterest
-        searchCompleter.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
-            span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 30)
-        )
+    // Save trip updates
+    private func save() async {
+        isSaving = true
         
-        searchCompleterDelegate = TripsSearchCompleterDelegate { results in
-            searchResults = Array(results.prefix(5))
+        // Update trip with edited values
+        do {
+            // Update main trip details
+            try await SupabaseDataController.shared.updateTripDetails(
+                id: trip.id,
+                destination: editedDestination,
+                address: editedAddress,
+                notes: editedNotes,
+                distance: calculatedDistance.isEmpty ? nil : calculatedDistance,
+                time: calculatedTime.isEmpty ? nil : calculatedTime
+            )
+            
+            // If driver is selected, update driver assignment
+            if let driverId = selectedDriverId {
+                try await SupabaseDataController.shared.updateTrip(
+                    id: trip.id,
+                    driverId: driverId
+                )
+            }
+            
+            // Refresh data
+            await tripController.refreshAllTrips()
+            
+            // Show success briefly
+            showingSaveSuccess = true
+            
+            // Reset state
+            isEditing = false
+            isSaving = false
+            
+            // Reset edited flags
+            destinationEdited = false
+            addressEdited = false
+            notesEdited = false
+        } catch {
+            print("Error saving trip: \(error)")
+            isSaving = false
         }
-        
-        searchCompleter.delegate = searchCompleterDelegate
     }
     
-    private func searchForLocation(_ query: String, isDestination: Bool) {
+    // Handle location search selection
+    private func searchForLocation(_ locationName: String, isDestination: Bool) {
         let searchRequest = MKLocalSearch.Request()
-        searchRequest.naturalLanguageQuery = query
-        searchRequest.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629), // Center of India
-            span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 30)
-        )
+        searchRequest.naturalLanguageQuery = locationName
         
         let search = MKLocalSearch(request: searchRequest)
         search.start { response, error in
-            guard let response = response, error == nil else {
+            guard let response = response else {
                 print("Error searching for location: \(error?.localizedDescription ?? "Unknown error")")
                 return
             }
             
             if let firstItem = response.mapItems.first {
-                let selectedCoordinate = firstItem.placemark.coordinate
+                let coordinate = firstItem.placemark.coordinate
+                let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
                 
-                if isDestination {
-                    self.editedDestination = query
-                    
-                    // If we also have a source location, calculate distance
-                    if !self.trip.startingPoint.isEmpty {
-                        // Get coordinates for the source location
-                        self.getCoordinatesForAddress(self.trip.startingPoint) { sourceCoordinate in
-                            if let sourceCoordinate = sourceCoordinate {
-                                self.calculateDistance(from: sourceCoordinate, to: selectedCoordinate)
-                            }
-                        }
+                // Get full address
+                CLGeocoder().reverseGeocodeLocation(location) { placemarks, error in
+                    guard let placemark = placemarks?.first, error == nil else {
+                        print("Reverse geocoding failed: \(error?.localizedDescription ?? "Unknown error")")
+                        return
                     }
-                } else {
-                    self.editedAddress = query
                     
-                    // If we also have a destination, calculate distance
-                    if !self.editedDestination.isEmpty {
-                        // Get coordinates for the destination
-                        self.getCoordinatesForAddress(self.editedDestination) { destinationCoordinate in
-                            if let destinationCoordinate = destinationCoordinate {
-                                self.calculateDistance(from: selectedCoordinate, to: destinationCoordinate)
-                            }
-                        }
-                    }
-                }
-                
-                // Clear search results
-                self.hideSearchResults()
-            }
-        }
-    }
-    
-    private func hideSearchResults() {
-        searchResults = []
-        activeTextField = nil
-    }
-    
-    private func getCoordinatesForAddress(_ address: String, completion: @escaping (CLLocationCoordinate2D?) -> Void) {
-        let geocoder = CLGeocoder()
-        geocoder.geocodeAddressString(address) { placemarks, error in
-            if let error = error {
-                print("Geocoding error: \(error.localizedDescription)")
-                completion(nil)
-                return
-            }
-            
-            if let placemark = placemarks?.first, let location = placemark.location {
-                completion(location.coordinate)
-            } else {
-                completion(nil)
-            }
-        }
-    }
-    
-    private func calculateDistance(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) {
-        let sourcePlacemark = MKPlacemark(coordinate: source)
-        let destinationPlacemark = MKPlacemark(coordinate: destination)
-        
-        let directionRequest = MKDirections.Request()
-        directionRequest.source = MKMapItem(placemark: sourcePlacemark)
-        directionRequest.destination = MKMapItem(placemark: destinationPlacemark)
-        directionRequest.transportType = .automobile
-        
-        let directions = MKDirections(request: directionRequest)
-        directions.calculate { response, error in
-            guard let response = response, let route = response.routes.first else {
-                print("Error calculating route: \(error?.localizedDescription ?? "Unknown error")")
-                return
-            }
-            
-            // Get distance in kilometers
-            let distanceInMeters = route.distance
-            let distanceInKilometers = distanceInMeters / 1000
-            
-            // Get estimated time in hours and minutes
-            let timeInSeconds = route.expectedTravelTime
-            let hours = Int(timeInSeconds / 3600)
-            let minutes = Int((timeInSeconds.truncatingRemainder(dividingBy: 3600)) / 60)
-            
-            // Update the calculated values
-            DispatchQueue.main.async {
-                self.calculatedDistance = String(format: "%.1f km", distanceInKilometers)
-                if hours > 0 {
-                    self.calculatedTime = "\(hours)h \(minutes)m"
-                } else {
-                    self.calculatedTime = "\(minutes)m"
-                }
-            }
-        }
-    }
-    
-    private func saveChanges() {
-        guard !isSaving && isFormValid else { return }
-        
-        isSaving = true
-        
-        var updatedTrip = trip
-        updatedTrip.destination = editedDestination
-        updatedTrip.address = editedAddress
-        
-        // Update notes with the latest information including destination, distance, and assigned driver
-        let driverInfo: String
-        if let driverId = selectedDriverId,
-           let driver = CrewDataController.shared.drivers.first(where: { $0.userID == driverId }) {
-            driverInfo = "Driver: \(driver.name)"
-        } else {
-            driverInfo = "Driver: Unassigned"
-        }
-        
-        let updatedNotes = """
-        Trip: \(trip.id.uuidString)
-        From: \(editedAddress)
-        To: \(editedDestination)
-        Distance: \(calculatedDistance)
-        Estimated Time: \(calculatedTime)
-        \(driverInfo)
-        """
-        updatedTrip.notes = updatedNotes
-        
-        // Update distance and time if they have changed
-        let hasDistanceChanged = calculatedDistance != trip.distance && !calculatedDistance.isEmpty
-        let hasTimeChanged = calculatedTime != trip.eta && !calculatedTime.isEmpty
-        
-        // Check if driver assignment has changed
-        let hasDriverChanged = selectedDriverId != trip.driverId
-        
-        Task {
-            do {
-                // First update trip details
-                try await SupabaseDataController.shared.updateTripDetails(
-                    id: trip.id,
-                    destination: editedDestination,
-                    address: editedAddress,
-                    notes: updatedNotes,
-                    distance: hasDistanceChanged ? calculatedDistance : nil,
-                    time: hasTimeChanged ? calculatedTime : nil
-                )
-                
-                // If driver assignment has changed, update it
-                if hasDriverChanged {
-                    if let driverId = selectedDriverId {
-                        try await SupabaseDataController.shared.updateTrip(id: trip.id, driverId: driverId)
+                    let address = formatAddress(from: placemark)
+                    
+                    if isDestination {
+                        // Update destination
+                        editedDestination = locationName
                         
-                        // If trip is in pending state and being assigned a driver, update status to assigned
-                        if trip.status == .pending {
-                            try await SupabaseDataController.shared.updateTrip(id: trip.id, status: "assigned")
+                        // Calculate distance if we have both origin and destination
+                        if !editedAddress.isEmpty {
+                            calculateRouteDistance()
                         }
                     } else {
-                        // If driver is being unassigned, reset to pending status
-                        try await SupabaseDataController.shared.updateTrip(id: trip.id, status: "pending")
+                        // Update address
+                        editedAddress = address
                         
-                        // Reset driver ID to null using EncodableNull instead of NSNull
-                        try await SupabaseDataController.shared.databaseFrom("trips")
-                            .update(["driver_id": EncodableNull()])
-                            .eq("id", value: trip.id)
-                            .execute()
+                        // Calculate distance if we have both origin and destination
+                        if !editedDestination.isEmpty {
+                            calculateRouteDistance()
+                        }
                     }
-                }
-                
-                await tripController.refreshAllTrips()
-                
-                await MainActor.run {
-                    isSaving = false
-                    isEditing = false
-                    showingSaveSuccess = true
-                }
-            } catch {
-                print("Error updating trip: \(error)")
-                await MainActor.run {
-                    isSaving = false
                 }
             }
         }
     }
     
-    private func deleteTrip() {
-        Task {
-            do {
-                SupabaseDataController.shared.deleteTrip(tripID: trip.id)
-                await tripController.refreshTrips()
-                await tripController.refreshAllTrips()
-                try await tripController.fetchAllTrips()
-                await MainActor.run {
-                    dismiss()
+    // Format address from placemark
+    private func formatAddress(from placemark: CLPlacemark) -> String {
+        var components = [String]()
+        
+        if let street = placemark.thoroughfare {
+            components.append(street)
+        }
+        
+        if let city = placemark.locality {
+            components.append(city)
+        }
+        
+        if let state = placemark.administrativeArea {
+            components.append(state)
+        }
+        
+        if let postalCode = placemark.postalCode {
+            components.append(postalCode)
+        }
+        
+        if let country = placemark.country {
+            components.append(country)
+        }
+        
+        return components.joined(separator: ", ")
+    }
+    
+    // Calculate distance between two locations
+    private func calculateRouteDistance() {
+        // Create geocoding requests for both addresses
+        let geocoder = CLGeocoder()
+        
+        // First, geocode the starting address
+        geocoder.geocodeAddressString(editedAddress) { startPlacemarks, startError in
+            guard let startPlacemark = startPlacemarks?.first,
+                  let startLocation = startPlacemark.location else {
+                print("Start location geocoding failed: \(startError?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            
+            // Then, geocode the destination address
+            geocoder.geocodeAddressString(editedDestination) { destPlacemarks, destError in
+                guard let destPlacemark = destPlacemarks?.first,
+                      let destLocation = destPlacemark.location else {
+                    print("Destination location geocoding failed: \(destError?.localizedDescription ?? "Unknown error")")
+                    return
+                }
+                
+                // Calculate distance
+                let distance = startLocation.distance(from: destLocation)
+                let distanceInMiles = distance / 1609.344 // Convert meters to miles
+                
+                // Format distance string
+                calculatedDistance = String(format: "%.2f miles", distanceInMiles)
+                
+                // Roughly estimate travel time (assuming avg speed of 45 mph)
+                let timeInHours = distanceInMiles / 45
+                let hours = Int(timeInHours)
+                let minutes = Int((timeInHours - Double(hours)) * 60)
+                
+                if hours > 0 {
+                    calculatedTime = "\(hours)h \(minutes)m"
+                } else {
+                    calculatedTime = "\(minutes)m"
                 }
             }
         }
@@ -1172,41 +1147,83 @@ struct TripDetailView: View {
     
     private var statusText: String {
         switch trip.status {
-        case .inProgress:
-            if !trip.hasCompletedPreTrip {
-                return "Initiated"
-            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
-                return "Pre-Trip Completed"
-            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
-                return "Post-Trip Completed"
-            }
-            return "In Progress"
-        case .pending:
-            return "Pending"
-        case .delivered:
-            return "Delivered"
-        case .assigned:
-            return "Assigned"
+        case .pending: return "Unassigned"
+        case .assigned: return "Assigned"
+        case .inProgress: return "In Progress"
+        case .delivered: return "Completed"
         }
     }
     
     private var statusIcon: String {
         switch trip.status {
-        case .inProgress:
-            if !trip.hasCompletedPreTrip {
-                return "play.circle.fill" // Initiated
-            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
-                return "checkmark.circle.fill" // Pre-Trip Completed
-            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
-                return "checkmark.shield.fill" // Post-Trip Completed
+        case .pending: return "clock"
+        case .assigned: return "person.fill.checkmark"
+        case .inProgress: return "arrow.triangle.turn.up.right.circle.fill"
+        case .delivered: return "checkmark.circle.fill"
+        }
+    }
+    
+    private func calculateFuelCost(from distance: String) -> (String, Double) {
+        // Extract numeric value from distance string
+        let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .joined()
+        
+        if let distance = Double(numericDistance) {
+            // Calculate fuel cost ($0.5 per km/mile)
+            let fuelCost = distance * 0.5
+            return (String(format: "$%.2f", fuelCost), fuelCost)
+        }
+        return ("N/A", 0.0)
+    }
+    
+    private func calculateTotalRevenue(distance: String, fuelCost: Double) -> String {
+        let numericDistance = distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .joined()
+        
+        if let distance = Double(numericDistance) {
+            // Total Revenue = Fuel Cost + ($0.25 × Distance) + $50
+            let distanceRevenue = distance * 0.25
+            let totalRevenue = fuelCost + distanceRevenue + 50.0
+            return String(format: "$%.2f", totalRevenue)
+        }
+        return "N/A"
+    }
+    
+    private func handleDestinationChange(_ newValue: String) {
+        destinationEdited = true
+        
+        // If destination was previously selected and user is editing
+        if destinationSelected && !newValue.isEmpty {
+            if newValue != editedDestination {
+                destinationSelected = false
             }
-            return "car.circle.fill" // In Progress
-        case .pending:
-            return "clock.fill"
-        case .delivered:
-            return "checkmark.circle.fill"
-        case .assigned:
-            return "person.fill"
+        }
+        
+        // Only show search results if not already selected and query has 3+ chars
+        if !destinationSelected && newValue.count > 2 {
+            searchCompleter.queryFragment = newValue
+            activeTextField = .destination
+        } else {
+            searchResults = []
+        }
+    }
+    
+    private func handleAddressChange(_ newValue: String) {
+        addressEdited = true
+        
+        // If address was previously selected and user is editing
+        if addressSelected && !newValue.isEmpty {
+            if newValue != editedAddress {
+                addressSelected = false
+            }
+        }
+        
+        // Only show search results if not already selected and query has 3+ chars
+        if !addressSelected && newValue.count > 2 {
+            searchCompleter.queryFragment = newValue
+            activeTextField = .address
+        } else {
+            searchResults = []
         }
     }
 }
@@ -1587,15 +1604,19 @@ struct TripsLocationSearchResults: View {
 
 // Search completer delegate for location autocompletion
 class TripsSearchCompleterDelegate: NSObject, MKLocalSearchCompleterDelegate {
-    var onUpdate: ([MKLocalSearchCompletion]) -> Void
+    var onResultsUpdated: (([MKLocalSearchCompletion]) -> Void)?
+    
+    override init() {
+        super.init()
+    }
     
     init(onUpdate: @escaping ([MKLocalSearchCompletion]) -> Void) {
-        self.onUpdate = onUpdate
+        self.onResultsUpdated = onUpdate
         super.init()
     }
     
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        onUpdate(completer.results)
+        onResultsUpdated?(completer.results)
     }
     
     func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
@@ -1676,17 +1697,47 @@ struct SignatureCaptureView: View {
 struct AddMidPointView: View {
     let trip: Trip
     @Environment(\.dismiss) private var dismiss
-    @State private var midPointLocation = ""
+    @State private var midPointLocation: String
     @State private var midPointCoordinate: CLLocationCoordinate2D?
     @State private var searchResults: [MKLocalSearchCompletion] = []
     @State private var searchCompleter = MKLocalSearchCompleter()
     @State private var searchCompleterDelegate: SearchCompleterDelegate?
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var isEditing = false
+    
+    init(trip: Trip) {
+        self.trip = trip
+        // Initialize with existing mid-point if available
+        _midPointLocation = State(initialValue: trip.middle_Pickup ?? "")
+        
+        // Set coordinates if they exist
+        if let lat = trip.middle_pickup_latitude, let lon = trip.middle_pickup_longitude {
+            _midPointCoordinate = State(initialValue: CLLocationCoordinate2D(latitude: lat, longitude: lon))
+            _isEditing = State(initialValue: true)
+        } else {
+            _midPointCoordinate = State(initialValue: nil)
+            _isEditing = State(initialValue: false)
+        }
+    }
     
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
+                // Current mid-point information (if editing)
+                if isEditing {
+                    HStack {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("You're editing the existing mid-point")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(10)
+                }
+                
                 // Location Search Field
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Mid-Point Location")
@@ -1727,46 +1778,36 @@ struct AddMidPointView: View {
                                             }
                                         }
                                     }) {
-                                        HStack(spacing: 12) {
-                                            Image(systemName: "mappin.circle.fill")
-                                                .foregroundColor(.blue)
-                                                .font(.system(size: 20))
-                                            
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(result.title)
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.primary)
+                                        VStack(alignment: .leading) {
+                                            Text(result.title)
+                                                .font(.headline)
+                                            if !result.subtitle.isEmpty {
                                                 Text(result.subtitle)
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.gray)
                                             }
-                                            
-                                            Spacer()
                                         }
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding()
                                     }
+                                    .buttonStyle(PlainButtonStyle())
                                     
-                                    if result != searchResults.last {
-                                        Divider()
-                                            .padding(.leading, 40)
-                                    }
+                                    Divider()
                                 }
                             }
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 5)
                         }
-                        .frame(maxHeight: 200)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .shadow(color: Color.black.opacity(0.1), radius: 5)
+                        .frame(height: 200)
                     }
                 }
                 
                 Spacer()
                 
-                // Save Button
                 Button(action: saveMidPoint) {
                     HStack {
-                        Text("Add Mid-Point")
+                        Text(isEditing ? "Update Mid-Point" : "Add Mid-Point")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
@@ -1779,7 +1820,7 @@ struct AddMidPointView: View {
                 .padding(.horizontal)
             }
             .padding()
-            .navigationTitle("Add Mid-Point")
+            .navigationTitle(isEditing ? "Edit Mid-Point" : "Add Mid-Point")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -1840,5 +1881,5 @@ struct AddMidPointView: View {
             }
         }
     }
-} 
+}
 

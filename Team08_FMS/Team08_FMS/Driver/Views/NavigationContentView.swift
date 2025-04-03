@@ -64,6 +64,10 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let speedHistoryDuration: TimeInterval = 300 // Keep 5 minutes of speed history
     private let minimumSpeedThreshold: Double = 1.0 // Minimum speed in m/s to consider for ETA
     
+    // In NavigationManager class, after private properties
+    private var currentTrip: Trip?
+    private var shouldShowAlternativeRoutes: Bool = false
+    
     init(destination: CLLocationCoordinate2D, sourceCoordinate: CLLocationCoordinate2D? = nil, vehicleType: VehicleType = .truck(height: 4.5, weight: 40000, length: 16.5)) {
         self._destination = destination
         self.sourceCoordinate = sourceCoordinate  // Updated to use the public property
@@ -367,7 +371,7 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         return sourceLoc.distance(from: destLoc)
     }
     
-    func updateRouteWithAlternatives(from location: CLLocation) {
+     func updateRouteWithAlternatives(from location: CLLocation) {
         // Clear existing alternatives first
         alternativeRoutes = []
         
@@ -375,20 +379,11 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         var pendingRequests = 3
         
         // Create base request
-        let baseRequest = createRouteRequest(from: location.coordinate, to: _destination)
+        let baseRequest = createRouteRequest(from: location.coordinate, to: destination)
         baseRequest.requestsAlternateRoutes = true
-        calculateRoute(with: baseRequest) { [weak self] routes in
-            guard let self = self else { return }
-            
-            if !routes.isEmpty {
-                // Set the first route as primary
-                self.route = routes[0]
-                // Add routes to alternatives, skipping the primary
-                if routes.count > 1 {
-                    self.alternativeRoutes.append(contentsOf: routes.dropFirst())
-                }
-            }
-            
+        
+        // Update the closure signature to match our new calculateRoute method
+        calculateRoute(with: baseRequest) {
             pendingRequests -= 1
             // When all requests complete, sort routes by distance
             if pendingRequests == 0 {
@@ -397,15 +392,12 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
         
         // Create a request with different toll preference
-        let tollRequest = createRouteRequest(from: location.coordinate, to: _destination)
+        let tollRequest = createRouteRequest(from: location.coordinate, to: destination)
         tollRequest.requestsAlternateRoutes = true
         tollRequest.tollPreference = .any // Different from the default .avoid
-        calculateRoute(with: tollRequest) { [weak self] routes in
-            guard let self = self else { return }
-            
-            // Add unique routes
-            self.addUniqueRoutes(routes)
-            
+        
+        // Update the closure signature to match our new calculateRoute method
+        calculateRoute(with: tollRequest) {
             pendingRequests -= 1
             if pendingRequests == 0 {
                 self.sortAlternativeRoutes()
@@ -413,15 +405,12 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
         
         // Create a request with waypoints to force a different path
-        if let waypoints = getAlternativeWaypoints(between: location.coordinate, and: _destination) {
-            let waypointRequest = createRouteRequest(from: location.coordinate, to: _destination, 
+        if let waypoints = getAlternativeWaypoints(between: location.coordinate, and: destination) {
+            let waypointRequest = createRouteRequest(from: location.coordinate, to: destination, 
                                                    via: waypoints)
-            calculateRoute(with: waypointRequest) { [weak self] routes in
-                guard let self = self else { return }
-                
-                // Add unique routes
-                self.addUniqueRoutes(routes)
-                
+                                                   
+            // Update the closure signature to match our new calculateRoute method
+            calculateRoute(with: waypointRequest) { 
                 pendingRequests -= 1
                 if pendingRequests == 0 {
                     self.sortAlternativeRoutes()
@@ -435,41 +424,39 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func createRouteRequest(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D, 
                                   via waypoints: [CLLocationCoordinate2D]? = nil) -> MKDirections.Request {
         let request = MKDirections.Request()
+        request.transportType = .automobile
         
+        // If we have waypoints, use intermediate destinations approach
         if let waypoints = waypoints, !waypoints.isEmpty {
-            // Create a series of waypoints
-            var items: [MKMapItem] = [MKMapItem(placemark: MKPlacemark(coordinate: source))]
+            // For a single waypoint, we'll make two separate requests (source to waypoint, waypoint to destination)
+            // This is handled in the calculateRoutes method
             
-            // Add intermediate waypoints
-            for waypoint in waypoints {
-                items.append(MKMapItem(placemark: MKPlacemark(coordinate: waypoint)))
-            }
-            
-            // Add destination
-            items.append(MKMapItem(placemark: MKPlacemark(coordinate: destination)))
-            
-            // Set up waypoints
-            request.source = items.first
-            request.destination = items.last
+            // Just set up direct route for this request
+            request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
+            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
         } else {
-            // Simple direct route
+            // Direct route from source to destination
             request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
             request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
         }
         
-        request.transportType = vehicleType.routingPreference
-        request.tollPreference = .avoid // Default
         return request
     }
     
-    private func calculateRoute(with request: MKDirections.Request, completion: @escaping ([MKRoute]) -> Void) {
+    private func calculateRoute(with request: MKDirections.Request, completion: @escaping () -> Void = {}) {
         let directions = MKDirections(request: request)
         directions.calculate { response, error in
-            guard let response = response, !response.routes.isEmpty else {
-                completion([])
+            if let error = error {
+                print("Error calculating route: \(error.localizedDescription)")
+                completion()
                 return
             }
-            completion(response.routes)
+            
+            if let response = response, !response.routes.isEmpty {
+                self.route = response.routes[0]
+            }
+            
+            completion()
         }
     }
     
@@ -631,6 +618,86 @@ class NavigationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if let location = lastLocation {
             print("Forcing route recalculation from current location")
             updateRoute(from: location, forceRecalculation: true)
+        }
+    }
+    
+    // Add to NavigationManager class
+    func setCurrentTrip(_ trip: Trip?) {
+        self.currentTrip = trip
+        if trip != nil {
+            updateNavigationForTrip()
+        }
+    }
+    
+    private func updateNavigationForTrip() {
+        guard let trip = currentTrip else { return }
+        
+        // Use destination coordinates if available
+        let destinationCoord = trip.destinationCoordinate
+        
+        // Check if we have mid-point coordinates to use as a waypoint
+        if let midLat = trip.middle_pickup_latitude, 
+           let midLon = trip.middle_pickup_longitude {
+            
+            let midPointCoordinate = CLLocationCoordinate2D(
+                latitude: midLat,
+                longitude: midLon
+            )
+            
+            // Set destination with mid-point as waypoint
+            setDestination(destinationCoord, via: [midPointCoordinate])
+        } else {
+            // Set destination without waypoints
+            setDestination(destinationCoord)
+        }
+    }
+    
+    // Fix the setDestination method to work with _destination
+    func setDestination(_ coordinate: CLLocationCoordinate2D, via waypoints: [CLLocationCoordinate2D]? = nil) {
+        // We can't reassign _destination since it's declared as a let
+        // Instead, we'll just work with the coordinate parameter
+        
+        guard let location = locationManager.location else {
+            return
+        }
+        
+        // Clear existing routes
+        route = nil
+        currentStep = nil
+        remainingDistance = 0
+        remainingTime = 0
+        nextStepDistance = 0
+        alternativeRoutes = []
+        
+        // Create and calculate route with waypoints if provided
+        let request = createRouteRequest(from: location.coordinate, to: coordinate, via: waypoints)
+        calculateRoute(with: request)
+        
+        // Calculate alternative routes if needed
+        if shouldShowAlternativeRoutes {
+            calculateAlternativeRoutes(using: location)
+        }
+    }
+    
+    private func calculateAlternativeRoutes(using location: CLLocation) {
+        // Implementation for calculating alternative routes
+        alternativeRoutes = []
+        
+        // Get waypoints for alternative routes
+        if let waypoints = getAlternativeWaypoints(between: location.coordinate, and: destination) {
+            for waypoint in waypoints {
+                let request = MKDirections.Request()
+                request.transportType = .automobile
+                request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
+                request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+                
+                let directions = MKDirections(request: request)
+                directions.calculate { response, error in
+                    if let route = response?.routes.first {
+                        self.alternativeRoutes.append(route)
+                    }
+                }
+            }
         }
     }
 }
@@ -1273,4 +1340,210 @@ extension TimeInterval {
             return "\(minutes)m"
         }
     }
-} 
+}
+
+struct NavigationContentView: View {
+    @State private var mapType: MKMapType = .standard
+    @State private var routeIndex: Int = 0
+    @State private var userTrackingMode: MapUserTrackingMode = .follow
+    @State private var showSearch = false
+    @State private var destination: String = ""
+    @State private var route: MKRoute?
+    @State private var showingDirections = false
+//    @State private var annotationItems: [AnnotationItem] = []
+    @State private var currentStep: MKRoute.Step?
+    @State private var showAlternativeRoutes = false
+    @State private var shouldShowAlternativeRoutes = false
+    @State private var alternativeRoutes: [MKRoute] = []
+    @State private var selectedRouteIndex: Int = 0
+    @State private var navigating = false
+    @State private var mapIsExpanded = false
+    @State private var didShowNavTip = false
+    @State private var showingArrivedMessage = false
+    @State private var currentTrip: Trip?
+    @State private var showingTrips = false
+
+    // Add reference to LocationManager and NavigationManager
+    @StateObject private var locationManager = LocationManager()
+//    @StateObject private var speechSynthesizer = SpeechSynthesizer()
+    @StateObject private var navigationManager = NavigationManager(
+        destination: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+        sourceCoordinate: nil,
+        vehicleType: .truck(height: 4.5, weight: 40000, length: 16.5)
+    )
+    
+    // Destination coordinate 
+    @State private var destinationCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+    
+    private var routes: [MKRoute] {
+        if let mainRoute = route {
+            var routes = [mainRoute]
+            if shouldShowAlternativeRoutes {
+                routes.append(contentsOf: alternativeRoutes)
+            }
+            return routes
+        }
+        return []
+    }
+    
+    var body: some View {
+        VStack {
+            Text("Navigation Content")
+            // Add your navigation UI here
+        }
+    }
+    
+    // Method to set the current trip
+    func setCurrentTrip(_ trip: Trip?) {
+        currentTrip = trip
+        navigationManager.setCurrentTrip(trip)
+    }
+    
+    // Method to calculate route with waypoints
+    private func calculateRoute(with request: MKDirections.Request, completion: @escaping () -> Void = {}) {
+        let directions = MKDirections(request: request)
+        directions.calculate { response, error in
+            if let error = error {
+                print("Error calculating route: \(error.localizedDescription)")
+                completion()
+                return
+            }
+            
+            if let response = response, !response.routes.isEmpty {
+                self.route = response.routes[0]
+            }
+            
+            completion()
+        }
+    }
+    
+    // Create a helper method for getting alternative waypoints
+    private func getAlternativeWaypoints(between source: CLLocationCoordinate2D, and destination: CLLocationCoordinate2D) -> [CLLocationCoordinate2D]? {
+        // Calculate midpoint between source and destination
+        let midLat = (source.latitude + destination.latitude) / 2
+        let midLng = (source.longitude + destination.longitude) / 2
+        
+        // Calculate distance
+        let sourceLoc = CLLocation(latitude: source.latitude, longitude: source.longitude)
+        let destLoc = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+        let distance = sourceLoc.distance(from: destLoc)
+        
+        // Only add waypoints for longer trips
+        if distance < 5000 { // Less than 5km
+            return nil
+        }
+        
+        // For longer trips, create offset waypoints
+        let offsetFactor = distance * 0.2 / 111000 // 20% of the distance in degrees (approx)
+        
+        return [
+            // North offset
+            CLLocationCoordinate2D(latitude: midLat + offsetFactor, longitude: midLng),
+            
+            // East offset
+            CLLocationCoordinate2D(latitude: midLat, longitude: midLng + offsetFactor),
+            
+            // South offset
+            CLLocationCoordinate2D(latitude: midLat - offsetFactor, longitude: midLng),
+            
+            // West offset
+            CLLocationCoordinate2D(latitude: midLat, longitude: midLng - offsetFactor)
+        ]
+    }
+    
+    // Create a helper method for creating route requests
+    private func createRouteRequest(from source: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D, 
+                                  via waypoints: [CLLocationCoordinate2D]? = nil) -> MKDirections.Request {
+        let request = MKDirections.Request()
+        request.transportType = .automobile
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: source))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        
+        return request
+    }
+    
+    // Method to update navigation for trip
+    private func updateNavigationForTrip() {
+        guard let trip = currentTrip else { return }
+        
+        // Use destination coordinates from trip
+        let destinationCoord = trip.destinationCoordinate
+        self.destinationCoordinate = destinationCoord
+        
+        // Check if we have mid-point coordinates to use as a waypoint
+        if let midLat = trip.middle_pickup_latitude, 
+           let midLon = trip.middle_pickup_longitude {
+            
+            let midPointCoordinate = CLLocationCoordinate2D(
+                latitude: midLat,
+                longitude: midLon
+            )
+            
+            // Set destination with mid-point as waypoint
+            setDestination(destinationCoord, via: [midPointCoordinate])
+        } else {
+            // Set destination without waypoints
+            setDestination(destinationCoord)
+        }
+    }
+    
+    // Method to set destination
+    func setDestination(_ coordinate: CLLocationCoordinate2D, via waypoints: [CLLocationCoordinate2D]? = nil) {
+        destinationCoordinate = coordinate
+        
+        guard let location = locationManager.location else {
+            return
+        }
+        
+        // Clear existing routes
+        route = nil
+        currentStep = nil
+        alternativeRoutes = []
+        
+        // Create and calculate route with waypoints if provided
+        let request = createRouteRequest(from: location.coordinate, to: coordinate, via: waypoints)
+        calculateRoute(with: request)
+        
+        // Calculate alternative routes if needed
+        if shouldShowAlternativeRoutes {
+            calculateAlternativeRoutes(using: location)
+        }
+    }
+    
+    // Calculate alternative routes
+    private func calculateAlternativeRoutes(using location: CLLocation) {
+        // Implementation for calculating alternative routes
+        // This is a simplified version
+        alternativeRoutes = []
+        
+        // Get waypoints for alternative routes
+        if let waypoints = getAlternativeWaypoints(between: location.coordinate, and: destinationCoordinate) {
+            for waypoint in waypoints {
+                let request = MKDirections.Request()
+                request.transportType = .automobile
+                request.source = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
+                request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destinationCoordinate))
+                
+                let directions = MKDirections(request: request)
+                directions.calculate { response, error in
+                    if let route = response?.routes.first {
+                        self.alternativeRoutes.append(route)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Define MapUserTrackingMode enum
+enum MapUserTrackingMode {
+    case none
+    case follow
+    case followWithHeading
+}
+
+// AnnotationItem definition already exists from previous changes
+
+// SpeechSynthesizer definition already exists from previous changes
+
+// Remove LocationManager class to avoid redeclaration, as it already exists elsewhere 

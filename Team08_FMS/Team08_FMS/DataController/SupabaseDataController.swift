@@ -1411,13 +1411,18 @@ class SupabaseDataController: ObservableObject {
     }
     public func updateTripMidPoint(tripId: UUID, midPoint: String, midPointLatitude: Double, midPointLongitude: Double) async throws -> Bool {
         do {
-            // Update the trip with mid-point information
+            // Update each field individually to avoid type issues
+            // First update the midPoint string field
+            try await databaseFrom("trips")
+                .update(["middle_pickup": midPoint])
+                .eq("id", value: tripId)
+                .execute()
+            
+            // Then update the latitude and longitude fields
             try await databaseFrom("trips")
                 .update([
-                    "middle_pickup": Double(midPoint) ?? 0.0,
                     "middle_pickup_latitude": midPointLatitude,
-                    "middle_pickup_longitude": midPointLongitude,
-//                    "updated_at": Date()
+                    "middle_pickup_longitude": midPointLongitude
                 ])
                 .eq("id", value: tripId)
                 .execute()
