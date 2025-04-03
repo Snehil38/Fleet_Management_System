@@ -743,7 +743,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             if let driverId = driverId {
                 query = query.or("driver_id.eq.\(driverId),secondary_driver_id.eq.\(driverId)")
             }
-            
+
             // Execute the query
             let response = try await query.execute()
             

@@ -375,12 +375,16 @@ private struct DeleteVehiclesView: View {
 struct VehiclesView: View {
     @EnvironmentObject private var dataManager: CrewDataController
     @EnvironmentObject private var vehicleManager: VehicleManager
+    @StateObject private var notificationsViewModel = NotificationsViewModel()
     @State private var showingAddVehicle = false
     @State private var showingDeleteMode = false
     @State private var showingProfile = false
     @State private var showingMessages = false
+    @State private var showingNotifications = false
     @State private var searchText = ""
     @State private var selectedStatus: VehicleStatus?
+
+    private let minimumUpdateInterval: TimeInterval = 15.0
 
     private func matchesSearch(_ vehicle: Vehicle) -> Bool {
         guard !searchText.isEmpty else { return true }
@@ -456,6 +460,22 @@ struct VehiclesView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
+                        Button(action: { showingNotifications = true }) {
+                            Image(systemName: "bell.fill")
+                                .overlay(
+                                    Group {
+                                        if notificationsViewModel.unreadCount > 0 {
+                                            Text("\(min(notificationsViewModel.unreadCount, 99))")
+                                                .font(.caption2)
+                                                .padding(4)
+                                                .background(Color.red)
+                                                .clipShape(Circle())
+                                                .offset(x: 10, y: -10)
+                                        }
+                                    }
+                                )
+                        }
+                        
                         Button(action: { showingAddVehicle = true }) {
                             Image(systemName: "plus")
                         }
@@ -476,6 +496,9 @@ struct VehiclesView: View {
             }
             .sheet(isPresented: $showingAddVehicle) {
                 VehicleSaveView(vehicleManager: vehicleManager)
+            }
+            .sheet(isPresented: $showingNotifications) {
+                NotificationsView()
             }
         }
     }
