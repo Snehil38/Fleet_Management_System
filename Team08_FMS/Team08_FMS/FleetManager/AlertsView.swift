@@ -186,7 +186,7 @@ struct SummaryCard: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.tertiarySystemBackground))
+                .fill(Color(.secondarySystemBackground))
                 .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
@@ -201,7 +201,7 @@ struct AlertRow: View {
                 .font(.system(size: 24))
                 .foregroundColor(event.isRead ? .gray : .blue)
                 .padding(6)
-                .background(Color(.tertiarySystemBackground))
+                .background(Color(.secondarySystemBackground))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 4) {
@@ -231,7 +231,7 @@ struct AlertRow: View {
         .padding(.horizontal)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(event.isRead ? Color(.tertiarySystemBackground) : Color.blue.opacity(0.1))
+                .fill(Color(.secondarySystemBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
