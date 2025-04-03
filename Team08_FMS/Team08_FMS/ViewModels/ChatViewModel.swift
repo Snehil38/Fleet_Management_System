@@ -182,18 +182,17 @@ final class ChatViewModel: ObservableObject {
                 )
             }
             
+            // Decode messages from response data
             var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
             
             // Update messages on main thread
-            let messages = fetchedMessages
             await MainActor.run {
-                // Update isFromCurrentUser for each message
-                for index in messages.indices {
-                    var message = messages[index]
+                for index in fetchedMessages.indices {
+                    var message = fetchedMessages[index]
                     if userRole == "fleet_manager" {
                         message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
                     } else {
-                        // For driver and maintenance, message is from current user if they are the sender (recipient_id is not them)
+                        // For driver and maintenance, message is from current user if they are the sender
                         message.isFromCurrentUser = message.recipient_id.uuidString != currentUserId.uuidString
                     }
                     fetchedMessages[index] = message
@@ -206,7 +205,8 @@ final class ChatViewModel: ObservableObject {
                     }
                 }
                 
-                self.messages = messages
+                // Assign the updated array to the messages property
+                self.messages = fetchedMessages
                 self.isLoading = false
                 self.hasLoadedMessages = true
             }
@@ -219,7 +219,7 @@ final class ChatViewModel: ObservableObject {
             }
         }
     }
-    
+
     private func updateUnreadCount() {
         Task {
             do {
