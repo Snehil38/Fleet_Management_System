@@ -79,7 +79,9 @@ struct CrewProfileView: View {
     private var isLicenseValid: Bool {
         // For drivers, license must not be empty.
         if isDriver {
-            return !editedLicense.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let trimmedLicense = editedLicense.trimmingCharacters(in: .whitespacesAndNewlines)
+            let regex = "^[A-Z]{2}\\s?[0-9]{2}\\s?[0-9]{4}\\s?[0-9]{7}$"
+            return NSPredicate(format: "SELF MATCHES %@", regex).evaluate(with: trimmedLicense)
         }
         return true
     }
