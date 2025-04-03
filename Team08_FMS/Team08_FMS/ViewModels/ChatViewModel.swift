@@ -181,8 +181,6 @@ final class ChatViewModel: ObservableObject {
         
         // Create new load task
         currentLoadTask = Task { @MainActor in
-            guard !hasLoadedMessages else { return }
-            
             self.isLoading = true
             var retryCount = 0
             
@@ -199,7 +197,6 @@ final class ChatViewModel: ObservableObject {
                     var query = supabaseDataController.supabase
                         .from("chat_messages")
                         .select()
-                        .eq("is_deleted", value: false) // Only get non-deleted messages
                     
                     // Add the appropriate filters based on user role
                     if userRole == "fleet_manager" {
@@ -273,27 +270,24 @@ final class ChatViewModel: ObservableObject {
                         }
                     }
                     
-                    self.messages = fetchedMessages
-                    self.lastMessageId = fetchedMessages.last?.id
-                    self.isLoading = false
-                    self.hasLoadedMessages = true
-                    break // Success, exit retry loop
+                    await MainActor.run {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            self.messages = fetchedMessages
+                        }
+                        self.lastMessageId = fetchedMessages.last?.id
+                        self.isLoading = false
+                        self.hasLoadedMessages = true
+                    }
+                    break
                     
                 } catch {
-                    if Task.isCancelled {
-                        print("Load messages task was cancelled during error handling")
-                        return
-                    }
-                    
+                    print("Error loading messages: \(error)")
                     retryCount += 1
-                    print("Error loading messages (attempt \(retryCount)/\(maxRetries)): \(error)")
-                    
                     if retryCount == maxRetries {
-                        self.error = error
-                        self.isLoading = false
-                    } else {
-                        // Wait before retrying (with exponential backoff)
-                        try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(retryCount))) * 1_000_000_000)
+                        await MainActor.run {
+                            self.error = error
+                            self.isLoading = false
+                        }
                     }
                 }
             }
@@ -799,6 +793,24 @@ final class ChatViewModel: ObservableObject {
             }
         } catch {
             print("Error marking message as read: \(error)")
+        }
+    }
+    
+    func deleteMessage(_ messageId: UUID) async {
+        do {
+            try await supabaseDataController.supabase.database
+                .from("chat_messages")
+                .delete()
+                .eq("id", value: messageId)
+                .execute()
+            
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    messages.removeAll { $0.id == messageId }
+                }
+            }
+        } catch {
+            print("Error deleting message: \(error)")
         }
     }
     

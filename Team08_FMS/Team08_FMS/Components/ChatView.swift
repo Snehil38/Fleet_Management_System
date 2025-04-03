@@ -97,14 +97,24 @@ struct ChatView: View {
                     LazyVStack(spacing: 8) {
                         ForEach(viewModel.messages) { message in
                             ChatBubbleView(message: message) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    // Remove the message from the local array first
+                                    viewModel.messages.removeAll { $0.id == message.id }
+                                }
+                                // Then refresh from server
                                 Task {
                                     await viewModel.loadMessages()
                                 }
                             }
                             .id(message.id)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: message.isFromCurrentUser ? .trailing : .leading).combined(with: .opacity)
+                            ))
                         }
                     }
                     .padding(.vertical)
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.messages)
                 }
                 .refreshable {
                     await viewModel.loadMessages()

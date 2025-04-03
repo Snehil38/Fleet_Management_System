@@ -70,6 +70,7 @@ struct ChatBubbleView: View {
     @State private var currentUserId: UUID?
     @StateObject private var audioPlayer = AudioPlayer()
     @State private var showDeleteAlert = false
+    @State private var isDeleting = false
     var onDelete: () -> Void = {} // Default empty closure
     
     private var backgroundColor: Color {
@@ -226,24 +227,17 @@ struct ChatBubbleView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .opacity(isAnimating ? 1 : 0)
-        .offset(y: isAnimating ? 0 : 20)
+        .opacity(isDeleting ? 0 : (isAnimating ? 1 : 0))
+        .offset(x: isDeleting ? (message.isFromCurrentUser ? 100 : -100) : 0, y: isAnimating ? 0 : 20)
         .alert("Delete Message", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
-                Task {
-                    do {
-                        // Delete the message from Supabase
-                        try await supabaseController.supabase.database
-                            .from("chat_messages")
-                            .delete()
-                            .eq("id", value: message.id)
-                            .execute()
-                        
-                        print("Message deleted successfully")
-                        onDelete()
-                    } catch {
-                        print("Error deleting message: \(error)")
-                    }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isDeleting = true
+                }
+                
+                // Delay the actual deletion to allow the animation to complete
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    onDelete()
                 }
             }
             Button("Cancel", role: .cancel) {}
