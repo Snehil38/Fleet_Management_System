@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ChatBubbleView: View {
     let message: ChatMessage
+    @State private var imageData: Data?
+    @State private var isImageLoading = false
     @State private var isAnimating = false
     @StateObject private var supabaseController = SupabaseDataController.shared
     @State private var currentUserId: UUID?
@@ -31,12 +33,51 @@ struct ChatBubbleView: View {
                     }
                     
                     VStack(alignment: message.isFromCurrentUser ? .trailing : .leading, spacing: 2) {
-                        Text(message.message_text)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(backgroundColor)
-                            .foregroundColor(textColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        if let attachmentUrl = message.attachment_url,
+                           message.attachment_type == "image/jpeg" {
+                            // Image message
+                            VStack(alignment: .leading, spacing: 4) {
+                                if let imageData = imageData, let uiImage = UIImage(data: imageData) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: 200, maxHeight: 200)
+                                        .cornerRadius(8)
+                                } else {
+                                    if isImageLoading {
+                                        ProgressView()
+                                            .frame(width: 200, height: 200)
+                                    } else {
+                                        Color.gray.opacity(0.3)
+                                            .frame(width: 200, height: 200)
+                                            .cornerRadius(8)
+                                            .onAppear {
+                                                loadImage(from: attachmentUrl)
+                                            }
+                                    }
+                                }
+                                
+                                Text(message.created_at, style: .time)
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(8)
+                            .background(message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray6))
+                            .cornerRadius(12)
+                        } else {
+                            // Text message
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(message.message_text)
+                                    .foregroundColor(message.isFromCurrentUser ? .white : .primary)
+                                
+                                Text(message.created_at, style: .time)
+                                    .font(.caption2)
+                                    .foregroundColor(message.isFromCurrentUser ? .white.opacity(0.8) : .gray)
+                            }
+                            .padding(8)
+                            .background(message.isFromCurrentUser ? ChatThemeColors.primary : Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
                         
                         HStack(spacing: 4) {
                             Text(formatDate(message.created_at))
@@ -95,6 +136,27 @@ struct ChatBubbleView: View {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+    
+    private func loadImage(from urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        
+        isImageLoading = true
+        
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                await MainActor.run {
+                    self.imageData = data
+                    self.isImageLoading = false
+                }
+            } catch {
+                print("Error loading image: \(error)")
+                await MainActor.run {
+                    self.isImageLoading = false
+                }
+            }
+        }
     }
 }
 

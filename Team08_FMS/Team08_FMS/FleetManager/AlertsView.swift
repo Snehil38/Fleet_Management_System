@@ -106,6 +106,14 @@ struct AlertsView: View {
         .task {
             await viewModel.loadNotifications()
         }
+        .alert("Enable Notifications", isPresented: $viewModel.showNotificationPermissionAlert) {
+            Button("Open Settings") {
+                viewModel.openAppSettings()
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("To receive important alerts about your fleet, please enable notifications in Settings.")
+        }
     }
 }
 

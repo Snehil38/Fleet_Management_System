@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var auth: SupabaseDataController
     @StateObject private var notificationsViewModel = NotificationsViewModel()
+    @State private var showingNotifications = false
 
     var body: some View {
         ZStack {
@@ -36,25 +37,12 @@ struct ContentView: View {
                 }
             }
             .animation(.easeInOut, value: auth.isAuthenticated)
-            
-            // Notification Banner Overlay
-            if notificationsViewModel.showBanner,
-               let notification = notificationsViewModel.currentBannerNotification {
-                VStack {
-                    InAppNotificationBannerView(
-                        notification: notification,
-                        onDismiss: {
-                            notificationsViewModel.dismissBanner()
-                        }
-                    )
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    
-                    Spacer()
-                }
-                .zIndex(1) // Ensure banner appears above other content
-            }
         }
         .environmentObject(notificationsViewModel)
+        .sheet(isPresented: $showingNotifications) {
+            AlertsView()
+                .environmentObject(notificationsViewModel)
+        }
         .task {
             await auth.autoLogin()
         }
