@@ -55,15 +55,21 @@ struct ChatView: View {
                     }
                     .padding(.vertical)
                 }
+                .refreshable {
+                    await viewModel.refreshMessages()
+                }
+                .overlay {
+                    if viewModel.messages.isEmpty && viewModel.isLoading {
+                        ProgressView("Loading messages...")
+                            .scaleEffect(1.0)
+                    }
+                }
                 .onAppear {
                     scrollProxy = proxy
                 }
                 .onChange(of: viewModel.messages) { _, _ in
                     scrollToBottom()
                 }
-            }
-            .refreshable {
-                await viewModel.loadMessages()
             }
             
             // Message input with trip details button for drivers
