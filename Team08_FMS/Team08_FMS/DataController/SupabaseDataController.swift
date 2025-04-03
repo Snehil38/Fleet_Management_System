@@ -1958,7 +1958,7 @@ class SupabaseDataController: ObservableObject {
                 .from("driver_location")
                 .insert(location)
                 .execute()
-            print("Location added successfully")
+            print("Location added successfully: \(response.data)")
         } catch {
             print("Error: \(error.localizedDescription)")
         }
@@ -1971,7 +1971,7 @@ class SupabaseDataController: ObservableObject {
                 .update(location)
                 .eq("driverID", value: location.driverID)
                 .execute()
-            print("Location updated successfully")
+            print("Location updated successfully: \(response.data)")
         } catch {
             print("Error: \(error.localizedDescription)")
         }
@@ -1986,7 +1986,7 @@ class SupabaseDataController: ObservableObject {
                 .update([payload])
                 .eq("driverID", value: driverID)
                 .execute()
-            print("Location updated successfully")
+            print("Location updated successfully: \(response.data)")
         } catch {
             print("Error: \(error.localizedDescription)")
         }

@@ -532,6 +532,9 @@ struct TripDetailView: View {
 
     var body: some View {
         NavigationView {
+            
+//            constructInProgressTripView(for: trip)
+            
             List {
                 // Trip Information Section with driver assignment
                 Section(header: Text("TRIP INFORMATION")) {
@@ -940,6 +943,28 @@ struct TripDetailView: View {
                 }
             } message: {
                 Text(pdfError ?? "Failed to generate delivery receipt")
+            }
+        }
+    }
+    
+    func constructInProgressTripView(for trip: Trip) -> some View {
+        Group {
+            if trip.status == .inProgress, let driverID = trip.driverId {
+                VStack {
+                    DriverMapCardView(driverID: driverID,
+                                      sourceCoordinate: trip.sourceCoordinate,
+                                      destinationCoordinate: trip.destinationCoordinate)
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal)
+                    
+                    // Other cards or content can go here
+                    Spacer()
+                }
+            } else {
+                Text("Trip is not in progress or no driver is assigned.")
+                    .foregroundColor(.secondary)
             }
         }
     }
