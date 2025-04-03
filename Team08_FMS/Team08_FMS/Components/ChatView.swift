@@ -72,6 +72,7 @@ struct ChatView: View {
     @State private var selectedImage: UIImage?
     @StateObject private var audioRecorder = AudioRecorder()
     @State private var isRecording = false
+    @StateObject private var supabaseController = SupabaseDataController.shared
     
     init(recipientType: RecipientType, recipientId: UUID, recipientName: String, contextData: [String: String]? = nil) {
         self.recipientType = recipientType
@@ -237,7 +238,8 @@ struct ChatView: View {
         VStack(spacing: 8) {
             // Trip details button (only for drivers)
             if recipientType == .driver,
-               tripController.currentTrip != nil {
+               tripController.currentTrip != nil,
+               supabaseController.userRole != "fleet_manager" {
                 Button(action: sendTripDetails) {
                     HStack {
                         Image(systemName: "car.fill")
