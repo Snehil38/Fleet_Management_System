@@ -100,7 +100,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         } message: {
             Text(alertMessage)
         }
-        .sheet(isPresented: $showingExpenseSheet) {
+        .sheet(isPresented: $showingExpenseSheet, onDismiss: {loadExpenses()}){
             NavigationView {
                 AddExpenseView(
                     request: request,

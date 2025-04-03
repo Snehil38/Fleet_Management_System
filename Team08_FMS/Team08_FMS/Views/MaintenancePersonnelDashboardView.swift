@@ -97,6 +97,9 @@ struct MaintenancePersonnelDashboardView: View {
             .sheet(isPresented: $showingChat) {
                 MaintenancePersonnelChatView()
             }
+            .refreshable {
+                await dataStore.loadData()
+            }
         }
     }
     
