@@ -30,14 +30,26 @@ struct RoleSelectionView: View {
                             UserDefaults.standard.set(role, forKey: "selectedRole")
                             navigateToLogin = true
                         }) {
-                            Text(role)
-                                .font(.system(.headline, design: .default))
-                                .foregroundColor(.white)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.blue)
-                                .cornerRadius(15)
-                                .shadow(radius: 5)
+                            HStack {
+                                Image(systemName: "person.fill")
+                                    .font(.title)
+                                    .foregroundColor(.blue)
+                                
+                                Text(role)
+                                    .font(.headline)
+                                    .foregroundColor(.black)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 15)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.gray.opacity(0.3), radius: 5, x: 0, y: 2)
+                            )
                         }
                         .padding(.horizontal, 20)
                     }
@@ -66,131 +78,131 @@ struct LoginView: View {
     @State private var navigateToForgotPassword = false
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Login as \(selectedRole)")
-                .multilineTextAlignment(.center)
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundColor(Color.pink.opacity(0.5))
-                .padding(.top, 20)
-                
-            TextField("Email", text: $email)
-                .autocapitalization(.none)
-                .keyboardType(.emailAddress)
-                .padding(10)
-                .background(Color.white)
-                .cornerRadius(25)
-                .shadow(radius: 1)
-                .padding(.horizontal, 20)
+        VStack {
+            Spacer()  // Pushes the content to the vertical center
             
-            ZStack(alignment: .trailing) {
-                Group {
-                    if isPasswordVisible {
-                        TextField("Password", text: $password)
-                            .autocapitalization(.none)
-                            .focused($isPasswordFocused)
-                    } else {
-                        SecureField("Password", text: $password)
-                            .focused($isPasswordFocused)
+            VStack(spacing: 20) {
+                Text("Login as \(selectedRole)")
+                    .multilineTextAlignment(.center)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.pink.opacity(0.5))
+                    .padding(.top, 20)
+                    
+                TextField("Email", text: $email)
+                    .autocapitalization(.none)
+                    .keyboardType(.emailAddress)
+                    .padding(10)
+                    .background(Color.white)
+                    .cornerRadius(25)
+                    .shadow(radius: 1)
+                    .padding(.horizontal, 20)
+                
+                ZStack(alignment: .trailing) {
+                    Group {
+                        if isPasswordVisible {
+                            TextField("Password", text: $password)
+                                .autocapitalization(.none)
+                                .focused($isPasswordFocused)
+                        } else {
+                            SecureField("Password", text: $password)
+                                .focused($isPasswordFocused)
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.white)
+                    .cornerRadius(25)
+                    .shadow(radius: 1)
+                    .padding(.horizontal, 20)
+                    
+                    Button(action: {
+                        isPasswordVisible.toggle()
+                    }) {
+                        Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                            .foregroundColor(.gray)
+                            .padding(.trailing, 30)
                     }
                 }
-                .padding(10)
-                .background(Color.white)
-                .cornerRadius(25)
-                .shadow(radius: 1)
-                .padding(.horizontal, 20)
+                
+                // Show criteria view if the field has been focused at least once.
+                if passwordFieldHasBeenFocused {
+                    PasswordCriteriaView(password: password)
+                        .padding(.horizontal, 20)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.spring(response: 0.7, dampingFraction: 0.8, blendDuration: 0.5), value: password)
+                }
                 
                 Button(action: {
-                    isPasswordVisible.toggle()
-                }) {
-                    Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                        .foregroundColor(.gray)
-                        .padding(.trailing, 30)
-                }
-            }
-            .onChange(of: isPasswordFocused) { oldValue, newValue in
-                if newValue {
-                    passwordFieldHasBeenFocused = true
-                }
-            }
-            
-            // Show criteria view if the field has been focused at least once.
-            if passwordFieldHasBeenFocused {
-                PasswordCriteriaView(password: password)
-                    .padding(.horizontal, 20)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.spring(response: 0.7, dampingFraction: 0.8, blendDuration: 0.5), value: password)
-            }
-            
-            Button(action: {
-                dataController.signInWithPassword(email: email, password: password, roleName: selectedRole) { success, error in
-                    if success {
-                        print("success")
-                        if !dataController.isGenPass, dataController.is2faEnabled {
-                            if dataController.roleMatched {
-                                dataController.sendOTP(email: email) { success, error in
-                                    if success {
-                                        print("OTP sent")
-                                    } else {
-                                        print("Failed to send OTP: \(error ?? "Unknown error")")
+                    dataController.signInWithPassword(email: email, password: password, roleName: selectedRole) { success, error in
+                        if success {
+                            print("success")
+                            if !dataController.isGenPass, dataController.is2faEnabled {
+                                if dataController.roleMatched {
+                                    dataController.sendOTP(email: email) { success, error in
+                                        if success {
+                                            print("OTP sent")
+                                        } else {
+                                            print("Failed to send OTP: \(error ?? "Unknown error")")
+                                        }
                                     }
                                 }
+                                navigateToVerify = dataController.roleMatched
                             }
-                            navigateToVerify = dataController.roleMatched
+                        } else {
+                            print("Cannot sign in")
                         }
-                    } else {
-                        print("Cannot sign in")
                     }
+                }) {
+                    Text("Login")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.accentColor)
+                        .cornerRadius(25)
+                        .padding(.horizontal, 20)
                 }
-            }) {
-                Text("Login")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.accentColor)
-                    .cornerRadius(25)
-                    .padding(.horizontal, 20)
+                .buttonStyle(PlainButtonStyle())
+                .disabled(isLoading || !isValidEmail(email) || !isValidPassword(password))
+                
+                // Forgot Password Button
+                Button(action: {
+                    navigateToForgotPassword = true
+                }) {
+                    Text("Forgot Password?")
+                        .foregroundColor(.blue)
+                        .font(.footnote)
+                }
+                .padding(.top, 5)
             }
-            .buttonStyle(PlainButtonStyle())
-            .disabled(isLoading || !isValidEmail(email) || !isValidPassword(password))
+            .padding(.trailing, 16)
+            .padding(.leading, 16)
             
-            // Forgot Password Button
-            Button(action: {
-                navigateToForgotPassword = true
-            }) {
-                Text("Forgot Password?")
-                    .foregroundColor(.blue)
-                    .font(.footnote)
-            }
-            .padding(.top, 5)
-
-            Spacer()
+            Spacer()  // Pushes the content to the vertical center
         }
-        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert(isPresented: $dataController.showAlert) {
             Alert(title: Text("Alert"), message: Text(dataController.alertMessage), dismissButton: .default(Text("OK")))
         }
         .navigationDestination(isPresented: $navigateToVerify) {
             VerifyOTPView(email: email)
         }
-        .navigationDestination(isPresented: $navigateToForgotPassword) { // Navigate to Forget Password View
+        .navigationDestination(isPresented: $navigateToForgotPassword) {
             ForgotPasswordView()
         }
     }
     
     private func isValidEmail(_ email: String) -> Bool {
-        // Regular expression for validating email format
         let emailRegex = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
         return NSPredicate(format: "SELF MATCHES %@", emailRegex).evaluate(with: email)
     }
     
     private func isValidPassword(_ password: String) -> Bool {
-        // Check that the password meets all criteria
         let passwordRegex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[#$@!%&*?])[A-Za-z\\d#$@!%&*?]{6,}$"
         return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
     }
 }
+
 
 struct PasswordCriteriaView: View {
     let password: String
