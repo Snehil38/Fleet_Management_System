@@ -460,21 +460,21 @@ struct VehiclesView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
-                        Button(action: { showingNotifications = true }) {
-                            Image(systemName: "bell.fill")
-                                .overlay(
-                                    Group {
-                                        if notificationsViewModel.unreadCount > 0 {
-                                            Text("\(min(notificationsViewModel.unreadCount, 99))")
-                                                .font(.caption2)
-                                                .padding(4)
-                                                .background(Color.red)
-                                                .clipShape(Circle())
-                                                .offset(x: 10, y: -10)
-                                        }
-                                    }
-                                )
-                        }
+//                        Button(action: { showingNotifications = true }) {
+//                            Image(systemName: "bell.fill")
+//                                .overlay(
+//                                    Group {
+//                                        if notificationsViewModel.unreadCount > 0 {
+//                                            Text("\(min(notificationsViewModel.unreadCount, 99))")
+//                                                .font(.caption2)
+//                                                .padding(4)
+//                                                .background(Color.red)
+//                                                .clipShape(Circle())
+//                                                .offset(x: 10, y: -10)
+//                                        }
+//                                    }
+//                                )
+//                        }
                         
                         Button(action: { showingAddVehicle = true }) {
                             Image(systemName: "plus")
@@ -497,9 +497,9 @@ struct VehiclesView: View {
             .sheet(isPresented: $showingAddVehicle) {
                 VehicleSaveView(vehicleManager: vehicleManager)
             }
-            .sheet(isPresented: $showingNotifications) {
-                NotificationsView()
-            }
+//            .sheet(isPresented: $showingNotifications) {
+//                NotificationsView()
+//            }
         }
     }
     
