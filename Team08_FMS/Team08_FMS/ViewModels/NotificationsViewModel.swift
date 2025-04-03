@@ -102,18 +102,21 @@ final class NotificationsViewModel: ObservableObject {
             guard let self = self else { return }
             
             Task { @MainActor in
-                print("Received notification update: \(payload)")
+                print("🔔 Received notification update: \(payload)")
+                
+                // Load notifications first
                 await self.loadNotifications()
                 
                 // Show banner for new notifications
                 if payload.event == "INSERT" {
+                    print("🔔 New notification inserted, showing banner...")
                     await self.showLatestNotificationBanner()
                 }
             }
         }
         
+        print("🔔 Subscribing to notifications channel...")
         channel.subscribe()
-        print("Subscribed to notifications channel")
         
         await MainActor.run {
             self.realtimeChannel = channel
@@ -121,19 +124,35 @@ final class NotificationsViewModel: ObservableObject {
     }
     
     private func showLatestNotificationBanner() async {
-        guard let latestNotification = notifications.first(where: { !$0.is_read }) else { return }
-        
-        // Cancel any pending banner dismissal
-        bannerWorkItem?.cancel()
-        
-        // Show the new notification banner
-        currentBannerNotification = latestNotification
-        showBanner = true
+        await MainActor.run {
+            // Show the new notification banner for the most recent unread notification
+            if let latestNotification = notifications.first(where: { !$0.is_read }) {
+                print("🔔 Showing banner for notification: \(latestNotification.message)")
+                
+                // Cancel any pending banner dismissal
+                bannerWorkItem?.cancel()
+                
+                // Show the new notification banner
+                currentBannerNotification = latestNotification
+                showBanner = true
+                
+                // Auto dismiss after 5 seconds
+                let workItem = DispatchWorkItem {
+                    self.dismissBanner()
+                }
+                bannerWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+            }
+        }
     }
     
     func dismissBanner() {
-        showBanner = false
-        currentBannerNotification = nil
+        Task { @MainActor in
+            withAnimation(.easeOut(duration: 0.3)) {
+                showBanner = false
+                currentBannerNotification = nil
+            }
+        }
     }
     
     func loadNotifications() async {

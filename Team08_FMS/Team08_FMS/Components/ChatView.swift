@@ -25,6 +25,8 @@ struct ChatView: View {
     @FocusState private var isFocused: Bool
     @State private var scrollProxy: ScrollViewProxy?
     @StateObject private var tripController = TripDataController.shared
+    @State private var isShowingImagePicker = false
+    @State private var selectedImage: UIImage?
     
     init(recipientType: RecipientType, recipientId: UUID, recipientName: String, contextData: [String: String]? = nil) {
         self.recipientType = recipientType
@@ -184,6 +186,25 @@ struct ChatView: View {
             }
             
             HStack(spacing: 12) {
+                // Photo picker button
+                Button(action: {
+                    isShowingImagePicker = true
+                }) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 20))
+                        .foregroundColor(ChatThemeColors.primary)
+                }
+                .sheet(isPresented: $isShowingImagePicker) {
+                    ImagePicker(image: $selectedImage, isShown: $isShowingImagePicker) { image in
+                        if let image = image {
+                            Task {
+                                await viewModel.sendImage(image)
+                                scrollToBottom()
+                            }
+                        }
+                    }
+                }
+                
                 // Message text field
                 TextField("Type a message...", text: $messageText)
                     .padding(12)
@@ -256,6 +277,47 @@ struct ChatView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+}
+
+// Add ImagePicker struct
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Binding var isShown: Bool
+    var onImagePicked: (UIImage?) -> Void
+    
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let uiImage = info[.originalImage] as? UIImage {
+                parent.image = uiImage
+                parent.onImagePicked(uiImage)
+            }
+            parent.isShown = false
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.isShown = false
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(self)
+    }
+    
+    func makeUIViewController(context: UIViewControllerRepresentableContext<ImagePicker>) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: UIViewControllerRepresentableContext<ImagePicker>) {
     }
 }
 
