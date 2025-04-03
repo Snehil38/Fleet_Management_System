@@ -250,4 +250,95 @@ struct DriverTabView: View {
             showingAlert = true
         }
     }
+}
+
+struct VehicleDetailsCard: View {
+    let vehicle: Vehicle
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Vehicle Details")
+                .font(.headline)
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    DetailRow(title: "Type", value: vehicle.bodyType.rawValue)
+                    DetailRow(title: "License Plate", value: vehicle.licensePlate)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding()
+        .background(Color(.systemSecondaryBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct TripDetailsCard: View {
+    let trip: Trip
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Trip Details")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                DetailRow(title: "Destination", value: trip.destination)
+                DetailRow(title: "Address", value: trip.address)
+                DetailRow(title: "Distance", value: trip.distance)
+            }
+        }
+        .padding()
+        .background(Color(.systemSecondaryBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct ActionButton: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(color)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+        }
+    }
+}
+
+struct NoActiveTripsView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "car")
+                .font(.system(size: 48))
+                .foregroundColor(.gray)
+            
+            Text("No Active Trips")
+                .font(.headline)
+            
+            Text("You don't have any active trips at the moment.")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .background(Color(.systemSecondaryBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
 } 
