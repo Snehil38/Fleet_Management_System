@@ -154,7 +154,7 @@ struct TripsView: View {
                     let supabaseTrip = SupabaseTrip(
                         id: UUID(),
                         destination: "Unknown Location",
-                        trip_status: "pending",
+                        trip_status: .pending,
                         has_completed_pre_trip: false,
                         has_completed_post_trip: false,
                         vehicle_id: vehicle.id,
@@ -172,7 +172,10 @@ struct TripsView: View {
                         end_longitude: 0,
                         pickup: "Unknown Address",
                         estimated_distance: 0,
-                        estimated_time: nil
+                        estimated_time: nil,
+                        midPoint: "N/A",
+                        midPointLat: 0.0,
+                        midPointLong: 0.0
                     )
                     
                     return Trip(from: supabaseTrip, vehicle: vehicle)
@@ -238,7 +241,7 @@ struct TripsView: View {
         let supabaseTrip = SupabaseTrip(
             id: delivery.id,
             destination: delivery.location,
-            trip_status: "delivered",
+            trip_status: .delivered,
             has_completed_pre_trip: true,
             has_completed_post_trip: true,
             vehicle_id: vehicle.id,
@@ -250,7 +253,7 @@ struct TripsView: View {
                    Trip: \(tripName)
                    Cargo Type: \(cargoType)
                    Estimated Distance: \(distance)
-                   Estimated Time: \(estimatedTime.map { "\(Int($0))h \(Int(($0 - Double(Int($0))) * 60))m" } ?? "N/A")
+                   Estimated Time: \(formatEstimatedTime(estimatedTime))
                    From: \(startingPoint)
                    \(deliveryNotes)
                    """,
@@ -263,7 +266,10 @@ struct TripsView: View {
             end_longitude: 0,
             pickup: startingPoint.isEmpty ? delivery.location : startingPoint,
             estimated_distance: estimatedDistance,
-            estimated_time: estimatedTime
+            estimated_time: estimatedTime,
+            midPoint: "n/a",
+            midPointLat: 0.0,
+            midPointLong: 0.0
         )
         
         return Trip(from: supabaseTrip, vehicle: vehicle)
@@ -287,6 +293,17 @@ struct TripsView: View {
             guard let minutes = numbers.first else { return nil }
             return minutes
         }
+    }
+    
+    private func formatEstimatedTime(_ time: Double?) -> String {
+        guard let time = time else {
+            return "N/A"
+        }
+        
+        let hours = Int(time)
+        let minutes = Int((time - Double(hours)) * 60)
+        
+        return "\(hours)h \(minutes)m"
     }
 }
 

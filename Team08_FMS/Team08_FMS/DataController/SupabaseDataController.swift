@@ -1386,6 +1386,7 @@ class SupabaseDataController: ObservableObject {
                 }
             }
             
+            
             // If time is provided, update it separately
             if let time = time {
                 // Extract hours and minutes from time string (e.g., "2h 30m" or "45m")
@@ -1408,7 +1409,26 @@ class SupabaseDataController: ObservableObject {
             throw error
         }
     }
-    
+    public func updateTripMidPoint(tripId: UUID, midPoint: String, midPointLatitude: Double, midPointLongitude: Double) async throws -> Bool {
+        do {
+            // Update the trip with mid-point information
+            try await databaseFrom("trips")
+                .update([
+                    "midPoint": Double(midPoint) ?? 0.0,
+                    "midPointLat": midPointLatitude,
+                    "midPointLong": midPointLongitude,
+//                    "updated_at": Date()
+                ])
+                .eq("id", value: tripId)
+                .execute()
+            
+            print("Successfully updated mid-point for trip \(tripId)")
+            return true
+        } catch {
+            print("Error updating trip mid-point: \(error)")
+            throw error
+        }
+    }
     func deleteTrip(tripID: UUID) {
         Task {
             do {
@@ -1758,7 +1778,7 @@ class SupabaseDataController: ObservableObject {
             .execute()
         print("Insert complete for MaintenancePersonnelRoutineSchedule")
     }
-    
+
     func deleteRoutineSchedule(schedule: MaintenancePersonnelRoutineSchedule) async throws {
         print("Deleting MaintenancePersonnelRoutineSchedule with id: \(schedule.id.uuidString)")
         try await supabase

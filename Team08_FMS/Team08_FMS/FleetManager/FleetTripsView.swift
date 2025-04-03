@@ -64,7 +64,7 @@ struct FleetTripsView: View {
             let supabaseTrip = SupabaseTrip(
                 id: delivery.id,
                 destination: delivery.location,
-                trip_status: "delivered",
+                trip_status: TripStatus(rawValue: delivery.status) ?? .inProgress,
                 has_completed_pre_trip: true,
                 has_completed_post_trip: true,
                 vehicle_id: vehicle.id,
@@ -81,7 +81,10 @@ struct FleetTripsView: View {
                 end_longitude: 0,
                 pickup: delivery.location,
                 estimated_distance: nil,
-                estimated_time: nil
+                estimated_time: nil,
+                midPoint: "",
+                midPointLat: 0,
+                midPointLong: 0
             )
             
             return Trip(from: supabaseTrip, vehicle: vehicle)
@@ -244,10 +247,11 @@ struct TripCardView: View {
     @State private var showingDetails = false
     @StateObject private var crewController = CrewDataController.shared
     @State var showingDeleteAlert = false
+    @State private var showingAddMidPoint = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Status badge only (removed ETA)
+            // Status badge and mid-point button
             HStack {
                 Text(statusText)
                     .font(.subheadline)
@@ -258,6 +262,25 @@ struct TripCardView: View {
                     .cornerRadius(8)
                 
                 Spacer()
+                
+                // Add Mid-Point button for in-progress trips
+                if trip.status == .inProgress {
+                    Button(action: {
+                        showingAddMidPoint = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14))
+                            Text("Add Mid-Point")
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .cornerRadius(8)
+                    }
+                }
             }
             
             // Trip name
@@ -343,57 +366,26 @@ struct TripCardView: View {
         .sheet(isPresented: $showingDetails) {
             TripDetailView(trip: trip)
         }
-        .contextMenu {
-            if trip.status == .pending || trip.status == .assigned || trip.status == .delivered {
-                Button(role: .destructive) {
-                    showingDeleteAlert = true
-                } label: {
-                    Label("Delete Trip", systemImage: "trash")
-                }
-            }
-        }
-        .onAppear {
-            crewController.update()
+        .sheet(isPresented: $showingAddMidPoint) {
+            AddMidPointView(trip: trip)
         }
     }
     
     private var statusText: String {
         switch trip.status {
-        case .inProgress:
-            if !trip.hasCompletedPreTrip {
-                return "Initiated"
-            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
-                return "Pre-Trip Completed"
-            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
-                return "Post-Trip Completed"
-            }
-            return "In Progress"
-        case .pending:
-            return "Pending"
-        case .delivered:
-            return "Delivered"
-        case .assigned:
-            return "Assigned"
+        case .pending: return "Unassigned"
+        case .assigned: return "Assigned"
+        case .inProgress: return "In Progress"
+        case .delivered: return "Completed"
         }
     }
     
     private var statusColor: Color {
         switch trip.status {
-        case .inProgress:
-            if !trip.hasCompletedPreTrip {
-                return .orange // Initiated
-            } else if trip.hasCompletedPreTrip && !trip.hasCompletedPostTrip {
-                return .blue // Pre-Trip Completed
-            } else if trip.hasCompletedPreTrip && trip.hasCompletedPostTrip {
-                return .green // Post-Trip Completed
-            }
-            return .blue // In Progress
-        case .pending:
-            return .green
-        case .delivered:
-            return .gray
-        case .assigned:
-            return .yellow
+        case .pending: return .gray
+        case .assigned: return .blue
+        case .inProgress: return .orange
+        case .delivered: return .green
         }
     }
 }
@@ -1676,6 +1668,176 @@ struct SignatureCaptureView: View {
                     .foregroundColor(.red)
             }
             .padding()
+        }
+    }
+}
+
+// Add Mid-Point View
+struct AddMidPointView: View {
+    let trip: Trip
+    @Environment(\.dismiss) private var dismiss
+    @State private var midPointLocation = ""
+    @State private var midPointCoordinate: CLLocationCoordinate2D?
+    @State private var searchResults: [MKLocalSearchCompletion] = []
+    @State private var searchCompleter = MKLocalSearchCompleter()
+    @State private var searchCompleterDelegate: SearchCompleterDelegate?
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 16) {
+                // Location Search Field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Mid-Point Location")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    
+                    HStack {
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 20))
+                        
+                        TextField("Enter mid-point location", text: $midPointLocation)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .onChange(of: midPointLocation) { _, newValue in
+                                if !newValue.isEmpty {
+                                    searchCompleter.queryFragment = newValue
+                                } else {
+                                    searchResults = []
+                                }
+                            }
+                    }
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                    
+                    if !searchResults.isEmpty {
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ForEach(searchResults, id: \.self) { result in
+                                    Button(action: {
+                                        midPointLocation = result.title
+                                        searchResults = []
+                                        let searchRequest = MKLocalSearch.Request(completion: result)
+                                        let search = MKLocalSearch(request: searchRequest)
+                                        search.start { response, error in
+                                            if let coordinate = response?.mapItems.first?.placemark.coordinate {
+                                                midPointCoordinate = coordinate
+                                            }
+                                        }
+                                    }) {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: "mappin.circle.fill")
+                                                .foregroundColor(.blue)
+                                                .font(.system(size: 20))
+                                            
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(result.title)
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.primary)
+                                                Text(result.subtitle)
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 12)
+                                    }
+                                    
+                                    if result != searchResults.last {
+                                        Divider()
+                                            .padding(.leading, 40)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 200)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5)
+                    }
+                }
+                
+                Spacer()
+                
+                // Save Button
+                Button(action: saveMidPoint) {
+                    HStack {
+                        Text("Add Mid-Point")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(midPointCoordinate != nil ? Color.blue : Color.gray)
+                    .foregroundColor(.white)
+                    .cornerRadius(16)
+                }
+                .disabled(midPointCoordinate == nil)
+                .padding(.horizontal)
+            }
+            .padding()
+            .navigationTitle("Add Mid-Point")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .alert("Error", isPresented: $showingAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(alertMessage)
+            }
+            .onAppear {
+                setupSearchCompleter()
+            }
+        }
+    }
+    
+    private func setupSearchCompleter() {
+        searchCompleter.resultTypes = [.pointOfInterest, .address, .query]
+        searchCompleter.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
+            span: MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 10)
+        )
+        let delegate = SearchCompleterDelegate { results in
+            self.searchResults = Array(results.prefix(10))
+        }
+        searchCompleter.delegate = delegate
+        searchCompleterDelegate = delegate
+    }
+    
+    private func saveMidPoint() {
+        guard let coordinate = midPointCoordinate else { return }
+        
+        Task {
+            do {
+                let success = try await SupabaseDataController.shared.updateTripMidPoint(
+                    tripId: trip.id,
+                    midPoint: midPointLocation,
+                    midPointLatitude: coordinate.latitude,
+                    midPointLongitude: coordinate.longitude
+                )
+                
+                if success {
+                    await MainActor.run {
+                        dismiss()
+                    }
+                } else {
+                    await MainActor.run {
+                        showingAlert = true
+                        alertMessage = "Failed to add mid-point. Please try again."
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    showingAlert = true
+                    alertMessage = "Error: \(error.localizedDescription)"
+                }
+            }
         }
     }
 } 

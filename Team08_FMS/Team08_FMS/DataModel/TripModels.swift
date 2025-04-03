@@ -8,6 +8,82 @@ enum TripStatus: String, Codable {
     case delivered = "delivered"
     case assigned = "assigned"
 }
+//
+//class Trip: Identifiable, ObservableObject {
+//    let id: UUID
+//    let destination: String
+//    @Published var status: TripStatus
+//    @Published var hasCompletedPreTrip: Bool
+//    @Published var hasCompletedPostTrip: Bool
+//    let vehicleId: UUID
+//    let driverId: UUID?
+//    let secondaryDriverId: UUID?
+//    let startTime: Date?
+//    let endTime: Date?
+//    let notes: String?
+//    let createdAt: Date
+//    let updatedAt: Date
+//    let isDeleted: Bool
+//    let startLatitude: Double?
+//    let startLongitude: Double?
+//    let endLatitude: Double?
+//    let endLongitude: Double?
+//    let pickup: String?
+//    let estimatedDistance: Double?
+//    let estimatedTime: Double?
+//    let midPoint: String?
+//    let midPointLatitude: Double?
+//    let midPointLongitude: Double?
+//    let vehicle: Vehicle?
+//    
+//    // Display-related properties
+//    let address: String
+//    let eta: String
+//    let distance: String
+//    
+//    var displayName: String {
+//        if let notes = notes {
+//            if let tripRange = notes.range(of: "Trip: "),
+//               let endRange = notes[tripRange.upperBound...].range(of: "\n") {
+//                return String(notes[tripRange.upperBound..<endRange.lowerBound])
+//            }
+//        }
+//        return "Trip \(id.uuidString.prefix(8))"
+//    }
+//    
+//    init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle? = nil) {
+//        self.id = supabaseTrip.id
+//        self.destination = supabaseTrip.destination
+//        self.status = supabaseTrip.trip_status
+//        self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
+//        self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
+//        self.vehicleId = supabaseTrip.vehicle_id
+//        self.driverId = supabaseTrip.driver_id
+//        self.secondaryDriverId = supabaseTrip.secondary_driver_id
+//        self.startTime = supabaseTrip.start_time
+//        self.endTime = supabaseTrip.end_time
+//        self.notes = supabaseTrip.notes
+//        self.createdAt = supabaseTrip.created_at
+//        self.updatedAt = supabaseTrip.updated_at ?? supabaseTrip.created_at
+//        self.isDeleted = supabaseTrip.is_deleted
+//        self.startLatitude = supabaseTrip.start_latitude
+//        self.startLongitude = supabaseTrip.start_longitude
+//        self.endLatitude = supabaseTrip.end_latitude
+//        self.endLongitude = supabaseTrip.end_longitude
+//        self.pickup = supabaseTrip.pickup
+//        self.estimatedDistance = supabaseTrip.estimated_distance
+//        self.estimatedTime = supabaseTrip.estimated_time
+//        self.midPoint = supabaseTrip.midPoint
+//        self.midPointLatitude = supabaseTrip.midPointLat
+//        self.midPointLongitude = supabaseTrip.midPointLong
+//        self.vehicle = vehicle
+//        
+//        // Initialize display-related properties
+//        self.address = supabaseTrip.pickup ?? "No address provided"
+//        self.eta = ""  // ETA will be calculated later
+//        self.distance = String(format: "%.1f km", supabaseTrip.estimated_distance ?? 0.0)
+//    }
+//}
 
 // Trip Model
 struct Trip: Identifiable, Equatable {
@@ -28,10 +104,19 @@ struct Trip: Identifiable, Equatable {
     let startingPoint: String
     let pickup: String?
     let driverId: UUID?
+    let midPoint: String?
+    let midPointLatitude: Double?
+    let midPointLongitude: Double?
     
     // Computed property for display purposes
     var displayName: String {
-        pickup ?? "Trip-\(id.uuidString.prefix(8))"
+        if let notes = notes {
+            if let tripRange = notes.range(of: "Trip: "),
+               let endRange = notes[tripRange.upperBound...].range(of: "\n") {
+                return String(notes[tripRange.upperBound..<endRange.lowerBound])
+            }
+        }
+        return "Trip \(id.uuidString.prefix(8))"
     }
     
     static func == (lhs: Trip, rhs: Trip) -> Bool {
@@ -56,63 +141,41 @@ struct Trip: Identifiable, Equatable {
                lhs.driverId == rhs.driverId
     }
     
-    init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle) {
+    init(from supabaseTrip: SupabaseTrip, vehicle: Vehicle? = nil) {
         self.id = supabaseTrip.id
         self.destination = supabaseTrip.destination
-        self.address = supabaseTrip.pickup ?? "N/A"
-        self.status = TripStatus(rawValue: supabaseTrip.trip_status) ?? .pending
+        self.status = supabaseTrip.trip_status
         self.hasCompletedPreTrip = supabaseTrip.has_completed_pre_trip
         self.hasCompletedPostTrip = supabaseTrip.has_completed_post_trip
-        self.vehicleDetails = vehicle
-        self.notes = supabaseTrip.notes
+//        self.vehicleId = supabaseTrip.vehicle_id
+        self.driverId = supabaseTrip.driver_id
+//        self.secondaryDriverId = supabaseTrip.secondary_driver_id
         self.startTime = supabaseTrip.start_time
         self.endTime = supabaseTrip.end_time
+        self.notes = supabaseTrip.notes
+//        self.createdAt = supabaseTrip.created_at
+//        self.updatedAt = supabaseTrip.updated_at ?? supabaseTrip.created_at
+//        self.isDeleted = supabaseTrip.is_deleted
+        self.sourceCoordinate = CLLocationCoordinate2D(latitude: supabaseTrip.start_longitude! , longitude: supabaseTrip.end_latitude!)
+        self.destinationCoordinate = CLLocationCoordinate2D(latitude: supabaseTrip.end_longitude! , longitude: supabaseTrip.end_latitude!)
+        self.startingPoint = supabaseTrip.pickup!
+//        self.startLongitude = supabaseTrip.start_longitude
+//        self.endLatitude = supabaseTrip.end_latitude
+//        self.endLongitude = supabaseTrip.end_longitude
         self.pickup = supabaseTrip.pickup
-        self.driverId = supabaseTrip.driver_id
+//        self.estimatedDistance = supabaseTrip.estimated_distance
+//        self.estimatedTime = supabaseTrip.estimated_time
+        self.midPoint = supabaseTrip.midPoint
+        self.midPointLatitude = supabaseTrip.midPointLat
+        self.midPointLongitude = supabaseTrip.midPointLong
+        self.vehicleDetails = vehicle!
         
-        // Set distance using estimated_distance if available
-        if let estimatedDistance = supabaseTrip.estimated_distance {
-            self.distance = String(format: "%.1f km", estimatedDistance)
-        } else if let notes = supabaseTrip.notes,
-                  let distanceRange = notes.range(of: "Estimated Distance: "),
-                  let endRange = notes[distanceRange.upperBound...].range(of: "\n") {
-            // Try to extract distance from notes as fallback
-            let distanceStr = String(notes[distanceRange.upperBound..<endRange.lowerBound])
-            self.distance = distanceStr.trimmingCharacters(in: .whitespaces)
-        } else {
-            self.distance = "N/A"
-        }
-        
-        // Set ETA using estimated_time if available
-        if let estimatedTime = supabaseTrip.estimated_time {
-            let hours = Int(estimatedTime)
-            let minutes = Int((estimatedTime - Double(hours)) * 60)
-            if hours > 0 {
-                self.eta = "\(hours)h \(minutes)m"
-            } else {
-                self.eta = "\(minutes) mins"
-            }
-        } else if let notes = supabaseTrip.notes,
-                  let etaRange = notes.range(of: "Estimated Time: "),
-                  let endRange = notes[etaRange.upperBound...].range(of: "\n") {
-            // Try to extract ETA from notes as fallback
-            let etaStr = String(notes[etaRange.upperBound..<endRange.lowerBound])
-            self.eta = etaStr.trimmingCharacters(in: .whitespaces)
-        } else {
-            self.eta = "N/A"
-        }
-        
-        // Set coordinates from the trip data
-        self.sourceCoordinate = CLLocationCoordinate2D(
-            latitude: supabaseTrip.start_latitude ?? 0,
-            longitude: supabaseTrip.start_longitude ?? 0
-        )
-        self.destinationCoordinate = CLLocationCoordinate2D(
-            latitude: supabaseTrip.end_latitude ?? 0,
-            longitude: supabaseTrip.end_longitude ?? 0
-        )
-        self.startingPoint = supabaseTrip.pickup ?? "N/A"
+        // Initialize display-related properties
+        self.address = supabaseTrip.pickup ?? "No address provided"
+        self.eta = ""  // ETA will be calculated later
+        self.distance = String(format: "%.1f km", supabaseTrip.estimated_distance ?? 0.0)
     }
+
 }
 
 // Delivery Details Model
@@ -150,7 +213,7 @@ struct DeliveryDetails: Identifiable, Equatable {
 struct SupabaseTrip: Codable, Identifiable {
     let id: UUID
     let destination: String
-    let trip_status: String
+    let trip_status: TripStatus
     let has_completed_pre_trip: Bool
     let has_completed_post_trip: Bool
     let vehicle_id: UUID
@@ -159,7 +222,7 @@ struct SupabaseTrip: Codable, Identifiable {
     let start_time: Date?
     let end_time: Date?
     let notes: String?
-    let created_at: Date?
+    let created_at: Date
     let updated_at: Date?
     let is_deleted: Bool
     let start_latitude: Double?
@@ -169,6 +232,9 @@ struct SupabaseTrip: Codable, Identifiable {
     let pickup: String?
     let estimated_distance: Double?
     let estimated_time: Double?
+    let midPoint: String?
+    let midPointLat: Double?
+    let midPointLong: Double?
 }
 
 extension TimeInterval {
