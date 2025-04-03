@@ -15,6 +15,7 @@ struct FleetManagerDashboardTabView: View {
     @EnvironmentObject private var supabaseDataController: SupabaseDataController
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var dataStore = MaintenancePersonnelDataStore()
+    @StateObject private var notificationsViewModel = NotificationsViewModel()
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
     @State private var showingAlertsView = false
@@ -204,6 +205,17 @@ struct FleetManagerDashboardTabView: View {
                     } label: {
                         Image(systemName: "bell.fill")
                             .foregroundColor(.blue)
+                            .overlay(alignment: .topTrailing) {
+                                if notificationsViewModel.unreadCount > 0 {
+                                    Text("\(notificationsViewModel.unreadCount)")
+                                        .font(.caption2)
+                                        .padding(4)
+                                        .foregroundColor(.white)
+                                        .background(Color.red)
+                                        .clipShape(Circle())
+                                        .offset(x: 10, y: -10)
+                                }
+                            }
                     }
                     // Profile button
                     Button {
@@ -232,6 +244,7 @@ struct FleetManagerDashboardTabView: View {
             .sheet(isPresented: $showingAlertsView) {
                 NavigationView {
                     AlertsView()
+                        .environmentObject(notificationsViewModel)
                 }
             }
         }

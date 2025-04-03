@@ -57,14 +57,6 @@ struct NotificationBannerView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 offset = 0
             }
-            
-            // Auto dismiss after 5 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                if shouldShow {
-                    print("🔔 Auto-dismissing banner")
-                    dismiss()
-                }
-            }
         }
     }
     
