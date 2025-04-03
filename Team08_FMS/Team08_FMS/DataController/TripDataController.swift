@@ -181,22 +181,22 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         
         // If trip has exceeded max duration
         if elapsedTime > maxTripDuration {
-            sendNotification(
-                title: "Trip Duration Alert",
-                body: "Trip has exceeded the maximum allowed duration of 1 hour. Please check vehicle status."
-            )
-            // Notify fleet manager through Supabase
-            Task {
-                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.id.uuidString ?? "Unknown")")
-            }
+//            sendNotification(
+//                title: "Trip Duration Alert",
+//                body: "Trip has exceeded the maximum allowed duration of 1 hour. Please check vehicle status."
+//            )
+//            // Notify fleet manager through Supabase
+//            Task {
+//                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.id.uuidString ?? "Unknown")")
+//            }
         }
         
         // If approaching estimated arrival time (within 15 minutes)
         if timeUntilEstimatedArrival <= 900 && timeUntilEstimatedArrival > 0 {
-            sendNotification(
-                title: "Approaching Destination",
-                body: "Vehicle should be arriving at destination soon. Current ETA: \(formatTimeRemaining(timeUntilEstimatedArrival))"
-            )
+//            sendNotification(
+//                title: "Approaching Destination",
+//                body: "Vehicle should be arriving at destination soon. Current ETA: \(formatTimeRemaining(timeUntilEstimatedArrival))"
+//            )
         }
         
         // If past estimated arrival time
@@ -206,9 +206,9 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                 body: "Vehicle should have reached the destination by now. Please verify location."
             )
             // Notify fleet manager through Supabase
-            Task {
-                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.id.uuidString ?? "Unknown")")
-            }
+//            Task {
+//                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.id.uuidString ?? "Unknown")")
+//            }
         }
     }
     
