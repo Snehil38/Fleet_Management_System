@@ -180,36 +180,36 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         let timeUntilEstimatedArrival = estimatedArrival.timeIntervalSince(currentTime)
         
         // If trip has exceeded max duration
-        if elapsedTime > maxTripDuration {
-//            sendNotification(
-//                title: "Trip Duration Alert",
-//                body: "Trip has exceeded the maximum allowed duration of 1 hour. Please check vehicle status."
-//            )
+//        if elapsedTime > maxTripDuration {
+////            sendNotification(
+////                title: "Trip Duration Alert",
+////                body: "Trip has exceeded the maximum allowed duration of 1 hour. Please check vehicle status."
+////            )
+////            // Notify fleet manager through Supabase
+////            Task {
+////                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.id.uuidString ?? "Unknown")")
+////            }
+//        }
+//        
+//        // If approaching estimated arrival time (within 15 minutes)
+//        if timeUntilEstimatedArrival <= 900 && timeUntilEstimatedArrival > 0 {
+////            sendNotification(
+////                title: "Approaching Destination",
+////                body: "Vehicle should be arriving at destination soon. Current ETA: \(formatTimeRemaining(timeUntilEstimatedArrival))"
+////            )
+//        }
+//        
+//        // If past estimated arrival time
+//        if timeUntilEstimatedArrival <= 0 {
+////            sendNotification(
+////                title: "Estimated Arrival Time Reached",
+////                body: "Vehicle should have reached the destination by now. Please verify location."
+////            )
 //            // Notify fleet manager through Supabase
-//            Task {
-//                await notifyFleetManager(message: "Trip duration exceeded for trip \(currentTrip?.id.uuidString ?? "Unknown")")
-//            }
-        }
-        
-        // If approaching estimated arrival time (within 15 minutes)
-        if timeUntilEstimatedArrival <= 900 && timeUntilEstimatedArrival > 0 {
-//            sendNotification(
-//                title: "Approaching Destination",
-//                body: "Vehicle should be arriving at destination soon. Current ETA: \(formatTimeRemaining(timeUntilEstimatedArrival))"
-//            )
-        }
-        
-        // If past estimated arrival time
-        if timeUntilEstimatedArrival <= 0 {
-//            sendNotification(
-//                title: "Estimated Arrival Time Reached",
-//                body: "Vehicle should have reached the destination by now. Please verify location."
-//            )
-            // Notify fleet manager through Supabase
-//            Task {
-//                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.id.uuidString ?? "Unknown")")
-//            }
-        }
+////            Task {
+////                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.id.uuidString ?? "Unknown")")
+////            }
+//        }
     }
     
     private func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {
