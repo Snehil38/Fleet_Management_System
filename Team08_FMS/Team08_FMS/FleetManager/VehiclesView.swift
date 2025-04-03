@@ -501,6 +501,7 @@ struct VehiclesView: View {
 //                NotificationsView()
 //            }
         }
+        .notificationBanner(viewModel: notificationsViewModel, showingNotifications: $showingNotifications)
     }
     
     func refreshVehicles() async {
