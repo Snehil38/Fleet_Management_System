@@ -61,12 +61,40 @@ final class ChatViewModel: ObservableObject {
     private let storageClient: SupabaseStorageClient
     private let storageBucket = "chat-attachments"
     private var currentLoadTask: Task<Void, Never>?
-    private let maxRetries = 3
+    private var maxRetries = 3
     
+    // Static shared instance specifically for fleet manager dashboard
+    static let shared: ChatViewModel = {
+        // Initialize with fleet manager specific parameters
+        return ChatViewModel(forFleetManagerDashboard: true)
+    }()
+    
+    // Add a dictionary to store unread counts per sender with debug logging
+    private static var unreadCountsPerSender: [UUID: Int] = [:] {
+        didSet {
+            print("DEBUG: Updated unread counts: \(unreadCountsPerSender)")
+        }
+    }
+    
+    // Convenience initializer for fleet manager dashboard
+    init(forFleetManagerDashboard: Bool) {
+        self.recipientId = UUID() // Dummy UUID for dashboard
+        self.recipientType = .driver
+        self.isFleetManagerDashboard = true
+        self.storageClient = SupabaseDataController.shared.supabase.storage
+        
+        // Only set up message listener for unread counts
+        Task {
+            await setupMessageListener()
+        }
+    }
+    
+    // Regular initializer for chat instances
     init(recipientId: UUID, recipientType: RecipientType) {
         self.recipientId = recipientId
         self.recipientType = recipientType
-        self.storageClient = supabaseDataController.supabase.storage
+        self.isFleetManagerDashboard = false
+        self.storageClient = SupabaseDataController.shared.supabase.storage
         
         Task {
             await requestNotificationPermission()
@@ -83,6 +111,38 @@ final class ChatViewModel: ObservableObject {
             updateUnreadCount()
             setupRefreshTimer()
         }
+    }
+    
+    // Method to get unread count for a specific sender with error handling
+    static func getUnreadCount(for senderId: UUID) -> Int {
+        print("DEBUG: Getting unread count for sender: \(senderId)")
+        return unreadCountsPerSender[senderId] ?? 0
+    }
+    
+    // Method to update unread count for a specific sender with validation
+    static func updateUnreadCount(for senderId: UUID, count: Int) {
+        guard count >= 0 else {
+            print("ERROR: Attempted to set negative unread count for sender: \(senderId)")
+            return
+        }
+        print("DEBUG: Updating unread count for sender \(senderId) to \(count)")
+        unreadCountsPerSender[senderId] = count
+        NotificationCenter.default.post(name: NSNotification.Name("UnreadCountUpdated"), object: nil, userInfo: ["senderId": senderId, "count": count])
+    }
+    
+    // Method to increment unread count for a specific sender with validation
+    static func incrementUnreadCount(for senderId: UUID) {
+        let currentCount = unreadCountsPerSender[senderId] ?? 0
+        print("DEBUG: Incrementing unread count for sender \(senderId) from \(currentCount)")
+        unreadCountsPerSender[senderId] = currentCount + 1
+        NotificationCenter.default.post(name: NSNotification.Name("UnreadCountUpdated"), object: nil, userInfo: ["senderId": senderId, "count": currentCount + 1])
+    }
+    
+    // Method to reset unread count for a specific sender with confirmation
+    static func resetUnreadCount(for senderId: UUID) {
+        print("DEBUG: Resetting unread count for sender \(senderId)")
+        unreadCountsPerSender[senderId] = 0
+        NotificationCenter.default.post(name: NSNotification.Name("UnreadCountUpdated"), object: nil, userInfo: ["senderId": senderId, "count": 0])
     }
     
     private func requestNotificationPermission() async {
@@ -124,39 +184,51 @@ final class ChatViewModel: ObservableObject {
     }
     
     private func setupMessageListener() async {
-        // First, cleanup any existing channel
-        realtimeChannel?.unsubscribe()
-        
-        let channel = supabaseDataController.supabase.realtime
-            .channel("chat_messages")
-        
-        channel.on("postgres_changes", filter: .init(
-            event: "*",
-            schema: "public",
-            table: "chat_messages"
-        )) { [weak self] payload in
-            guard let self = self else { return }
+        do {
+            // First, cleanup any existing channel
+            realtimeChannel?.unsubscribe()
             
-            Task { @MainActor in
-                do {
-                    if payload.event == "INSERT" {
-                        if let data = try? JSONSerialization.data(withJSONObject: payload.payload["record"] ?? [:]),
-                           let message = try? JSONDecoder().decode(ChatMessage.self, from: data) {
-                            // Show notification for new message
-                            await self.showMessageNotification(message)
+            let channel = supabaseDataController.supabase.realtime
+                .channel("chat_messages")
+            
+            channel.on("postgres_changes", filter: .init(
+                event: "*",
+                schema: "public",
+                table: "chat_messages"
+            )) { [weak self] payload in
+                guard let self = self else { return }
+                
+                Task { @MainActor in
+                    do {
+                        if payload.event == "INSERT" {
+                            if let data = try? JSONSerialization.data(withJSONObject: payload.payload["record"] ?? [:]),
+                               let message = try? JSONDecoder().decode(ChatMessage.self, from: data) {
+                                // Show notification for new message
+                                await self.showMessageNotification(message)
+                                
+                                // Increment unread count if message is from driver to fleet manager
+                                if message.recipient_type == "driver" && !message.isFromCurrentUser {
+                                    print("DEBUG: New message received from driver: \(message.fleet_manager_id)")
+                                    ChatViewModel.incrementUnreadCount(for: message.fleet_manager_id)
+                                }
+                            }
                         }
+                        await self.fetchNewMessages()
+                    } catch {
+                        print("❌ Error handling message update: \(error)")
+                        self.error = error
                     }
-                    await self.fetchNewMessages()
-                } catch {
-                    print("❌ Error handling message update: \(error)")
-                    self.error = error
                 }
             }
+            
+            print("🔔 Subscribing to chat messages channel...")
+            channel.subscribe()
+            self.realtimeChannel = channel
+            
+        } catch {
+            print("❌ Error setting up message listener: \(error)")
+            self.error = error
         }
-        
-        print("🔔 Subscribing to chat messages channel...")
-        channel.subscribe()
-        self.realtimeChannel = channel
     }
     
     func clearMessages() {

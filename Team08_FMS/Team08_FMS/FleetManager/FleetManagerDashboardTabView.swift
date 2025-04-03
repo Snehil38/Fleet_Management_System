@@ -16,6 +16,8 @@ struct FleetManagerDashboardTabView: View {
     @StateObject private var tripController = TripDataController.shared
     @StateObject private var dataStore = MaintenancePersonnelDataStore()
     @StateObject private var notificationsViewModel = NotificationsViewModel()
+    @StateObject private var chatViewModel = ChatViewModel(forFleetManagerDashboard: true)
+    @State private var unreadMessageCounts: [UUID: Int] = [:]
     @State private var showingProfile = false
     @State private var showingAddTripSheet = false
     @State private var showingAlertsView = false
@@ -104,12 +106,16 @@ struct FleetManagerDashboardTabView: View {
                             value: "\(availableVehiclesCount)"
                         )
 
-                        // Drivers Stat
+                        // Drivers Stat with debug print
+                        let unreadCount = getTotalUnreadMessages()
+                        print("DEBUG: Displaying badge with count: \(unreadCount)")
                         StatCard(
                             icon: "person.fill",
                             iconColor: .green,
                             title: "Available Drivers",
-                            value: "\(availableDriversCount)"
+                            value: "\(availableDriversCount)",
+                            showBadge: unreadCount > 0,
+                            badgeCount: unreadCount
                         )
 
                         // Maintenance Personnel Stat
@@ -254,6 +260,19 @@ struct FleetManagerDashboardTabView: View {
                 listenForGeofenceEvents()
                 await refreshData()
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("UnreadCountUpdated"))) { notification in
+                print("DEBUG: Received unread count update notification")
+                if let userInfo = notification.userInfo,
+                   let senderId = userInfo["senderId"] as? UUID,
+                   let count = userInfo["count"] as? Int {
+                    print("DEBUG: Updating count for sender \(senderId) to \(count)")
+                }
+                updateUnreadCounts()
+            }
+            .onAppear {
+                print("DEBUG: FleetManagerDashboardTabView appeared")
+                updateUnreadCounts()
+            }
         }
     }
     
@@ -266,6 +285,31 @@ struct FleetManagerDashboardTabView: View {
     func listenForGeofenceEvents() {
         SupabaseDataController.shared.subscribeToGeofenceEvents()
     }
+    
+    private func updateUnreadCounts() {
+        print("DEBUG: Updating unread counts for all drivers")
+        for driver in dataManager.drivers {
+            let driverId = driver.id
+            print("DEBUG: Checking unread count for driver: \(driver.name) (ID: \(driverId))")
+            let count = ChatViewModel.getUnreadCount(for: driverId)
+            unreadMessageCounts[driverId] = count
+            print("DEBUG: Updated count for driver \(driver.name): \(count)")
+        }
+        print("DEBUG: Final unread counts: \(unreadMessageCounts)")
+    }
+    
+    private func getTotalUnreadMessages() -> Int {
+        print("DEBUG: Calculating total unread messages")
+        var total = 0
+        for driver in dataManager.drivers {
+            let driverId = driver.id
+            let count = ChatViewModel.getUnreadCount(for: driverId)
+            total += count
+            print("DEBUG: Added \(count) messages from driver \(driver.name)")
+        }
+        print("DEBUG: Total unread messages: \(total)")
+        return total
+    }
 }
 
 // Supporting Views
@@ -274,6 +318,8 @@ struct StatCard: View {
     let iconColor: Color
     let title: String
     let value: String
+    var showBadge: Bool = false
+    var badgeCount: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -282,6 +328,14 @@ struct StatCard: View {
                     .font(.title2)
                     .foregroundColor(iconColor)
                 Spacer()
+                if showBadge && badgeCount > 0 {
+                    Text("\(badgeCount)")
+                        .font(.caption2)
+                        .padding(6)
+                        .foregroundColor(.white)
+                        .background(Color.red)
+                        .clipShape(Circle())
+                }
                 Text(value)
                     .font(.title2)
                     .fontWeight(.bold)
