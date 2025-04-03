@@ -192,6 +192,8 @@ final class ChatViewModel: ObservableObject {
                     }
                     
                     let userRole = supabaseDataController.userRole
+                    print("Current user role: \(userRole)")
+                    print("Current user ID: \(currentUserId)")
                     
                     // Build the query based on user role and recipient type
                     var query = supabaseDataController.supabase
@@ -212,12 +214,6 @@ final class ChatViewModel: ObservableObject {
                     let response = try await query
                         .order("created_at", ascending: true)
                         .execute()
-                    
-                    // Check if task was cancelled
-                    if Task.isCancelled {
-                        print("Load messages task was cancelled")
-                        return
-                    }
                     
                     let decoder = JSONDecoder()
                     decoder.dateDecodingStrategy = .custom { decoder in
@@ -246,28 +242,19 @@ final class ChatViewModel: ObservableObject {
                     
                     var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
                     
-                    // Check if task was cancelled again
-                    if Task.isCancelled {
-                        print("Load messages task was cancelled during decoding")
-                        return
-                    }
-                    
                     // Update isFromCurrentUser for each message
                     for index in fetchedMessages.indices {
                         var message = fetchedMessages[index]
                         if userRole == "fleet_manager" {
-                            message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
+                            // For fleet manager: message is from current user if fleet_manager_id matches currentUserId
+                            message.isFromCurrentUser = message.fleet_manager_id == currentUserId
+                            print("Message \(message.id): FM_ID=\(message.fleet_manager_id), isFromCurrentUser=\(message.isFromCurrentUser)")
                         } else {
-                            message.isFromCurrentUser = message.recipient_id.uuidString != currentUserId.uuidString
+                            // For others: message is from current user if recipient_id is NOT currentUserId
+                            message.isFromCurrentUser = message.recipient_id != currentUserId
+                            print("Message \(message.id): R_ID=\(message.recipient_id), isFromCurrentUser=\(message.isFromCurrentUser)")
                         }
                         fetchedMessages[index] = message
-                        
-                        // Mark as read if needed
-                        if message.recipient_id.uuidString == currentUserId.uuidString && message.status == .sent {
-                            Task {
-                                await self.markMessageAsRead(message.id)
-                            }
-                        }
                     }
                     
                     await MainActor.run {

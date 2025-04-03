@@ -96,22 +96,37 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        ForEach(viewModel.messages) { message in
-                            ChatBubbleView(message: message) {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    // Remove the message from the local array first
-                                    viewModel.messages.removeAll { $0.id == message.id }
-                                }
-                                // Then refresh from server
-                                Task {
-                                    await viewModel.loadMessages()
+                        if viewModel.messages.isEmpty && viewModel.isLoading {
+                            ProgressView("Loading messages...")
+                                .scaleEffect(1.0)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.top, 20)
+                        } else {
+                            ForEach(viewModel.messages) { message in
+                                HStack {
+                                    if message.isFromCurrentUser {
+                                        Spacer(minLength: 60)
+                                    }
+                                    
+                                    ChatBubbleView(message: message) {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            viewModel.messages.removeAll { $0.id == message.id }
+                                        }
+                                        Task {
+                                            await viewModel.loadMessages()
+                                        }
+                                    }
+                                    .id(message.id)
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: message.isFromCurrentUser ? .trailing : .leading).combined(with: .opacity)
+                                    ))
+                                    
+                                    if !message.isFromCurrentUser {
+                                        Spacer(minLength: 60)
+                                    }
                                 }
                             }
-                            .id(message.id)
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .move(edge: message.isFromCurrentUser ? .trailing : .leading).combined(with: .opacity)
-                            ))
                         }
                     }
                     .padding(.vertical)
@@ -119,12 +134,6 @@ struct ChatView: View {
                 }
                 .refreshable {
                     await viewModel.loadMessages()
-                }
-                .overlay {
-                    if viewModel.messages.isEmpty && viewModel.isLoading {
-                        ProgressView("Loading messages...")
-                            .scaleEffect(1.0)
-                    }
                 }
                 .onAppear {
                     scrollProxy = proxy
