@@ -1,91 +1,35 @@
+import Foundation
 import SwiftUI
 import Combine
 @preconcurrency import Supabase
 
-struct Notification: Identifiable, Codable {
-    let id: UUID
-    let message: String
-    let type: String
-    let created_at: Date
-    var is_read: Bool
-    
-    enum CodingKeys: String, CodingKey {
-        case id, message, type, created_at, is_read
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        message = try container.decode(String.self, forKey: .message)
-        type = try container.decode(String.self, forKey: .type)
-        is_read = try container.decode(Bool.self, forKey: .is_read)
-        
-        // Handle multiple date formats
-        let dateString = try container.decode(String.self, forKey: .created_at)
-        print("Attempting to parse date: \(dateString)")
-        
-        // Try different date formats
-        if let date = Notification.postgresDateFormatter.date(from: dateString) {
-            print("Successfully parsed with postgres formatter")
-            created_at = date
-        } else if let date = Notification.backupDateFormatter.date(from: dateString) {
-            print("Successfully parsed with backup formatter")
-            created_at = date
-        } else if let date = Notification.iso8601Formatter.date(from: dateString) {
-            print("Successfully parsed with ISO8601 formatter")
-            created_at = date
-        } else {
-            print("Failed to parse date with all formatters")
-            throw DecodingError.dataCorruptedError(forKey: .created_at,
-                  in: container,
-                  debugDescription: "Could not parse date string: \(dateString)")
-        }
-    }
-    
-    // Primary Postgres timestamp format (2025-03-31 06:20:09+00)
-    private static let postgresDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ssZ"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }()
-    
-    // Backup formatter for alternative format (2025-03-31T06:20:09+00:00)
-    private static let backupDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }()
-    
-    // ISO8601 formatter as final fallback
-    private static let iso8601Formatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-}
-
 @MainActor
 final class NotificationsViewModel: ObservableObject {
-    @Published var notifications: [Notification] = []
+    @Published var notifications: [NotificationItem] = []
     @Published var unreadCount: Int = 0
     @Published var isLoading = false
     @Published var error: Error?
-    @Published var currentBannerNotification: Notification?
+    @Published var currentBannerNotification: NotificationItem?
     @Published var showBanner = false
     
     private var realtimeChannel: RealtimeChannel?
     private let supabaseDataController = SupabaseDataController.shared
     private var bannerWorkItem: DispatchWorkItem?
+    private var loadingTask: Task<Void, Never>?
+    private var lastLoadTime: Date = .distantPast
+    private let minimumLoadInterval: TimeInterval = 1.0 // Minimum time between loads
     
     init() {
         Task {
             await setupNotificationListener()
             await loadNotifications()
         }
+    }
+    
+    deinit {
+        realtimeChannel?.unsubscribe()
+        loadingTask?.cancel()
+        bannerWorkItem?.cancel()
     }
     
     private func setupNotificationListener() async {
@@ -104,13 +48,15 @@ final class NotificationsViewModel: ObservableObject {
             Task { @MainActor in
                 print("🔔 Received notification update: \(payload)")
                 
-                // Load notifications first
-                await self.loadNotifications()
-                
-                // Show banner for new notifications
-                if payload.event == "INSERT" {
-                    print("🔔 New notification inserted, showing banner...")
-                    await self.showLatestNotificationBanner()
+                // Only reload if enough time has passed since last load
+                let now = Date()
+                if now.timeIntervalSince(self.lastLoadTime) >= self.minimumLoadInterval {
+                    await self.loadNotifications()
+                    
+                    if payload.event == "INSERT" {
+                        print("🔔 New notification inserted, checking if should show banner...")
+                        await self.handleNewNotification(payload)
+                    }
                 }
             }
         }
@@ -123,32 +69,41 @@ final class NotificationsViewModel: ObservableObject {
         }
     }
     
-    private func showLatestNotificationBanner() async {
-        await MainActor.run {
-            // Show the new notification banner for the most recent unread notification
-            if let latestNotification = notifications.first(where: { !$0.is_read }) {
-                print("🔔 Showing banner for notification: \(latestNotification.message)")
-                
-                // Cancel any pending banner dismissal
-                bannerWorkItem?.cancel()
-                
-                // Show the new notification banner
-                currentBannerNotification = latestNotification
-                showBanner = true
-                
-                // Auto dismiss after 5 seconds
-                let workItem = DispatchWorkItem {
-                    self.dismissBanner()
-                }
-                bannerWorkItem = workItem
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+    private func handleNewNotification(_ payload: RealtimeMessage) async {
+        do {
+            let decoder = JSONDecoder()
+            if let data = try? JSONSerialization.data(withJSONObject: payload.payload["data"] ?? [:]),
+               let change = try? decoder.decode(DatabaseChange<NotificationItem>.self, from: data),
+               let notification = change.record,
+               notification.type.shouldShowBanner && !notification.is_read {
+                print("🔔 Showing banner for notification: \(notification.message)")
+                await showNotificationBanner(notification)
             }
+        } catch {
+            print("❌ Error handling new notification: \(error)")
+        }
+    }
+    
+    private func showNotificationBanner(_ notification: NotificationItem) async {
+        await MainActor.run {
+            bannerWorkItem?.cancel()
+            
+            currentBannerNotification = notification
+            withAnimation(.spring()) {
+                showBanner = true
+            }
+            
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.dismissBanner()
+            }
+            bannerWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
         }
     }
     
     func dismissBanner() {
         Task { @MainActor in
-            withAnimation(.easeOut(duration: 0.3)) {
+            withAnimation(.spring()) {
                 showBanner = false
                 currentBannerNotification = nil
             }
@@ -156,54 +111,85 @@ final class NotificationsViewModel: ObservableObject {
     }
     
     func loadNotifications() async {
-        isLoading = true
-        error = nil // Reset error state
+        // Cancel any existing loading task
+        loadingTask?.cancel()
         
-        do {
-            let response = try await supabaseDataController.supabase.database
-                .from("notifications")
-                .select()
-                .order("created_at", ascending: false)
-                .limit(50)
-                .execute()
+        // Create new loading task
+        loadingTask = Task { @MainActor in
+            guard !Task.isCancelled else { return }
             
-            print("Raw response data: \(String(data: response.data, encoding: .utf8) ?? "none")")
+            // Check if enough time has passed since last load
+            let now = Date()
+            guard now.timeIntervalSince(lastLoadTime) >= minimumLoadInterval else {
+                return
+            }
             
-            let decoder = JSONDecoder()
+            isLoading = true
+            error = nil
             
-            let fetchedNotifications = try decoder.decode([Notification].self, from: response.data)
-            
-            await MainActor.run {
+            do {
+                let response = try await supabaseDataController.supabase.database
+                    .from("notifications")
+                    .select()
+                    .order("created_at", ascending: false)
+                    .limit(50)
+                    .execute()
+                
+                guard !Task.isCancelled else { return }
+                
+                let decoder = JSONDecoder()
+                let fetchedNotifications = try decoder.decode([NotificationItem].self, from: response.data)
+                
                 self.notifications = fetchedNotifications
                 self.unreadCount = fetchedNotifications.filter { !$0.is_read }.count
                 self.isLoading = false
                 self.error = nil
-            }
-        } catch {
-            print("Error loading notifications: \(error)")
-            await MainActor.run {
+                self.lastLoadTime = now
+                
+                // Show banner for most recent unread notification that should show banner
+                if let latestBannerNotification = fetchedNotifications.first(where: { !$0.is_read && $0.type.shouldShowBanner }) {
+                    await self.showNotificationBanner(latestBannerNotification)
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                
+                print("❌ Error loading notifications: \(error)")
                 self.error = error
                 self.isLoading = false
                 self.notifications = []
                 self.unreadCount = 0
             }
         }
+        
+        // Wait for the loading task to complete
+        await loadingTask?.value
     }
     
-    func markAsRead(_ notificationId: UUID) async {
+    func markAsRead(_ notification: NotificationItem) async {
         do {
             try await supabaseDataController.supabase.database
                 .from("notifications")
                 .update(["is_read": true])
-                .eq("id", value: notificationId)
+                .eq("id", value: notification.id)
                 .execute()
             
             await loadNotifications()
         } catch {
-            print("Error marking notification as read: \(error)")
-            await MainActor.run {
-                self.error = error
-            }
+            print("❌ Failed to mark notification as read: \(error)")
+        }
+    }
+    
+    func deleteNotification(_ notification: NotificationItem) async {
+        do {
+            try await supabaseDataController.supabase.database
+                .from("notifications")
+                .delete()
+                .eq("id", value: notification.id)
+                .execute()
+            
+            await loadNotifications()
+        } catch {
+            print("❌ Failed to delete notification: \(error)")
         }
     }
     
@@ -217,31 +203,16 @@ final class NotificationsViewModel: ObservableObject {
             
             await loadNotifications()
         } catch {
-            print("Error marking all notifications as read: \(error)")
-            await MainActor.run {
-                self.error = error
-            }
+            print("❌ Failed to mark all notifications as read: \(error)")
         }
     }
-    
-    func deleteNotification(_ notificationId: UUID) async {
-        do {
-            try await supabaseDataController.supabase.database
-                .from("notifications")
-                .delete()
-                .eq("id", value: notificationId)
-                .execute()
-            
-            await loadNotifications()
-        } catch {
-            print("Error deleting notification: \(error)")
-            await MainActor.run {
-                self.error = error
-            }
-        }
-    }
-    
-    deinit {
-        realtimeChannel?.unsubscribe()
-    }
+}
+
+// Helper struct for decoding database changes
+private struct DatabaseChange<T: Codable>: Codable {
+    let schema: String
+    let table: String
+    let commit_timestamp: String
+    let type: String
+    let record: T?
 } 

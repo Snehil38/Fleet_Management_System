@@ -9,29 +9,6 @@ struct NotificationsView: View {
             ZStack {
                 if viewModel.isLoading && viewModel.notifications.isEmpty {
                     ProgressView()
-                } else if let error = viewModel.error {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 48))
-                            .foregroundColor(.red)
-                        Text("Error Loading Notifications")
-                            .font(.headline)
-                        Text(error.localizedDescription)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        Button("Try Again") {
-                            Task {
-                                await viewModel.loadNotifications()
-                            }
-                        }
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                    .padding()
                 } else if viewModel.notifications.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "bell.slash")
@@ -48,16 +25,7 @@ struct NotificationsView: View {
                         ForEach(viewModel.notifications) { notification in
                             NotificationCell(notification: notification) {
                                 Task {
-                                    await viewModel.markAsRead(notification.id)
-                                }
-                            }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    Task {
-                                        await viewModel.deleteNotification(notification.id)
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    await viewModel.markAsRead(notification)
                                 }
                             }
                         }
@@ -93,51 +61,19 @@ struct NotificationsView: View {
 }
 
 struct NotificationCell: View {
-    let notification: Notification
+    let notification: NotificationItem
     let onTap: () -> Void
-    
-    private var iconName: String {
-        switch notification.type {
-        case "chat_message":
-            return "message.fill"
-        case "emergency":
-            return "exclamationmark.triangle.fill"
-        case "maintenance":
-            return "wrench.fill"
-        default:
-            return "bell.fill"
-        }
-    }
-    
-    private var iconColor: Color {
-        switch notification.type {
-        case "chat_message":
-            return .blue
-        case "emergency":
-            return .red
-        case "maintenance":
-            return .orange
-        default:
-            return .gray
-        }
-    }
-    
-    private var timeAgo: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: notification.created_at, relativeTo: Date())
-    }
     
     var body: some View {
         Button(action: onTap) {
             HStack(alignment: .top, spacing: 12) {
                 // Icon
                 Circle()
-                    .fill(iconColor.opacity(0.1))
+                    .fill(notification.type.color.opacity(0.1))
                     .frame(width: 40, height: 40)
                     .overlay(
-                        Image(systemName: iconName)
-                            .foregroundColor(iconColor)
+                        Image(systemName: notification.type.iconName)
+                            .foregroundColor(notification.type.color)
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -146,7 +82,7 @@ struct NotificationCell: View {
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.leading)
                     
-                    Text(timeAgo)
+                    Text(notification.created_at, style: .relative)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
