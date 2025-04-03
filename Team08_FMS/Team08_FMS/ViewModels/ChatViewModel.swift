@@ -37,6 +37,7 @@ final class ChatViewModel: ObservableObject {
     private var realtimeChannel: RealtimeChannel?
     private var refreshTimer: Timer?
     private var hasLoadedMessages = false
+    private var lastMessageId: UUID?
     
     init(recipientId: UUID, recipientType: RecipientType) {
         self.recipientId = recipientId
@@ -47,7 +48,7 @@ final class ChatViewModel: ObservableObject {
             await loadMessages()
         }
         
-        // Only set up realtime listener and refresh timer
+        // Set up realtime listener and refresh timer
         Task { @MainActor in
             await setupMessageListener()
             updateUnreadCount()
@@ -63,11 +64,10 @@ final class ChatViewModel: ObservableObject {
         // Cancel existing timer if any
         refreshTimer?.invalidate()
         
-        // Create a new timer that refreshes every 30 seconds
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        // Create a new timer that refreshes every 5 seconds
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                await self?.loadMessages()
-                self?.updateUnreadCount()
+                await self?.fetchNewMessages()
             }
         }
     }
@@ -79,42 +79,31 @@ final class ChatViewModel: ObservableObject {
             realtimeChannel = nil
         }
         
-        do {
-            let channel = supabaseDataController.supabase.realtime
-                .channel("chat_messages")
+        let channel = supabaseDataController.supabase.realtime
+            .channel("chat_messages")
+        
+        // Set up the channel before subscribing
+        channel.on("postgres_changes", filter: .init(
+            event: "*",
+            schema: "public",
+            table: "chat_messages"
+        )) { [weak self] payload in
+            guard let self = self else { return }
             
-            // Set up the channel before subscribing
-            channel.on("postgres_changes", filter: .init(
-                event: "*",
-                schema: "public",
-                table: "chat_messages"
-            )) { [weak self] payload in
-                guard let self = self else { return }
-                
-                // Dispatch to main thread and refresh messages
-                DispatchQueue.main.async {
-                    Task { @MainActor in
-                        print("Realtime update received: \(payload)")
-                        await self.loadMessages()
-                        self.updateUnreadCount()
-                    }
-                }
+            Task { @MainActor in
+                await self.fetchNewMessages()
             }
-            
-            // Subscribe to the channel
-            channel.subscribe()
-            print("Successfully subscribed to realtime updates")
-            
-            // Store the channel reference
-            await MainActor.run {
-                self.realtimeChannel = channel
-            }
-            
         }
+        
+        // Subscribe to the channel
+        channel.subscribe()
+        print("Successfully subscribed to realtime updates")
+        
+        // Store the channel reference
+        self.realtimeChannel = channel
     }
     
     func loadMessages() async {
-        // If messages are already loaded, don't load again
         guard !hasLoadedMessages else { return }
         
         await MainActor.run {
@@ -126,6 +115,7 @@ final class ChatViewModel: ObservableObject {
                 print("No current user ID found")
                 return
             }
+            
             let userRole = supabaseDataController.userRole
             
             // Build the query based on user role and recipient type
@@ -135,51 +125,35 @@ final class ChatViewModel: ObservableObject {
             
             // Add the appropriate filters based on user role
             if userRole == "fleet_manager" {
-                // Fleet manager viewing messages: show messages where they are sender or recipient
                 query = query
                     .eq("recipient_type", value: recipientType.rawValue)
                     .or("and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString)),and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString))")
-            } else if userRole == "driver" {
-                // Driver viewing messages: show messages between them and fleet manager
+            } else {
                 query = query
-                    .eq("recipient_type", value: RecipientType.driver.rawValue)
-                    .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
-            } else if userRole == "maintenance" {
-                // Maintenance viewing messages: show messages between them and fleet manager
-                query = query
-                    .eq("recipient_type", value: RecipientType.maintenance.rawValue)
+                    .eq("recipient_type", value: recipientType.rawValue)
                     .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
             }
             
-            // Add ordering and execute
             let response = try await query
                 .order("created_at", ascending: true)
                 .execute()
             
             let decoder = JSONDecoder()
-            
-            // Create date formatters for both formats
-            let basicFormatter = DateFormatter()
-            basicFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-            basicFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            basicFormatter.locale = Locale(identifier: "en_US_POSIX")
-            
-            let fractionalFormatter = DateFormatter()
-            fractionalFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-            fractionalFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            fractionalFormatter.locale = Locale(identifier: "en_US_POSIX")
-            
             decoder.dateDecodingStrategy = .custom { decoder in
                 let container = try decoder.singleValueContainer()
                 let dateString = try container.decode(String.self)
                 
-                // Try parsing with fractional seconds first
-                if let date = fractionalFormatter.date(from: dateString) {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                
+                if let date = formatter.date(from: dateString) {
                     return date
                 }
                 
-                // If that fails, try without fractional seconds
-                if let date = basicFormatter.date(from: dateString) {
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                if let date = formatter.date(from: dateString) {
                     return date
                 }
                 
@@ -192,15 +166,13 @@ final class ChatViewModel: ObservableObject {
             var fetchedMessages = try decoder.decode([ChatMessage].self, from: response.data)
             
             // Update messages on main thread
-            let messages = fetchedMessages
             await MainActor.run {
                 // Update isFromCurrentUser for each message
-                for index in messages.indices {
-                    var message = messages[index]
+                for index in fetchedMessages.indices {
+                    var message = fetchedMessages[index]
                     if userRole == "fleet_manager" {
                         message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
                     } else {
-                        // For driver and maintenance, message is from current user if they are the sender (recipient_id is not them)
                         message.isFromCurrentUser = message.recipient_id.uuidString != currentUserId.uuidString
                     }
                     fetchedMessages[index] = message
@@ -213,7 +185,8 @@ final class ChatViewModel: ObservableObject {
                     }
                 }
                 
-                self.messages = messages
+                self.messages = fetchedMessages
+                self.lastMessageId = fetchedMessages.last?.id
                 self.isLoading = false
                 self.hasLoadedMessages = true
             }
@@ -224,6 +197,85 @@ final class ChatViewModel: ObservableObject {
                 self.error = error
                 self.isLoading = false
             }
+        }
+    }
+    
+    private func fetchNewMessages() async {
+        do {
+            guard let currentUserId = await supabaseDataController.getUserID() else { return }
+            
+            var query = supabaseDataController.supabase
+                .from("chat_messages")
+                .select()
+            
+            if let lastId = lastMessageId {
+                query = query.gt("id", value: lastId)
+            }
+            
+            let userRole = supabaseDataController.userRole
+            if userRole == "fleet_manager" {
+                query = query
+                    .eq("recipient_type", value: recipientType.rawValue)
+                    .or("and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString)),and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString))")
+            } else {
+                query = query
+                    .eq("recipient_type", value: recipientType.rawValue)
+                    .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
+            }
+            
+            let response = try await query
+                .order("created_at", ascending: true)
+                .execute()
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .custom { decoder in
+                let container = try decoder.singleValueContainer()
+                let dateString = try container.decode(String.self)
+                
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
+                
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
+                
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Cannot decode date string \(dateString)"
+                )
+            }
+            
+            if let newMessages = try? decoder.decode([ChatMessage].self, from: response.data) {
+                await MainActor.run {
+                    for var message in newMessages {
+                        if !self.messages.contains(where: { $0.id == message.id }) {
+                            if userRole == "fleet_manager" {
+                                message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
+                            } else {
+                                message.isFromCurrentUser = message.recipient_id.uuidString != currentUserId.uuidString
+                            }
+                            
+                            self.messages.append(message)
+                            self.lastMessageId = message.id
+                            
+                            if message.recipient_id.uuidString == currentUserId.uuidString && message.status == .sent {
+                                Task {
+                                    await self.markMessageAsRead(message.id)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch {
+            print("Error fetching new messages: \(error)")
         }
     }
     
@@ -415,12 +467,7 @@ final class ChatViewModel: ObservableObject {
     }
     
     deinit {
-        // Cleanup
         refreshTimer?.invalidate()
-        if let channel = realtimeChannel {
-            Task {
-                channel.unsubscribe()
-            }
-        }
+        realtimeChannel?.unsubscribe()
     }
 } 
