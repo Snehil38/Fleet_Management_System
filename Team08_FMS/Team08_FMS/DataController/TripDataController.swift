@@ -172,10 +172,10 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     }
     
     private func checkTripDuration() {
-        guard let startTime = tripStartTime,
-              let estimatedArrival = estimatedArrivalTime else { return }
-        
-        let currentTime = Date()
+//        guard let startTime = tripStartTime,
+//              let estimatedArrival = estimatedArrivalTime else { return }
+//        
+//        let currentTime = Date()
 //        let elapsedTime = currentTime.timeIntervalSince(startTime)
 //        let timeUntilEstimatedArrival = estimatedArrival.timeIntervalSince(currentTime)
         
