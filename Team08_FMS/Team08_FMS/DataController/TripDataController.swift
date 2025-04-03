@@ -423,6 +423,21 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         
         print("Distance from current location to source region: \(distanceToSource) meters")
         print("Distance from current location to destination region: \(distanceToDestination) meters")
+        
+        // --- New Code: Send driver location to Supabase ---
+        // Assumes you have a currentDriver (or a driverID) available. Adjust as needed.
+        if let driverId = currentTrip.driverId {
+            let driverLocation = SupabaseDriverLocation(
+                driverID: driverId,
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                isTripAssigned: true
+            )
+            
+            Task {
+                await SupabaseDataController.shared.updateDriverLocation(location: driverLocation)
+            }
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
@@ -1080,6 +1095,41 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
             }
             try await fetchTrips()
             print("Trips refreshed after starting trip")
+            
+            guard let currentTrip = currentTrip else {return}
+            
+            // Make sure to get the current location from your location manager
+            guard let currentLocation = locationManager.location else {
+                print("Current location is not available")
+                return
+            }
+            
+            if let driverId = currentTrip.driverId {
+                let newLocation = SupabaseDriverLocation(
+                    driverID: driverId,
+                    latitude: currentLocation.coordinate.latitude,
+                    longitude: currentLocation.coordinate.longitude,
+                    isTripAssigned: true
+                )
+                
+                Task {
+                    do {
+                        // Check if a driver location entry already exists
+                        let exists = try await SupabaseDataController.shared.doesDriverLocationExist(for: driverId)
+                        
+                        if exists {
+                            // Update the existing driver location entry
+                            await SupabaseDataController.shared.updateDriverLocation(location: newLocation)
+                        } else {
+                            // Insert a new driver location entry
+                            await SupabaseDataController.shared.insertDriverLocation(location: newLocation)
+                        }
+                    } catch {
+                        print("Error updating/inserting driver location: \(error.localizedDescription)")
+                    }
+                }
+            }
+
         } catch {
             print("Error starting trip: \(error)")
             throw TripError.updateError("Failed to start trip: \(error.localizedDescription)")

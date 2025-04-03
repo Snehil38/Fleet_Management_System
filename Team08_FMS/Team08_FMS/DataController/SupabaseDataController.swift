@@ -29,6 +29,13 @@ struct GeofenceEvents: Codable, Identifiable {
     }
 }
 
+struct SupabaseDriverLocation: Codable {
+    let driverID: UUID
+    let latitude: Double?
+    let longitude: Double?
+    let isTripAssigned: Bool
+}
+
 class SupabaseDataController: ObservableObject {
     static let shared = SupabaseDataController()
     
@@ -1932,5 +1939,92 @@ class SupabaseDataController: ObservableObject {
         let expenses = try decoder.decode([Expense].self, from: response.data)
         
         return expenses
+    }
+    
+    func fetchDriverLocation(userID: UUID) async throws -> SupabaseDriverLocation {
+        let response = try await supabase
+            .from("driver_location")
+            .select()
+            .execute()
+        
+        let location = try JSONDecoder().decode(SupabaseDriverLocation.self, from: response.data)
+        
+        return location
+    }
+    
+    func insertDriverLocation(location: SupabaseDriverLocation) async {
+        do {
+            let response = try await supabase
+                .from("driver_location")
+                .insert(location)
+                .execute()
+            print("Location added successfully")
+        } catch {
+            print("Error: \(error.localizedDescription)")
+        }
+    }
+    
+    func updateDriverLocation(location: SupabaseDriverLocation) async {
+        do {
+            let response = try await supabase
+                .from("driver_location")
+                .update(location)
+                .eq("driverID", value: location.driverID)
+                .execute()
+            print("Location updated successfully")
+        } catch {
+            print("Error: \(error.localizedDescription)")
+        }
+    }
+    
+    func updateDriverLocationStatus(driverID: UUID, isTripAssigned: Bool) async {
+        do {
+            let payload: [String: Bool] = ["isTripAssigned": isTripAssigned]
+            
+            let response = try await supabase
+                .from("driver_location")
+                .update([payload])
+                .eq("driverID", value: driverID)
+                .execute()
+            print("Location updated successfully")
+        } catch {
+            print("Error: \(error.localizedDescription)")
+        }
+    }
+    
+    func doesDriverLocationExist(for driverID: UUID) async throws -> Bool {
+        // Perform a select query with a filter for the provided driverID
+        let response = try await supabase
+            .from("driver_location")
+            .select()
+            .eq("driverID", value: driverID)
+            .execute()
+        
+        // Decode the response data into an array of SupabaseDriverLocation
+        let locations = try JSONDecoder().decode([SupabaseDriverLocation].self, from: response.data)
+        
+        // Return true if the array is not empty (i.e. an entry exists)
+        return !locations.isEmpty
+    }
+    
+    func subscribeToLocation(driverID: UUID) {
+        Task {
+            let myChannel = supabase.channel("db-changes")
+            let changes = myChannel.postgresChange(AnyAction.self, schema: "public", table: "driver_location")
+            await myChannel.subscribe()
+            for await change in changes {
+              switch change {
+              case .insert(let action):
+                  print(action)
+//                  try await fetchDriverLocation(userID: driverID)
+              case .update(let action):
+                  print(action)
+//                  try await fetchDriverLocation(userID: driverID)
+              case .delete(let action):
+                  print(action)
+//                  try await fetchDriverLocation(userID: driverID)
+              }
+            }
+        }
     }
 }
