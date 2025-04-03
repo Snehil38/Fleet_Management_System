@@ -267,9 +267,11 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
         // Check if enough time has passed since last load
         let now = Date()
         guard now.timeIntervalSince(lastLoadTime) >= minimumLoadInterval else {
+            print("⏱️ Skipping notification load - too soon since last load")
             return
         }
         
+        print("📥 Starting notification load")
         self.isLoading = true
         self.error = nil
         
@@ -277,6 +279,8 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
             let response = try await supabaseDataController.supabase.database
                 .from("notifications")
                 .select()
+                .not("message", operator: .like, value: "%Trip duration exceeded%")
+                .not("message", operator: .like, value: "%Estimated arrival time reached%")
                 .order("created_at", ascending: false)
                 .limit(50)
                 .execute()
@@ -286,6 +290,7 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
             let decoder = JSONDecoder()
             let fetchedNotifications = try decoder.decode([NotificationItem].self, from: response.data)
             
+            print("📋 Loaded \(fetchedNotifications.count) notifications")
             self.notifications = fetchedNotifications
             self.unreadCount = fetchedNotifications.filter { !$0.is_read }.count
             
@@ -295,11 +300,6 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
             self.isLoading = false
             self.error = nil
             self.lastLoadTime = now
-            
-            // Show notification for any unread notifications
-            for notification in fetchedNotifications where !notification.is_read {
-                await self.showNotification(notification)
-            }
         } catch {
             guard !Task.isCancelled else { return }
             

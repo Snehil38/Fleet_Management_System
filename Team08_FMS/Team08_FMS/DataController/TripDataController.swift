@@ -179,20 +179,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         let elapsedTime = currentTime.timeIntervalSince(startTime)
         let timeUntilEstimatedArrival = estimatedArrival.timeIntervalSince(currentTime)
         
-        // If trip has exceeded max duration
-        if elapsedTime > maxTripDuration {
-            // Trip duration exceeded logic here if needed
-        }
-        
-        // If approaching estimated arrival time (within 15 minutes)
-        if timeUntilEstimatedArrival <= 900 && timeUntilEstimatedArrival > 0 {
-            // Approaching destination logic here if needed
-        }
-        
-        // If past estimated arrival time
-        if timeUntilEstimatedArrival <= 0 {
-            // Past arrival time logic here if needed
-        }
+        // Removed all notification logic for trip duration and estimated arrival
+        // Only keep track of the times for internal use if needed
     }
     
     private func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {

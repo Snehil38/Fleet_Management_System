@@ -282,5 +282,128 @@ final class NotificationsViewModel: ObservableObject {
         }
     }
     
-    // ... rest of the existing code ...
+    private func setupNotificationListener() async {
+        realtimeChannel?.unsubscribe()
+        
+        let channel = supabaseDataController.supabase.realtime
+            .channel("notifications")
+        
+        channel.on("postgres_changes", filter: .init(
+            event: "*",
+            schema: "public",
+            table: "notifications"
+        )) { [weak self] payload in
+            guard let self = self else { return }
+            
+            Task { @MainActor in
+                print("🔄 Realtime notification update received")
+                print("🔄 Payload event type: \(payload.event)")
+                
+                if payload.event == "INSERT" {
+                    print("🆕 New notification insert detected")
+                    if let data = try? JSONSerialization.data(withJSONObject: payload.payload["data"] ?? [:]),
+                       let change = try? JSONDecoder().decode(DatabaseChange<NotificationItem>.self, from: data),
+                       let notification = change.record {
+                        print("📨 Processing new notification: \(notification.id)")
+                        // Only show notification, don't reload full list to prevent duplicates
+                        await self.showNotification(notification)
+                        // Don't call loadNotifications() here as it will be triggered by the UI refresh
+                    }
+                }
+                // Remove the else block that was reloading notifications
+            }
+        }
+        
+        print("🔔 Subscribing to notifications channel...")
+        channel.subscribe()
+        self.realtimeChannel = channel
+    }
+
+    func loadNotifications() async {
+        guard !Task.isCancelled else { return }
+        
+        // Check if enough time has passed since last load
+        let now = Date()
+        guard now.timeIntervalSince(lastLoadTime) >= minimumLoadInterval else {
+            print("⏱️ Skipping notification load - too soon since last load")
+            return
+        }
+        
+        print("📥 Starting notification load")
+        self.isLoading = true
+        self.error = nil
+        
+        do {
+            let response = try await supabaseDataController.supabase.database
+                .from("notifications")
+                .select()
+                .order("created_at", ascending: false)
+                .limit(50)
+                .execute()
+            
+            guard !Task.isCancelled else { return }
+            
+            let decoder = JSONDecoder()
+            let fetchedNotifications = try decoder.decode([NotificationItem].self, from: response.data)
+            
+            print("📋 Loaded \(fetchedNotifications.count) notifications")
+            self.notifications = fetchedNotifications
+            self.unreadCount = fetchedNotifications.filter { !$0.is_read }.count
+            
+            // Update app badge
+            try await UNUserNotificationCenter.current().setBadgeCount(self.unreadCount)
+            
+            self.isLoading = false
+            self.error = nil
+            self.lastLoadTime = now
+            
+            // Remove this section to prevent duplicate notifications
+            // Notifications will be shown through the realtime listener instead
+            // for notification in fetchedNotifications where !notification.is_read {
+            //     await self.showNotification(notification)
+            // }
+        } catch {
+            guard !Task.isCancelled else { return }
+            
+            print("❌ Error loading notifications: \(error)")
+            self.error = error
+            self.isLoading = false
+            self.notifications = []
+            self.unreadCount = 0
+        }
+    }
+
+    private func showNotification(_ notification: NotificationItem) async {
+        // Add tracking of shown notifications to prevent duplicates
+        if UserDefaults.standard.bool(forKey: "notification_shown_\(notification.id.uuidString)") {
+            print("🚫 Notification \(notification.id) already shown, skipping")
+            return
+        }
+        
+        // Skip trip duration and estimated arrival notifications
+        if notification.message.contains("Trip duration exceeded") ||
+           notification.message.contains("Estimated arrival time reached") {
+            print("⏭️ Skipping filtered notification type")
+            return
+        }
+        
+        print("🔔 Preparing to show notification: \(notification.id)")
+// ... rest of existing showNotification code ...
+
+        do {
+            try await center.add(request)
+            print("✅ Notification scheduled successfully: \(notification.id)")
+            
+            // Mark this notification as shown
+            UserDefaults.standard.set(true, forKey: "notification_shown_\(notification.id.uuidString)")
+            
+            // Verify the notification was added
+            let updatedPendingRequests = await center.pendingNotificationRequests()
+            if updatedPendingRequests.contains(where: { $0.identifier == notification.id.uuidString }) {
+                print("✅ Notification verified in pending requests")
+            } else {
+                print("⚠️ Notification not found in pending requests after scheduling")
+            }
+// ... rest of existing code ...
+    }
 }
