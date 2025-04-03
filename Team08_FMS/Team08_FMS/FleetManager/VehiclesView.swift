@@ -447,9 +447,6 @@ struct VehiclesView: View {
                 }
                 .padding(.vertical)
             }
-            .refreshable {
-                await refreshVehicles()
-            }
             .onAppear {
                 if vehicleManager.vehicles.isEmpty {
                     vehicleManager.loadVehicles()
