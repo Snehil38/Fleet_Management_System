@@ -218,6 +218,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         Task {
             await dataStore.updateServiceRequestStatus(request, newStatus: .completed, userID: nil)
             await dataStore.addToServiceHistory(from: request)
+            await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: request.vehicleId)
         }
         alertMessage = "Service request marked as completed"
         showingAlert = true

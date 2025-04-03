@@ -271,7 +271,7 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
         self.error = nil
         
         do {
-            let response = try await supabaseDataController.supabase.database
+            let response = try await supabaseDataController.supabase
                 .from("notifications")
                 .select()
                 .order("created_at", ascending: false)
@@ -310,7 +310,7 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
     
     func markAsRead(_ notification: NotificationItem) async {
         do {
-            try await self.supabaseDataController.supabase.database
+            try await self.supabaseDataController.supabase
                 .from("notifications")
                 .update(["is_read": true])
                 .eq("id", value: notification.id)
@@ -324,7 +324,7 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
     
     func deleteNotification(_ notification: NotificationItem) async {
         do {
-            try await self.supabaseDataController.supabase.database
+            try await self.supabaseDataController.supabase
                 .from("notifications")
                 .delete()
                 .eq("id", value: notification.id)
@@ -338,7 +338,7 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
     
     func markAllAsRead() async {
         do {
-            try await self.supabaseDataController.supabase.database
+            try await self.supabaseDataController.supabase
                 .from("notifications")
                 .update(["is_read": true])
                 .eq("is_read", value: false)

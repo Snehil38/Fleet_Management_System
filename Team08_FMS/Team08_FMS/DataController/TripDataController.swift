@@ -176,8 +176,8 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
               let estimatedArrival = estimatedArrivalTime else { return }
         
         let currentTime = Date()
-        let elapsedTime = currentTime.timeIntervalSince(startTime)
-        let timeUntilEstimatedArrival = estimatedArrival.timeIntervalSince(currentTime)
+//        let elapsedTime = currentTime.timeIntervalSince(startTime)
+//        let timeUntilEstimatedArrival = estimatedArrival.timeIntervalSince(currentTime)
         
         // If trip has exceeded max duration
 //        if elapsedTime > maxTripDuration {

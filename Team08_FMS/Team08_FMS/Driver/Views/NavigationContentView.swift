@@ -1224,7 +1224,7 @@ struct NavigationControls: View {
                                 .foregroundColor(.red)
                         }
                         
-                        Text("End")
+                        Text("Cancel")
                             .font(.caption)
                             .foregroundColor(.red)
                     }
