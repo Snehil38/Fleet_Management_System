@@ -218,7 +218,6 @@ struct ExpensesCard: View {
     }
 }
 
-
 struct ExpenseRow: View {
     let expense: Expense
     
