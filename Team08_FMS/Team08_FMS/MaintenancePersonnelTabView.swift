@@ -112,6 +112,7 @@ struct RServiceRequestCard: View {
             HStack {
                 Text(request.vehicleName)
                     .font(.headline)
+                    .foregroundColor(.primary)
                 Spacer()
                 Text(request.priority)
                     .font(.subheadline)
@@ -123,10 +124,12 @@ struct RServiceRequestCard: View {
             
             Text(request.description)
                 .font(.subheadline)
+                .foregroundColor(.secondary)
             
             HStack {
                 Text("Vehicle ID: \(request.vehicleId)")
                     .font(.caption)
+                    .foregroundColor(.secondary)
                 Spacer()
                 Text(request.status)
                     .font(.caption)
@@ -151,9 +154,10 @@ struct RServiceRequestCard: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
-        .padding(.horizontal)
+        .frame(maxWidth: .infinity)
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         .sheet(isPresented: $showingContact) {
             ContactView()
         }

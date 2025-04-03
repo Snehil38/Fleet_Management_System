@@ -1175,7 +1175,7 @@ struct NavigationControls: View {
                     .foregroundColor(.blue)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.white)
+                    .background(Color(.tertiarySystemBackground))
                     .cornerRadius(16)
                     .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
                 }
@@ -1233,7 +1233,7 @@ struct NavigationControls: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(.systemBackground))
+        .background(Color(.tertiarySystemBackground))
         .cornerRadius(15)
         .shadow(radius: 5)
         .padding(.horizontal, 8)

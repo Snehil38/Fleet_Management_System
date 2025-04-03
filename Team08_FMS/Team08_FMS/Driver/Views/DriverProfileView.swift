@@ -23,7 +23,7 @@ struct DriverProfileView: View {
                             logoutButton
                         }
                         .padding()
-                        .background(Color(.systemGroupedBackground))
+                        .background(Color(.systemBackground))
                     }
                 } else {
                     ProgressView("Loading...")
@@ -119,7 +119,7 @@ struct DriverProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -142,7 +142,7 @@ struct DriverProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -159,7 +159,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Email", value: driver.email)
             }
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -195,7 +195,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Expiry Date", value: driver.driverLicenseExpiry != nil ? formattedDate(driver.driverLicenseExpiry!) : "N/A")
             }
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -213,7 +213,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Salary", value: "$\(driver.salary)")
             }
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -230,7 +230,7 @@ struct DriverProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
@@ -250,7 +250,7 @@ struct DriverProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
         }
         .padding(.top, 20)

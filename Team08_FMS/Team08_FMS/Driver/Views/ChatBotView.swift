@@ -197,7 +197,7 @@ struct ChatBotView: View {
                 }
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(.tertiarySystemBackground))
             
             // Chat Messages
             ScrollView {

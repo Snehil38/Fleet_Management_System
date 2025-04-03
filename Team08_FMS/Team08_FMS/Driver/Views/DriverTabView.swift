@@ -130,7 +130,7 @@ struct DriverTabView: View {
                                                     }
                                                 }
                                             }
-                                            .background(Color(.systemBackground))
+                                            .background(Color(.secondarySystemBackground))
                                             .cornerRadius(20)
                                             .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                                             .padding(.horizontal)
@@ -187,7 +187,7 @@ struct DriverTabView: View {
                                                 showingDeliveryDetails = true
                                             }
                                         }
-                                        .background(Color(.systemBackground))
+                                        .background(Color(.secondarySystemBackground))
                                         .cornerRadius(20)
                                         .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                                         .padding(.horizontal)
@@ -336,7 +336,7 @@ struct DriverTabView: View {
             currentDeliveryContent(trip)
         }
         .padding(16)
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
         .padding(.horizontal)
@@ -444,7 +444,7 @@ struct DriverTabView: View {
                 }
             }
             .padding(16)
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
             .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
             
@@ -1170,7 +1170,7 @@ struct UpcomingTripRow: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .onTapGesture {

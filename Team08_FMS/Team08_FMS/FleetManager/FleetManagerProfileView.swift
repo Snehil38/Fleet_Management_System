@@ -66,7 +66,7 @@ struct FleetManagerProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -85,7 +85,7 @@ struct FleetManagerProfileView: View {
                 Divider()
                 infoRow(title: "ID", value: fm.id.uuidString.prefix(6) + "...")
             }
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -103,7 +103,7 @@ struct FleetManagerProfileView: View {
                 Divider()
                 infoRow(title: "Phone", value: "\(fm.phoneNumber)")
             }
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -124,7 +124,7 @@ struct FleetManagerProfileView: View {
                 Divider()
                 infoRow(title: "Working Hours", value: "9:00 AM - 5:00 PM")
             }
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -142,7 +142,7 @@ struct FleetManagerProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
@@ -162,7 +162,7 @@ struct FleetManagerProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .cornerRadius(20)
         }
         .padding(.top, 20)

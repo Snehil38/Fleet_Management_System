@@ -76,6 +76,9 @@ struct SOSButton: View {
                             }
                         }
                     }
+                    .padding()
+                    .background(Color(.systemSecondaryBackground))
+                    .cornerRadius(12)
                     
                     // CONTACT DETAILS Section
                     VStack(alignment: .leading, spacing: 16) {
@@ -98,6 +101,9 @@ struct SOSButton: View {
                                 .foregroundColor(.gray)
                         }
                     }
+                    .padding()
+                    .background(Color(.systemSecondaryBackground))
+                    .cornerRadius(12)
                     
                     // MESSAGE Section
                     VStack(alignment: .leading, spacing: 16) {
@@ -111,6 +117,9 @@ struct SOSButton: View {
                             .background(Color(.systemGray6))
                             .cornerRadius(10)
                     }
+                    .padding()
+                    .background(Color(.systemSecondaryBackground))
+                    .cornerRadius(12)
                     
                     // Send Message Button
                     Button(action: {

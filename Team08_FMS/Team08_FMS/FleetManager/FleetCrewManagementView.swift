@@ -266,7 +266,7 @@ struct CrewCardView: View {
                 }
                 .padding()
             }
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         }
@@ -447,6 +447,7 @@ struct StatusCard: View {
             Text("\(count)")
                 .font(.title)
                 .fontWeight(.bold)
+                .foregroundColor(.primary)
 
             Text(title)
                 .font(.system(.subheadline, design: .default))
@@ -459,7 +460,7 @@ struct StatusCard: View {
         }
         .padding()
         .frame(width: 110, height: 100)
-        .background(isSelected ? color.opacity(0.1) : Color(UIColor.systemBackground))
+        .background(isSelected ? color.opacity(0.1) : Color(.secondarySystemBackground))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
