@@ -188,7 +188,7 @@ struct CrewProfileView: View {
                             TextField("License Number", text: $editedLicense)
                                 .onChange(of: editedLicense) { _, _ in licenseEdited = true }
                             if licenseEdited && !isLicenseValid {
-                                Text("License number cannot be empty.")
+                                Text("License number format is invalid. Please use the format: AA 00 0000 0000000")
                                     .font(.caption)
                                     .foregroundColor(.red)
                             }
