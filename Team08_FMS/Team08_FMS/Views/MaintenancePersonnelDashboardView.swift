@@ -6,6 +6,7 @@ struct MaintenancePersonnelDashboardView: View {
     @State private var selectedPriority: ServiceRequestPriority?
     @State private var showingProfile = false
     @State private var showingChat = false
+    @State private var userID: UUID?
     
     var body: some View {
         NavigationView {
@@ -101,12 +102,15 @@ struct MaintenancePersonnelDashboardView: View {
                 await dataStore.loadData()
             }
         }
+        .task {
+            self.userID = await SupabaseDataController.shared.getUserID()
+        }
     }
     
     private var filteredRequests: [MaintenanceServiceRequest] {
         var filtered = dataStore.serviceRequests.filter { $0.status == selectedStatus }
         if let priority = selectedPriority {
-            filtered = filtered.filter { $0.priority == priority }
+            filtered = filtered.filter { $0.priority == priority && ($0.personnelID == nil || $0.personnelID == userID!) }
         }
         return filtered
     }
