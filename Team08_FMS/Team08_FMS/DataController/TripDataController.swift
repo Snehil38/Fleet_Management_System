@@ -40,7 +40,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published var allTrips: [Trip] = []
     
     private var locationManager = CLLocationManager()
-    private let geofenceRadius: CLLocationDistance = 50.0 // 100 meters
+    private let geofenceRadius: CLLocationDistance = 100.0 // 100 meters
     private var driverId: UUID?
     private var tripTimer: Timer?
     private let maxTripDuration: TimeInterval = 3600 // 1 hour in seconds
@@ -359,10 +359,20 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
     
-//    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-//        guard let location = locations.last else { return }
-//        // Handle location updates if needed
-//    }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last, let currentTrip = currentTrip else { return }
+        
+        let sourceLocation = CLLocation(latitude: currentTrip.sourceCoordinate.latitude,
+                                        longitude: currentTrip.sourceCoordinate.longitude)
+        let destinationLocation = CLLocation(latitude: currentTrip.destinationCoordinate.latitude,
+                                             longitude: currentTrip.destinationCoordinate.longitude)
+        
+        let distanceToSource = location.distance(from: sourceLocation)
+        let distanceToDestination = location.distance(from: destinationLocation)
+        
+        print("Distance from current location to source region: \(distanceToSource) meters")
+        print("Distance from current location to destination region: \(distanceToDestination) meters")
+    }
     
     func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
         print("DEBUG: Successfully started monitoring region: \(region.identifier)")
