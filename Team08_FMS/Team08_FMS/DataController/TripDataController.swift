@@ -743,7 +743,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                         status,
                         lastMaintenanceDistance,
                         totalDistance
-                    )
+                    ),middle_pickup,middle_pickup_latitude,middle_pickup_longitude
                 """)
                 .eq("is_deleted", value: false)
 

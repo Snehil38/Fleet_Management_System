@@ -1414,9 +1414,9 @@ class SupabaseDataController: ObservableObject {
             // Update the trip with mid-point information
             try await databaseFrom("trips")
                 .update([
-                    "midPoint": Double(midPoint) ?? 0.0,
-                    "midPointLat": midPointLatitude,
-                    "midPointLong": midPointLongitude,
+                    "middle_pickup": Double(midPoint) ?? 0.0,
+                    "middle_pickup_latitude": midPointLatitude,
+                    "middle_pickup_longitude": midPointLongitude,
 //                    "updated_at": Date()
                 ])
                 .eq("id", value: tripId)

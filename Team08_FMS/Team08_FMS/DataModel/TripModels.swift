@@ -104,9 +104,9 @@ struct Trip: Identifiable, Equatable {
     let startingPoint: String
     let pickup: String?
     let driverId: UUID?
-    let midPoint: String?
-    let midPointLatitude: Double?
-    let midPointLongitude: Double?
+    let middle_Pickup: String?
+    let middle_pickup_latitude: Double?
+    let middle_pickup_longitude: Double?
     
     // Computed property for display purposes
     var displayName: String {
@@ -165,9 +165,9 @@ struct Trip: Identifiable, Equatable {
         self.pickup = supabaseTrip.pickup
 //        self.estimatedDistance = supabaseTrip.estimated_distance
 //        self.estimatedTime = supabaseTrip.estimated_time
-        self.midPoint = supabaseTrip.midPoint
-        self.midPointLatitude = supabaseTrip.midPointLat
-        self.midPointLongitude = supabaseTrip.midPointLong
+        self.middle_Pickup = supabaseTrip.midPoint
+        self.middle_pickup_latitude = supabaseTrip.midPointLat
+        self.middle_pickup_longitude = supabaseTrip.midPointLong
         self.vehicleDetails = vehicle!
         
         // Initialize display-related properties
