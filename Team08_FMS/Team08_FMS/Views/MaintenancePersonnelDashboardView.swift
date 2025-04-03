@@ -108,11 +108,23 @@ struct MaintenancePersonnelDashboardView: View {
     }
     
     private var filteredRequests: [MaintenanceServiceRequest] {
-        var filtered = dataStore.serviceRequests.filter { $0.status == selectedStatus }
-        if let priority = selectedPriority {
-            filtered = filtered.filter { $0.priority == priority && ($0.personnelID == nil || $0.personnelID == userID!) }
+        dataStore.serviceRequests.filter { request in
+            // Always filter by status.
+            guard request.status == selectedStatus else { return false }
+            
+            // If a priority is selected, filter by it.
+            if let priority = selectedPriority, request.priority != priority {
+                return false
+            }
+            
+            // If there's a valid userID, only allow requests with no assigned personnel or those matching the user.
+            if let currentUserID = userID {
+                return request.personnelID == nil || request.personnelID == currentUserID
+            }
+            
+            // If userID is nil, do not filter on personnel.
+            return true
         }
-        return filtered
     }
 }
 
