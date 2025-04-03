@@ -201,10 +201,10 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
         
         // If past estimated arrival time
         if timeUntilEstimatedArrival <= 0 {
-            sendNotification(
-                title: "Estimated Arrival Time Reached",
-                body: "Vehicle should have reached the destination by now. Please verify location."
-            )
+//            sendNotification(
+//                title: "Estimated Arrival Time Reached",
+//                body: "Vehicle should have reached the destination by now. Please verify location."
+//            )
             // Notify fleet manager through Supabase
 //            Task {
 //                await notifyFleetManager(message: "Estimated arrival time reached for trip \(currentTrip?.id.uuidString ?? "Unknown")")
