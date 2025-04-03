@@ -104,7 +104,7 @@ struct MaintenancePersonnelProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -141,7 +141,7 @@ struct MaintenancePersonnelProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -175,7 +175,7 @@ struct MaintenancePersonnelProfileView: View {
                 infoRow(title: "Experience", value: "\(personnel.yearsOfExperience) Years")
                 Divider()
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -192,7 +192,7 @@ struct MaintenancePersonnelProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
@@ -212,7 +212,7 @@ struct MaintenancePersonnelProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
         }
         .padding(.top, 20)

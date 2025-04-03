@@ -203,6 +203,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         Task {
             if let userID = await SupabaseDataController.shared.getUserID() {
                 await dataStore.updateServiceRequestStatus(request, newStatus: .inProgress, userID: userID)
+                await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: .busy, userID: userID, id: nil)
             } else {
                 print("No userID found to assign the service request.")
             }
@@ -218,7 +219,13 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         Task {
             await dataStore.updateServiceRequestStatus(request, newStatus: .completed, userID: nil)
             await dataStore.addToServiceHistory(from: request)
-            await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: request.vehicleId)
+            if request.serviceType != .routine {
+                await SupabaseDataController.shared.updateVehicleStatus(newStatus: .inService, vehicleID: request.vehicleId)
+            } else {
+                await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: request.vehicleId)
+            }
+            guard let userID = await SupabaseDataController.shared.getUserID() else { return }
+            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
         }
         alertMessage = "Service request marked as completed"
         showingAlert = true

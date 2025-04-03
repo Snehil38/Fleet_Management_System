@@ -119,7 +119,7 @@ struct DriverProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -142,7 +142,7 @@ struct DriverProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -159,7 +159,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Email", value: driver.email)
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -195,7 +195,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Expiry Date", value: driver.driverLicenseExpiry != nil ? formattedDate(driver.driverLicenseExpiry!) : "N/A")
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -213,7 +213,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Salary", value: "$\(driver.salary)")
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -230,7 +230,7 @@ struct DriverProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
@@ -250,7 +250,7 @@ struct DriverProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
         }
         .padding(.top, 20)
