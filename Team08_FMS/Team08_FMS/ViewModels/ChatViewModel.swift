@@ -199,6 +199,7 @@ final class ChatViewModel: ObservableObject {
                     var query = supabaseDataController.supabase
                         .from("chat_messages")
                         .select()
+                        .eq("is_deleted", value: false) // Only get non-deleted messages
                     
                     // Add the appropriate filters based on user role
                     if userRole == "fleet_manager" {

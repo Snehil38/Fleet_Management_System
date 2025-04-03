@@ -232,11 +232,14 @@ struct ChatBubbleView: View {
             Button("Delete", role: .destructive) {
                 Task {
                     do {
+                        // Delete the message from Supabase
                         try await supabaseController.supabase.database
                             .from("chat_messages")
-                            .update(["is_deleted": true])
+                            .delete()
                             .eq("id", value: message.id)
                             .execute()
+                        
+                        print("Message deleted successfully")
                         onDelete()
                     } catch {
                         print("Error deleting message: \(error)")
@@ -245,7 +248,7 @@ struct ChatBubbleView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to delete this message?")
+            Text("Are you sure you want to delete this message? This action cannot be undone.")
         }
         .onAppear {
             withAnimation(ChatBubbleAnimation.messageAppearance) {

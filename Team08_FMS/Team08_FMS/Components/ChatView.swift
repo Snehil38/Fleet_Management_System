@@ -96,8 +96,12 @@ struct ChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(viewModel.messages) { message in
-                            ChatBubbleView(message: message)
-                                .id(message.id)
+                            ChatBubbleView(message: message) {
+                                Task {
+                                    await viewModel.loadMessages()
+                                }
+                            }
+                            .id(message.id)
                         }
                     }
                     .padding(.vertical)
