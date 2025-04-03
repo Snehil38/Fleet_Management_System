@@ -128,9 +128,12 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
     }
     
     private func showNotification(_ notification: NotificationItem) async {
+        print("🔔 Starting to process notification: \(notification.id)")
+        
         // Skip trip duration and estimated arrival notifications
         if notification.message.contains("Trip duration exceeded") ||
            notification.message.contains("Estimated arrival time reached") {
+            print("⏭️ Skipping filtered notification type")
             return
         }
         
@@ -153,6 +156,7 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
         // Format the title and body based on the message content
         if notification.message.contains("Trip Details:") {
             content.title = "New Trip Assignment"
+            print("📝 Formatting trip details notification")
             
             // Extract and format the trip details
             let details = notification.message
@@ -179,10 +183,12 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
             }
             
             content.body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            print("📝 Formatted notification body: \(content.body)")
         } else {
             // For regular messages
             content.title = "New Message"
             content.body = notification.message.replacingOccurrences(of: "New message from driver: ", with: "")
+            print("📝 Regular notification body: \(content.body)")
         }
         
         content.sound = .default
@@ -194,24 +200,20 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
             "type": notification.type.rawValue
         ]
         
-        // Add a thread identifier to group related notifications
         content.threadIdentifier = notification.type.rawValue
-        
-        // Add notification category for actionable notifications
         content.categoryIdentifier = "NOTIFICATION_CATEGORY"
         
         let request = UNNotificationRequest(
             identifier: notification.id.uuidString,
             content: content,
-            trigger: nil // Deliver immediately
+            trigger: nil
         )
         
         do {
-            // Check if this notification has already been scheduled
+            print("📋 Checking existing notifications...")
             let pendingRequests = await center.pendingNotificationRequests()
             let deliveredNotifications = await center.deliveredNotifications()
             
-            print("📋 Current notification status:")
             print("  - Pending notifications: \(pendingRequests.count)")
             print("  - Delivered notifications: \(deliveredNotifications.count)")
             
@@ -224,13 +226,8 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
             try await center.add(request)
             print("✅ Notification scheduled successfully")
             
-            // Verify the notification was added
-            let updatedPendingRequests = await center.pendingNotificationRequests()
-            if updatedPendingRequests.contains(where: { $0.identifier == notification.id.uuidString }) {
-                print("✅ Notification verified in pending requests")
-            } else {
-                print("⚠️ Notification not found in pending requests after scheduling")
-            }
+            // Show banner in-app as well
+            await showNotificationBanner(notification)
             
         } catch {
             print("❌ Error showing notification: \(error)")
@@ -276,38 +273,75 @@ final class NotificationsViewModel: NSObject, ObservableObject, UNUserNotificati
         self.error = nil
         
         do {
+            print("🔍 Fetching notifications from database...")
             let response = try await supabaseDataController.supabase.database
                 .from("notifications")
                 .select()
-                .not("message", operator: .like, value: "%Trip duration exceeded%")
-                .not("message", operator: .like, value: "%Estimated arrival time reached%")
                 .order("created_at", ascending: false)
                 .limit(50)
                 .execute()
             
             guard !Task.isCancelled else { return }
             
+            print("🔄 Processing response data...")
             let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            // Print raw response data for debugging
+            if let jsonString = String(data: response.data, encoding: .utf8) {
+                print("📦 Raw response data: \(jsonString)")
+            }
+            
             let fetchedNotifications = try decoder.decode([NotificationItem].self, from: response.data)
             
             print("📋 Loaded \(fetchedNotifications.count) notifications")
-            self.notifications = fetchedNotifications
-            self.unreadCount = fetchedNotifications.filter { !$0.is_read }.count
+            
+            // Filter out unwanted notifications in memory
+            let filteredNotifications = fetchedNotifications.filter { notification in
+                !notification.message.contains("Trip duration exceeded") &&
+                !notification.message.contains("Estimated arrival time reached")
+            }
+            
+            print("🎯 Filtered to \(filteredNotifications.count) relevant notifications")
+            
+            await MainActor.run {
+                self.notifications = filteredNotifications
+                self.unreadCount = filteredNotifications.filter { !$0.is_read }.count
+                print("📬 Unread count: \(self.unreadCount)")
+            }
             
             // Update app badge
             try await UNUserNotificationCenter.current().setBadgeCount(self.unreadCount)
             
+            // Show unread notifications
+            for notification in filteredNotifications where !notification.is_read {
+                print("🔔 Processing unread notification: \(notification.id)")
+                await self.showNotification(notification)
+            }
+            
             self.isLoading = false
             self.error = nil
             self.lastLoadTime = now
+            
         } catch {
             guard !Task.isCancelled else { return }
             
             print("❌ Error loading notifications: \(error)")
-            self.error = error
-            self.isLoading = false
-            self.notifications = []
-            self.unreadCount = 0
+            print("Error details: \(error.localizedDescription)")
+            
+            // Log detailed error information
+            if let nsError = error as? NSError {
+                print("Error domain: \(nsError.domain)")
+                print("Error code: \(nsError.code)")
+                print("Error user info: \(nsError.userInfo)")
+            }
+            
+            await MainActor.run {
+                self.error = error
+                self.isLoading = false
+                self.notifications = []
+                self.unreadCount = 0
+            }
         }
     }
     
