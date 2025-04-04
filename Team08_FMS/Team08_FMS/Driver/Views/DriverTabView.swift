@@ -1542,8 +1542,6 @@ struct SOSModalView: View {
     @State private var showingChat = false
     @State private var selectedOption: SOSOption = .emergency
     
-
-    
     enum SOSOption {
         case emergency
         case chat

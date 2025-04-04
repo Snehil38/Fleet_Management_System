@@ -389,7 +389,7 @@ class TripDataController: NSObject, ObservableObject, CLLocationManagerDelegate 
                     case "destinationRegion":
                         isInDestinationRegion = true
                         print("DEBUG: Entered destination region")
-                        let message = "Vehicle: \(currentTrip.vehicleDetails.name) is i the destination region"
+                        let message = "Vehicle: \(currentTrip.vehicleDetails.name) is in the destination region"
                         let event = GeofenceEvents(id: UUID(), tripId: currentTrip.id, message: message)
                         supabaseController.insertIntoGeofenceEvents(event: event)
                         tripTimer?.invalidate()

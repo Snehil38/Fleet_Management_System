@@ -272,10 +272,12 @@ struct CrewCardView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .contextMenu {
-            Button(role: .destructive) {
-                showingDeleteAlert = true
-            } label: {
-                Label("Delete Crew Member", systemImage: "trash")
+            if currentCrew.status != .busy {
+                Button(role: .destructive) {
+                    showingDeleteAlert = true
+                } label: {
+                    Label("Delete Crew Member", systemImage: "trash")
+                }
             }
             
             if currentCrew is Driver {
