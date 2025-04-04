@@ -987,6 +987,10 @@ struct DriverTabView: View {
                     // Then mark the trip as delivered in Supabase
                     try await tripController.markTripAsDelivered(trip: trip)
                     print("Trip marked as delivered successfully")
+                    if let userID = await SupabaseDataController.shared.getUserID() {
+                        await SupabaseDataController.shared.updateDriverStatus(newStatus: .available, userID: userID, id: nil)
+                    }
+                    
                     
                     // Explicitly refresh trips to ensure data is updated
                     await tripController.refreshTrips()
