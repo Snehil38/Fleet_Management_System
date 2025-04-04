@@ -93,8 +93,7 @@ struct LoginView: View {
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
                     .padding(10)
-                    .background(Color(.systemGray6))
-                    .foregroundColor(.primary)
+                    .background(Color.white)
                     .cornerRadius(25)
                     .shadow(radius: 1)
                     .padding(.horizontal, 20)
@@ -111,8 +110,7 @@ struct LoginView: View {
                         }
                     }
                     .padding(10)
-                    .background(Color(.systemGray6))
-                    .foregroundColor(.primary)
+                    .background(Color.white)
                     .cornerRadius(25)
                     .shadow(radius: 1)
                     .padding(.horizontal, 20)
@@ -275,7 +273,6 @@ struct VerifyOTPView: View {
                 .keyboardType(.numberPad)
                 .padding()
                 .background(Color(.systemGray6))
-                .foregroundColor(.primary)
                 .cornerRadius(10)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.3)))
                 .padding(.horizontal, 20)
@@ -359,84 +356,6 @@ struct VerifyOTPView: View {
         }
     }
 }
-
-//struct ForgotPasswordView: View {
-//    @State private var email: String = ""
-//    @State private var newPassword: String = ""
-//    @State private var confirmPassword: String = ""
-//    @State private var isLoading: Bool = false
-//    @State private var showAlert: Bool = false
-//    @State private var alertMessage: String = ""
-//
-//    var body: some View {
-//        VStack(spacing: 20) {
-//            Text("Forgot Password")
-//                .font(.title)
-//                .fontWeight(.bold)
-//                .foregroundColor(Color.pink.opacity(0.5))
-//                .padding(.top, 20)
-//            
-//            TextField("Enter your email", text: $email)
-//                .keyboardType(.emailAddress)
-//                .autocapitalization(.none)
-//                .padding()
-//                .background(Color(.systemGray6))
-//                .foregroundColor(.primary)
-//                .cornerRadius(8)
-//            
-//            TextField("Enter new password", text: $newPassword)
-//                .autocapitalization(.none)
-//                .padding(10)
-//                .background(Color(.systemGray6))
-//                .foregroundColor(.primary)
-//                .cornerRadius(8)
-//            
-//            SecureField("Enter new password", text: $newPassword)
-//                .autocapitalization(.none)
-//                .padding(10)
-//                .background(Color(.systemGray6))
-//                .foregroundColor(.primary)
-//                .cornerRadius(8)
-//            
-//            SecureField("Confirm new password", text: $confirmPassword)
-//                .padding(10)
-//                .background(Color(.systemGray6))
-//                .foregroundColor(.primary)
-//                .cornerRadius(8)
-//            
-//            Button(action: {
-//                // Implement password reset logic here
-//            }) {
-//                Text("Reset Password")
-//                    .font(.headline)
-//                    .foregroundColor(.white)
-//                    .padding()
-//                    .frame(maxWidth: .infinity)
-//                    .background(Color.accentColor)
-//                    .cornerRadius(25)
-//                    .padding(.horizontal, 20)
-//            }
-//            .buttonStyle(PlainButtonStyle())
-//            .disabled(isLoading || !isValidEmail(email) || !isValidPassword(newPassword) || newPassword != confirmPassword)
-//            
-//            Spacer()
-//        }
-//        .padding()
-//        .alert(isPresented: $showAlert) {
-//            Alert(title: Text("Alert"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
-//        }
-//    }
-//    
-//    private func isValidEmail(_ email: String) -> Bool {
-//        let emailRegex = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
-//        return NSPredicate(format: "SELF MATCHES %@", emailRegex).evaluate(with: email)
-//    }
-//    
-//    private func isValidPassword(_ password: String) -> Bool {
-//        let passwordRegex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[#$@!%&*?])[A-Za-z\\d#$@!%&*?]{6,}$"
-//        return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
-//    }
-//}
 
 #Preview {
     RoleSelectionView()

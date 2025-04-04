@@ -203,6 +203,7 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         Task {
             if let userID = await SupabaseDataController.shared.getUserID() {
                 await dataStore.updateServiceRequestStatus(request, newStatus: .inProgress, userID: userID)
+                await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: .busy, userID: userID, id: nil)
             } else {
                 print("No userID found to assign the service request.")
             }
@@ -218,6 +219,13 @@ struct MaintenancePersonnelServiceRequestDetailView: View {
         Task {
             await dataStore.updateServiceRequestStatus(request, newStatus: .completed, userID: nil)
             await dataStore.addToServiceHistory(from: request)
+            if request.serviceType != .routine {
+                await SupabaseDataController.shared.updateVehicleStatus(newStatus: .inService, vehicleID: request.vehicleId)
+            } else {
+                await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: request.vehicleId)
+            }
+            guard let userID = await SupabaseDataController.shared.getUserID() else { return }
+            await SupabaseDataController.shared.updateMaintenancePersonnelStatus(newStatus: .available, userID: userID, id: nil)
         }
         alertMessage = "Service request marked as completed"
         showingAlert = true
@@ -415,7 +423,7 @@ struct ExpensesCard: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
@@ -537,7 +545,7 @@ struct MaintenanceVehicleRequestInfoCard: View {
             InfoRow(title: "Due Date", value: request.dueDate.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -603,7 +611,7 @@ struct MaintenanceServiceDetailsCard: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
@@ -645,7 +653,7 @@ struct MaintenanceSafetyChecksCard: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)

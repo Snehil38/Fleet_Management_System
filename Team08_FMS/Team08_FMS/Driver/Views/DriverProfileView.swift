@@ -23,7 +23,7 @@ struct DriverProfileView: View {
                             logoutButton
                         }
                         .padding()
-                        .background(Color(.systemBackground))
+                        .background(Color(.systemGroupedBackground))
                     }
                 } else {
                     ProgressView("Loading...")
@@ -119,7 +119,7 @@ struct DriverProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -130,19 +130,34 @@ struct DriverProfileView: View {
                 Text("Status")
                     .font(.headline)
                 Spacer()
-                Text(driver.status == .available ? "Available" : "Unavailable")
+                Text(AppDataController.shared.getStatusString(status: driver.status))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(driver.status == .available ? .green : .red)
+                    .foregroundColor(driver.status.color)
                 
                 Toggle("", isOn: statusToggleBinding(for: driver))
                     .tint(.green)
+                    .disabled(driver.status == .offDuty)
             }
             .padding(.horizontal)
+            
+            if driver.status == .offDuty {
+                Text("Your status will automatically change back to Available tomorrow.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .italic()
+            }
+            
+            else if driver.status == .busy {
+                Text("You cannot change status while you have a In-Progress Trip.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .italic()
+            }
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -159,7 +174,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Email", value: driver.email)
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -195,7 +210,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Expiry Date", value: driver.driverLicenseExpiry != nil ? formattedDate(driver.driverLicenseExpiry!) : "N/A")
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -213,7 +228,7 @@ struct DriverProfileView: View {
                 Divider()
                 infoRow(title: "Salary", value: "$\(driver.salary)")
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -230,7 +245,7 @@ struct DriverProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
@@ -250,7 +265,7 @@ struct DriverProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
         }
         .padding(.top, 20)

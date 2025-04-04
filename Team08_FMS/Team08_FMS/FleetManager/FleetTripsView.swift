@@ -321,7 +321,7 @@ struct TripCardView: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .onTapGesture {
@@ -1280,6 +1280,7 @@ struct AssignDriverView: View {
         // Filter to include digits and the decimal separator
         let numericDistanceString = trip.distance.filter { "0123456789.".contains($0) }
         if let distance = Double(numericDistanceString) {
+
             return distance > 500
         }
         return false
