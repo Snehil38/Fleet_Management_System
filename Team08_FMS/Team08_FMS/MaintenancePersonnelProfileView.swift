@@ -24,14 +24,14 @@ struct MaintenancePersonnelProfileView: View {
                             logoutButton
                         }
                         .padding()
-                        .background(Color(.systemBackground))
+                        .background(Color(.systemGroupedBackground))
                     }
                 } else {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                 }
             }
-            .background(Color(.systemBackground))
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -158,7 +158,7 @@ struct MaintenancePersonnelProfileView: View {
                 Divider()
                 infoRow(title: "Email", value: personnel.email)
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }

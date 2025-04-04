@@ -236,7 +236,7 @@ struct InspectionItemView: View {
                 Button(action: { item.isChecked.toggle() }) {
                     ZStack {
                         Circle()
-                            .fill(item.isChecked ? Color.green : Color(.tertiarySystemBackground))
+                            .fill(item.isChecked ? Color.green : Color(.systemBackground))
                             .frame(width: 28, height: 28)
                             .overlay(
                                 Circle()
@@ -253,7 +253,7 @@ struct InspectionItemView: View {
                 .buttonStyle(PlainButtonStyle())
             }
             .padding()
-            .background(Color(.tertiarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(10, corners: item.isChecked && item.hasIssue ? [.topLeft, .topRight] : .allCorners)
 
             // Issue section (only shown when checked)
@@ -286,7 +286,7 @@ struct InspectionItemView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 12)
                 }
-                .background(Color(.tertiarySystemBackground))
+                .background(Color(.systemBackground))
                 .cornerRadius(10, corners: item.hasIssue ? [.bottomLeft, .bottomRight] : .allCorners)
             }
 
@@ -302,7 +302,7 @@ struct InspectionItemView: View {
                     TextField("Describe the issue...", text: $item.notes, axis: .vertical)
                         .lineLimit(4)
                         .padding(12)
-                        .background(Color(.tertiarySystemBackground))
+                        .background(Color(.systemGray6))
                         .cornerRadius(8)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -310,7 +310,7 @@ struct InspectionItemView: View {
                         )
                 }
                 .padding()
-                .background(Color(.tertiarySystemBackground))
+                .background(Color(.systemBackground))
                 .cornerRadius(10, corners: [.bottomLeft, .bottomRight])
             }
         }

@@ -23,7 +23,7 @@ struct DriverProfileView: View {
                             logoutButton
                         }
                         .padding()
-                        .background(Color(.systemBackground))
+                        .background(Color(.systemGroupedBackground))
                     }
                 } else {
                     ProgressView("Loading...")
