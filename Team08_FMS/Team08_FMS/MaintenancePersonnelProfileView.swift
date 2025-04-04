@@ -24,14 +24,14 @@ struct MaintenancePersonnelProfileView: View {
                             logoutButton
                         }
                         .padding()
-                        .background(Color(.systemBackground))
+                        .background(Color(.systemGroupedBackground))
                     }
                 } else {
                     ProgressView("Loading...")
                         .progressViewStyle(CircularProgressViewStyle(tint: .blue))
                 }
             }
-            .background(Color(.systemBackground))
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -104,7 +104,7 @@ struct MaintenancePersonnelProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -133,7 +133,7 @@ struct MaintenancePersonnelProfileView: View {
                     .italic()
             }
             else if personnel.status == .busy {
-                Text("You cannot change status while you have an In-Progress Maintenance.")
+                Text("You cannot change status while you have a In-Progress Maintenance.")
                     .font(.caption)
                     .foregroundColor(.gray)
                     .italic()
@@ -141,7 +141,7 @@ struct MaintenancePersonnelProfileView: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemBackground))
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -158,7 +158,7 @@ struct MaintenancePersonnelProfileView: View {
                 Divider()
                 infoRow(title: "Email", value: personnel.email)
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -175,7 +175,7 @@ struct MaintenancePersonnelProfileView: View {
                 infoRow(title: "Experience", value: "\(personnel.yearsOfExperience) Years")
                 Divider()
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
@@ -192,7 +192,7 @@ struct MaintenancePersonnelProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
@@ -212,7 +212,7 @@ struct MaintenancePersonnelProfileView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.systemBackground))
             .cornerRadius(20)
         }
         .padding(.top, 20)

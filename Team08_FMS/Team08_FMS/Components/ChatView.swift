@@ -162,7 +162,6 @@ struct ChatView: View {
                             .foregroundColor(.secondary)
                         Text(data["vehicleName"] ?? "")
                             .font(.headline)
-                            .foregroundColor(.primary)
                     }
                     Spacer()
                     Text(data["status"] ?? "")
@@ -185,7 +184,6 @@ struct ChatView: View {
                                 .foregroundColor(.secondary)
                             Text(data["destination"] ?? "")
                                 .font(.headline)
-                                .foregroundColor(.primary)
                         }
                         Spacer()
                         Text(data["status"] ?? "")
@@ -200,7 +198,7 @@ struct ChatView: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.systemGray6))
     }
     
     private var chatHeader: some View {

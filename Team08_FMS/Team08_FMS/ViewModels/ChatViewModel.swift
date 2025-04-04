@@ -147,9 +147,6 @@ final class ChatViewModel: ObservableObject {
                         }
                     }
                     await self.fetchNewMessages()
-                } catch {
-                    print("❌ Error handling message update: \(error)")
-                    self.error = error
                 }
             }
         }
@@ -587,7 +584,7 @@ final class ChatViewModel: ObservableObject {
             
             print("Sending message with image URL: \(urlString)")
             
-            let response = try await supabaseDataController.supabase.database
+            let response = try await supabaseDataController.supabase
                 .from("chat_messages")
                 .insert(message)
                 .select()
