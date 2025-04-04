@@ -130,15 +130,30 @@ struct DriverProfileView: View {
                 Text("Status")
                     .font(.headline)
                 Spacer()
-                Text(driver.status == .available ? "Available" : "Unavailable")
+                Text(AppDataController.shared.getStatusString(status: driver.status))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(driver.status == .available ? .green : .red)
+                    .foregroundColor(driver.status.color)
                 
                 Toggle("", isOn: statusToggleBinding(for: driver))
                     .tint(.green)
+                    .disabled(driver.status == .offDuty)
             }
             .padding(.horizontal)
+            
+            if driver.status == .offDuty {
+                Text("Your status will automatically change back to Available tomorrow.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .italic()
+            }
+            
+            else if driver.status == .busy {
+                Text("You cannot change status while you have a In-Progress Trip.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .italic()
+            }
         }
         .padding()
         .frame(maxWidth: .infinity)
