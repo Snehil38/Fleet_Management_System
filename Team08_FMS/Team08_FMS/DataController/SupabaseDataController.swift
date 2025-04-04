@@ -38,7 +38,7 @@ class SupabaseDataController: ObservableObject {
     @Published var userID: UUID?
     @Published var otpVerified: Bool = false
     
-    @Published var is2faEnabled: Bool = true
+    @Published var is2faEnabled: Bool = false
     
     @Published var roleMatched: Bool = false
     @Published var isGenPass: Bool = false
