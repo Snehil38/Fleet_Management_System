@@ -1277,10 +1277,10 @@ struct AssignDriverView: View {
     
     // If the trip distance is greater than 500, it's considered a long trip.
     private var isLongTrip: Bool {
-        // Extract numeric value from distance string
-        let numericDistance = trip.distance.components(separatedBy: CharacterSet.decimalDigits.inverted)
-            .joined()
-        if let distance = Double(numericDistance) {
+        // Filter to include digits and the decimal separator
+        let numericDistanceString = trip.distance.filter { "0123456789.".contains($0) }
+        if let distance = Double(numericDistanceString) {
+
             return distance > 500
         }
         return false
