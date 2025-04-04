@@ -307,6 +307,7 @@ struct DriverTabView: View {
         .sheet(isPresented: $showingDeliveryDetails) {
             if let delivery = selectedDelivery {
                 DeliveryDetailsView(delivery: delivery)
+                
             }
         }
     }
@@ -1326,22 +1327,22 @@ struct DeliveryDetailsView: View {
                     DetailRow(icon: "checkmark.circle.fill", title: "Status", value: delivery.status)
                 }
                 
-                // Route Details Section
-                Section(header: Text("Route Details")) {
-                    if let startPoint = parsedNotes["From"] {
-                        DetailRow(icon: "arrow.up.circle.fill", title: "Starting Point", value: startPoint)
-                    }
-                    if let distance = parsedNotes["Distance"] {
-                        DetailRow(icon: "arrow.left.and.right", title: "Distance", value: distance)
-                    }
-                }
-                
-                // Cargo Section
-                Section(header: Text("Cargo Information")) {
-                    if let cargo = parsedNotes["Cargo"] {
-                        DetailRow(icon: "box.truck.fill", title: "Cargo Type", value: cargo)
-                    }
-                }
+//                // Route Details Section
+//                Section(header: Text("Route Details")) {
+//                    if let startPoint = parsedNotes["From"] {
+//                        DetailRow(icon: "arrow.up.circle.fill", title: "Starting Point", value: startPoint)
+//                    }
+//                    if let distance = parsedNotes["Distance"] {
+//                        DetailRow(icon: "arrow.left.and.right", title: "Distance", value: distance)
+//                    }
+//                }
+//                
+//                // Cargo Section
+//                Section(header: Text("Cargo Information")) {
+//                    if let cargo = parsedNotes["Cargo"] {
+//                        DetailRow(icon: "box.truck.fill", title: "Cargo Type", value: cargo)
+//                    }
+//                }
                 
                 // Vehicle & Driver Info Section
                 Section(header: Text("Vehicle")) {
