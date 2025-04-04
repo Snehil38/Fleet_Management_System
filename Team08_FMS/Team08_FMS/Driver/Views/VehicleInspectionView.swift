@@ -192,7 +192,7 @@ struct VehicleInspectionView: View {
                         // Call the async insertion function.
                         Task {
                             do {
-                                if isPreTrip {
+                                if isPreTrip && hasIssues {
                                     await SupabaseDataController.shared.updateVehicleStatus(newStatus: .underMaintenance, vehicleID: trip.vehicleDetails.id)
                                 }
                                 try await SupabaseDataController.shared.insertServiceRequest(request: newRequest)

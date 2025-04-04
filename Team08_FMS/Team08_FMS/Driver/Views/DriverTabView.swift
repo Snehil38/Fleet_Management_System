@@ -538,10 +538,10 @@ struct DriverTabView: View {
                             .multilineTextAlignment(.center)
                     }
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.gray.opacity(0.2))
+                    .background(Color.orange)
                     .cornerRadius(10)
                 }
             }
