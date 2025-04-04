@@ -487,35 +487,35 @@ struct TripDetailsView: View {
                         TripDetailRow(icon: "checkmark.shield.fill", title: "Post-Trip Inspection", value: "Completed")
                     }
                     
-                    Section(header: Text("PROOF OF DELIVERY")) {
-                        Button(action: {
-                            generateDeliveryReceipt()
-                        }) {
-                            HStack {
-                                Image(systemName: "doc.text.fill")
-                                    .foregroundColor(.blue)
-                                Text("Delivery Receipt")
-                                    .foregroundColor(.blue)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        Button(action: {
-                            generateChatHistoryPDF()
-                        }) {
-                            HStack {
-                                Image(systemName: "bubble.left.and.bubble.right.fill")
-                                    .foregroundColor(.blue)
-                                Text("Chat History")
-                                    .foregroundColor(.blue)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                    }
+//                    Section(header: Text("PROOF OF DELIVERY")) {
+//                        Button(action: {
+//                            generateDeliveryReceipt()
+//                        }) {
+//                            HStack {
+//                                Image(systemName: "doc.text.fill")
+//                                    .foregroundColor(.blue)
+//                                Text("Delivery Receipt")
+//                                    .foregroundColor(.blue)
+//                                Spacer()
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                        
+//                        Button(action: {
+//                            generateChatHistoryPDF()
+//                        }) {
+//                            HStack {
+//                                Image(systemName: "bubble.left.and.bubble.right.fill")
+//                                    .foregroundColor(.blue)
+//                                Text("Chat History")
+//                                    .foregroundColor(.blue)
+//                                Spacer()
+//                                Image(systemName: "chevron.right")
+//                                    .foregroundColor(.gray)
+//                            }
+//                        }
+//                    }
                 } else {
                     // Status section for non-completed trips
                     Section(header: Text("Status")) {

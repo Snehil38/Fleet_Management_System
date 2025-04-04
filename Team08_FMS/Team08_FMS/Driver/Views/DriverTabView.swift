@@ -1537,6 +1537,7 @@ struct SOSModalView: View {
     @Binding var isPresented: Bool
     @StateObject private var profileManager = ProfileManager.shared
     @State private var emergencySubject: String = ""
+    @Environment(\.openURL) var openURL
     @State private var showingAlert = false
     @State private var alertMessage = ""
     @State private var showingChat = false
@@ -1593,8 +1594,20 @@ struct SOSModalView: View {
                             alertMessage = "Please enter emergency details"
                             showingAlert = true
                         } else {
-                            // Handle emergency contact
-                            // This would trigger the phone call
+                            // Attempt to call the fleet manager using their phone number
+                            guard let phone = profileManager.fleetManager?.phoneNumber,
+                                  let url = URL(string: "tel://\(phone)") else {
+                                alertMessage = "Fleet manager phone number is not available"
+                                showingAlert = true
+                                return
+                            }
+                            
+                            if UIApplication.shared.canOpenURL(url) {
+                                openURL(url)
+                            } else {
+                                alertMessage = "Unable to initiate call"
+                                showingAlert = true
+                            }
                         }
                     }) {
                         HStack {
