@@ -133,7 +133,7 @@ struct MaintenancePersonnelProfileView: View {
                     .italic()
             }
             else if personnel.status == .busy {
-                Text("You cannot change status while you have an In-Progress Maintenance.")
+                Text("You cannot change status while you have a In-Progress Maintenance.")
                     .font(.caption)
                     .foregroundColor(.gray)
                     .italic()
