@@ -201,6 +201,7 @@ struct DriverTabView: View {
                         }
                         .refreshable {
                             await tripController.refreshTrips()
+                            await tripController.refreshAllTrips()
                         }
                     }
                 }

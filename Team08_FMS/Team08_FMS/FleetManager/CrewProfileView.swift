@@ -234,14 +234,16 @@ struct CrewProfileView: View {
             
             // Delete Section.
             Section {
-                Button(role: .destructive) {
-                    showingDeleteAlert = true
-                } label: {
-                    HStack {
-                        Spacer()
-                        Image(systemName: "trash")
-                        Text("Delete \(role)")
-                        Spacer()
+                if crewMember.status != .busy {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "trash")
+                            Text("Delete \(role)")
+                            Spacer()
+                        }
                     }
                 }
             }
