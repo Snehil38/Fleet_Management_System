@@ -108,6 +108,9 @@ struct ChatBubbleView: View {
                                             .scaledToFit()
                                             .frame(maxWidth: 200, maxHeight: 200)
                                             .cornerRadius(8)
+                                            .onAppear {
+                                                print("Image loaded successfully")
+                                            }
                                     } else {
                                         if isImageLoading {
                                             ProgressView()
@@ -117,6 +120,7 @@ struct ChatBubbleView: View {
                                                 .frame(width: 200, height: 200)
                                                 .cornerRadius(8)
                                                 .onAppear {
+                                                    print("Loading image from URL: \(attachmentUrl)")
                                                     loadImage(from: attachmentUrl)
                                                 }
                                         }
@@ -129,6 +133,7 @@ struct ChatBubbleView: View {
                                 // Voice note message
                                 Button(action: {
                                     if let url = URL(string: attachmentUrl) {
+                                        print("Playing audio from URL: \(attachmentUrl)")
                                         audioPlayer.play(url: url)
                                     }
                                 }) {
@@ -271,19 +276,42 @@ struct ChatBubbleView: View {
     }
     
     private func loadImage(from urlString: String) {
-        guard let url = URL(string: urlString) else { return }
+        guard let url = URL(string: urlString) else {
+            print("Invalid image URL: \(urlString)")
+            return
+        }
         
         isImageLoading = true
+        print("Starting image download from: \(urlString)")
         
         Task {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let (data, response) = try await URLSession.shared.data(from: url)
+                
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    print("Invalid response or status code")
+                    await MainActor.run {
+                        self.isImageLoading = false
+                    }
+                    return
+                }
+                
+                guard let _ = UIImage(data: data) else {
+                    print("Invalid image data received")
+                    await MainActor.run {
+                        self.isImageLoading = false
+                    }
+                    return
+                }
+                
+                print("Image downloaded successfully")
                 await MainActor.run {
                     self.imageData = data
                     self.isImageLoading = false
                 }
             } catch {
-                print("Error loading image: \(error)")
+                print("Error loading image: \(error.localizedDescription)")
                 await MainActor.run {
                     self.isImageLoading = false
                 }

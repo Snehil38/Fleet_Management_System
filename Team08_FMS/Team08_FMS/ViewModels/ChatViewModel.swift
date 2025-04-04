@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 import UserNotifications
 @preconcurrency import Supabase
+import PostgREST
 
 private struct MessagePayload: Encodable {
     let id: String
@@ -177,7 +178,7 @@ final class ChatViewModel: ObservableObject {
         currentLoadTask?.cancel()
         
         // Create new load task
-        currentLoadTask = Task { @MainActor in
+        let task = Task { @MainActor in
             self.isLoading = true
             var retryCount = 0
             
@@ -208,9 +209,21 @@ final class ChatViewModel: ObservableObject {
                             .or("and(fleet_manager_id.eq.\(recipientId.uuidString),recipient_id.eq.\(currentUserId.uuidString)),and(fleet_manager_id.eq.\(currentUserId.uuidString),recipient_id.eq.\(recipientId.uuidString))")
                     }
                     
+                    // Check if task is cancelled before making the request
+                    if Task.isCancelled {
+                        print("Load messages task was cancelled")
+                        return
+                    }
+                    
                     let response = try await query
                         .order("created_at", ascending: true)
                         .execute()
+                    
+                    // Check again if task is cancelled after the request
+                    if Task.isCancelled {
+                        print("Load messages task was cancelled after fetch")
+                        return
+                    }
                     
                     let decoder = JSONDecoder()
                     decoder.dateDecodingStrategy = .custom { decoder in
@@ -252,6 +265,12 @@ final class ChatViewModel: ObservableObject {
                         fetchedMessages[index] = message
                     }
                     
+                    // Final cancellation check before updating UI
+                    if Task.isCancelled {
+                        print("Load messages task was cancelled before UI update")
+                        return
+                    }
+                    
                     await MainActor.run {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             self.messages = fetchedMessages
@@ -263,6 +282,11 @@ final class ChatViewModel: ObservableObject {
                     break
                     
                 } catch {
+                    if Task.isCancelled {
+                        print("Load messages task was cancelled during error handling")
+                        return
+                    }
+                    
                     print("Error loading messages: \(error)")
                     retryCount += 1
                     if retryCount == maxRetries {
@@ -274,6 +298,8 @@ final class ChatViewModel: ObservableObject {
                 }
             }
         }
+        
+        currentLoadTask = task
     }
     
     private func fetchNewMessages() async {
@@ -492,7 +518,24 @@ final class ChatViewModel: ObservableObject {
                 print("Bucket already exists: \(storageBucket)")
             } catch {
                 print("Bucket does not exist, creating: \(storageBucket)")
-                // Create the bucket with public access and specific mime types
+                
+                // Convert array to JSON string for allowed_mime_types
+                let mimeTypes = ["image/jpeg", "image/png", "audio/m4a", "audio/mpeg", "audio/mp4"]
+                let mimeTypesJson = try String(data: JSONEncoder().encode(mimeTypes), encoding: .utf8) ?? "[]"
+                
+                // First create the bucket in the storage.buckets table
+                try await supabaseDataController.supabase.database
+                    .from("storage.buckets")
+                    .insert([
+                        "id": storageBucket,
+                        "name": storageBucket,
+                        "public": "true",
+                        "file_size_limit": "10485760",
+                        "allowed_mime_types": mimeTypesJson
+                    ])
+                    .execute()
+                
+                // Then create the bucket in storage
                 try await storageClient.createBucket(
                     storageBucket,
                     options: BucketOptions(
@@ -504,14 +547,17 @@ final class ChatViewModel: ObservableObject {
                 print("Successfully created bucket: \(storageBucket)")
             }
         } catch {
-            print("Error managing storage bucket: \(error)")
-            // Don't throw the error, just log it - the bucket might already exist
+            print("Error managing storage bucket: \(error.localizedDescription)")
+            // Don't throw the error, just log it - the bucket might already exist in the database
             print("Attempting to proceed with upload anyway...")
         }
     }
     
     func sendImage(_ image: UIImage) async {
         do {
+            // First ensure the bucket exists
+            try await createStorageBucketIfNeeded()
+            
             // Ensure image is not too large (max 10MB)
             var compressionQuality: CGFloat = 0.7
             var imageData = image.jpegData(compressionQuality: compressionQuality)
@@ -526,18 +572,27 @@ final class ChatViewModel: ObservableObject {
                 return
             }
             
-            let fileName = "\(UUID().uuidString).jpg"
+            guard let currentUserId = await supabaseDataController.getUserID() else {
+                print("No user ID found")
+                return
+            }
             
-            // Upload image to storage
+            let fileName = "chat/\(UUID().uuidString).jpg"
+            print("Attempting to upload file: \(fileName) to bucket: \(storageBucket)")
+            
+            // Upload the file to storage
             try await storageClient
                 .from(storageBucket)
                 .upload(
                     path: fileName,
                     file: finalImageData,
                     options: FileOptions(
-                        contentType: "image/jpeg"
+                        contentType: "image/jpeg",
+                        upsert: true
                     )
                 )
+            
+            print("Successfully uploaded image, getting public URL...")
             
             // Get the public URL
             let publicURL = try await storageClient
@@ -547,11 +602,7 @@ final class ChatViewModel: ObservableObject {
                     expiresIn: 365 * 24 * 60 * 60 // 1 year in seconds
                 )
             
-            // Send message with image attachment
-            guard let currentUserId = await supabaseDataController.getUserID() else {
-                print("No user ID found")
-                return
-            }
+            print("Got public URL: \(publicURL.absoluteString)")
             
             let userRole = supabaseDataController.userRole
             let (messageFleetManagerId, messageRecipientId): (UUID, UUID)
@@ -584,7 +635,7 @@ final class ChatViewModel: ObservableObject {
             
             print("Sending message with image URL: \(urlString)")
             
-            let response = try await supabaseDataController.supabase
+            let response = try await supabaseDataController.supabase.database
                 .from("chat_messages")
                 .insert(message)
                 .select()
@@ -620,8 +671,13 @@ final class ChatViewModel: ObservableObject {
     
     func sendVoiceNote(_ audioURL: URL) async {
         do {
+            // First ensure the bucket exists
+            try await createStorageBucketIfNeeded()
+            
+            print("Reading audio file from: \(audioURL)")
             // Read audio file data
             let audioData = try Data(contentsOf: audioURL)
+            print("Audio data size: \(audioData.count) bytes")
             
             guard let currentUserId = await supabaseDataController.getUserID() else {
                 print("No user ID found")
@@ -629,7 +685,7 @@ final class ChatViewModel: ObservableObject {
             }
             
             let fileName = "chat/\(UUID().uuidString).m4a"
-            print("Attempting to upload voice note: \(fileName)")
+            print("Attempting to upload voice note: \(fileName) to bucket: \(storageBucket)")
             
             // Upload the file to storage
             try await storageClient
@@ -645,7 +701,7 @@ final class ChatViewModel: ObservableObject {
             
             print("Successfully uploaded voice note, getting public URL...")
             
-            // Get the public URL
+            // Get the public URL with a longer expiration
             let publicURL = try await storageClient
                 .from(storageBucket)
                 .createSignedURL(
@@ -656,6 +712,7 @@ final class ChatViewModel: ObservableObject {
             print("Got public URL: \(publicURL.absoluteString)")
             
             let userRole = supabaseDataController.userRole
+            print("Current user role: \(userRole ?? "unknown")")
             let (messageFleetManagerId, messageRecipientId): (UUID, UUID)
             
             if userRole == "fleet_manager" {
@@ -716,6 +773,15 @@ final class ChatViewModel: ObservableObject {
             
         } catch {
             print("Error sending voice note: \(error.localizedDescription)")
+            if let urlError = error as? URLError {
+                print("URL Error code: \(urlError.code.rawValue)")
+                print("URL Error description: \(urlError.localizedDescription)")
+                print("Failed URL: \(urlError.failureURLString ?? "unknown URL")")
+            } else if let postgrestError = error as? PostgrestError {
+                print("Database error: \(postgrestError.localizedDescription)")
+            } else if let storageError = error as? StorageError {
+                print("Storage error: \(storageError.localizedDescription)")
+            }
             self.error = error
         }
     }
