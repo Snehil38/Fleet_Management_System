@@ -248,11 +248,9 @@ final class ChatViewModel: ObservableObject {
                         if userRole == "fleet_manager" {
                             // For fleet manager: message is from current user if fleet_manager_id matches currentUserId
                             message.isFromCurrentUser = message.fleet_manager_id == currentUserId
-                            print("Message \(message.id): FM_ID=\(message.fleet_manager_id), isFromCurrentUser=\(message.isFromCurrentUser)")
                         } else {
-                            // For others: message is from current user if recipient_id is NOT currentUserId
-                            message.isFromCurrentUser = message.recipient_id != currentUserId
-                            print("Message \(message.id): R_ID=\(message.recipient_id), isFromCurrentUser=\(message.isFromCurrentUser)")
+                            // For others: message is from current user if fleet_manager_id is NOT currentUserId
+                            message.isFromCurrentUser = message.fleet_manager_id != currentUserId
                         }
                         fetchedMessages[index] = message
                     }
@@ -340,7 +338,7 @@ final class ChatViewModel: ObservableObject {
                             if userRole == "fleet_manager" {
                                 message.isFromCurrentUser = message.fleet_manager_id.uuidString == currentUserId.uuidString
                             } else {
-                                message.isFromCurrentUser = message.recipient_id.uuidString != currentUserId.uuidString
+                                message.isFromCurrentUser = message.fleet_manager_id.uuidString != currentUserId.uuidString
                             }
                             
                             self.messages.append(message)
