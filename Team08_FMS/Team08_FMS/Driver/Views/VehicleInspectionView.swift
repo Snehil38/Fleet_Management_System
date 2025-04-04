@@ -192,11 +192,15 @@ struct VehicleInspectionView: View {
                         // Call the async insertion function.
                         Task {
                             do {
-                                if isPreTrip && hasIssues {
-                                    await SupabaseDataController.shared.updateVehicleStatus(newStatus: .underMaintenance, vehicleID: trip.vehicleDetails.id)
+                                if hasIssues {
+                                    if isPreTrip {
+                                        await SupabaseDataController.shared.updateVehicleStatus(newStatus: .underMaintenance, vehicleID: trip.vehicleDetails.id)
+                                    }
+                                    try await SupabaseDataController.shared.insertServiceRequest(request: newRequest)
+                                    print("Maintenance service request inserted successfully.")
+                                } else {
+                                    await SupabaseDataController.shared.updateVehicleStatus(newStatus: .available, vehicleID: trip.vehicleDetails.id)
                                 }
-                                try await SupabaseDataController.shared.insertServiceRequest(request: newRequest)
-                                print("Maintenance service request inserted successfully.")
                             } catch {
                                 print("Error inserting maintenance request: \(error)")
                             }

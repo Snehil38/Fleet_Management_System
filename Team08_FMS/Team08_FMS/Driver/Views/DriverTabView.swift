@@ -539,10 +539,11 @@ struct DriverTabView: View {
                             .multilineTextAlignment(.center)
                     }
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .disabled(trip.hasCompletedPreTrip)
+                    .foregroundColor(!trip.hasCompletedPreTrip ? Color.white : Color.gray)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.orange)
+                    .background(!trip.hasCompletedPreTrip ? Color.orange : Color.gray.opacity(0.3))
                     .cornerRadius(10)
                 }
             }
