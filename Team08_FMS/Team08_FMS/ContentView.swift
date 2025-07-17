@@ -8,29 +8,41 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var auth = SupabaseDataController.shared  // Observing changes
+    @EnvironmentObject private var auth: SupabaseDataController
 
     var body: some View {
         VStack {
             if !auth.isAuthenticated {
-                LoginView()
+                RoleSelectionView()
             } else {
-                switch auth.userRole {
-                case "fleet_manager":
-                    FleetManagerDashboardView()
-                case "driver":
-                    DriverDashboardView()
-                case "maintenance_personnel":
-                    MaintenancePersonnelDashboardView()
-                default:
-                    LoginView() // Handles unknown role case
+                if let userID = auth.userID, auth.isGenPass {
+                    ResetGeneratedPasswordView(userID: userID)
+                } else {
+                    switch auth.userRole {
+                    case "fleet_manager":
+                        FleetManagerTabView()
+                    case "driver":
+                        if let userID = auth.userID {
+                            DriverTabView(driverId: userID)
+                        }
+                    case "maintenance_personnel":
+                        MaintenancePersonnelDashboardView()
+                    default:
+                        RoleSelectionView()
+                    }
                 }
             }
         }
-        .animation(.easeInOut, value: auth.isAuthenticated) // Smooth transition
+        .animation(.easeInOut, value: auth.isAuthenticated)
+        .task {
+            await auth.autoLogin()
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(SupabaseDataController.shared)
+        .environmentObject(VehicleManager.shared)
+        .environmentObject(CrewDataController.shared)
 }
